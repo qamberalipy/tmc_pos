@@ -1,87 +1,42 @@
-# Byte-compiled / optimized / DLL files
+# Python cache
 __pycache__/
 *.py[cod]
-*$py.class
-
-# Flask instance folder
-instance/
-.env
-*.env
-
-# Environment variables
-.env.*
-*.secret
-
-# Flask-specific
-*.log
-*.db
-*.sqlite3
+*.pyo
+*.pyd
 
 # Virtual environment
 venv/
-ENV/
 env/
-.venv/
-.Python
 
-# Pytest / Coverage
-htmlcov/
-.tox/
-.nox/
-.coverage
-coverage.*
-.cache
-nosetests.xml
-pytest_cache/
-.testmondata
+# Environment variables & secrets
+.env
+key.py
 
-# mypy / pylint / flake8 / etc.
-.mypy_cache/
-.dmypy.json
-.pyre/
-.pytype/
-pylint-report.txt
-pylint-global.txt
-
-# IDEs and editors
+# IDE/editor files
 .vscode/
 .idea/
 *.sublime-project
 *.sublime-workspace
 
-# macOS / Windows
+# OS files
 .DS_Store
 Thumbs.db
 
-# Jupyter Notebooks
-.ipynb_checkpoints
+# Bytecode/misc
+*.bak
+*.log
+*.swp
 
-# Build artifacts
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
+# Flask migrations
+migrations/__pycache__/
+migrations/versions/*.pyc
+
+# SQLite DB (if used)
+*.sqlite
+*.db
+
+# Compiled files
+*.so
 *.egg-info/
-.installed.cfg
-*.egg
-
-# AWS / GCP credentials or config (optional)
-.aws/
-.gcp/
-
-# Docker (if using)
-*.pid
-docker-compose.override.yml
-
-# Node (if you use frontend with Node)
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+dist/
+build/
