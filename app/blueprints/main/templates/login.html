@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <link href="https://fonts.googleapis.com/css2?family=Cambria:wght@300;400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{{ url_for('main.static', filename='main/css/login.css') }}">
+  <link rel="stylesheet" href="{{ url_for('main.static', filename='main/css/style.css') }}">
+  <style>
+    .flash {
+      position: relative;
+      padding: 10px 40px 10px 10px;
+      margin: 10px 0;
+      border-radius: 4px;
+      font-weight: bold;
+      text-align: center;
+    }
+
+    .flash.success {
+      background-color: #d4edda;
+      color: #155724;
+    }
+
+    .flash.error {
+      background-color: #f8d7da;
+      color: #721c24;
+    }
+
+    .close-btn {
+      position: absolute;
+      right: 12px;
+      top: 9px;
+      cursor: pointer;
+      font-size: 20px;
+      line-height: 20px;
+      color: #000;
+    }
+  </style>
+</head>
+
+<body>
+  <section class="background-texture"></section>
+  <div class="card-container">
+
+
+    <form class="form" method="POST" action="{{ url_for('main.login') }}">
+      <div class="img-div">
+        <img src="{{ url_for('static', filename='fulllogo.png') }}" alt="Logo" />
+      </div>
+      <input type="email" name="email" placeholder="Email" required pattern="^[^@\s]+@[^@\s]+\.[^@\s]+$" />
+      <input type="password" name="password" placeholder="Password" required />
+      {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+      {% for category, message in messages %}
+      <div class="flash {{ category }}">
+        <span class="close-btn" onclick="this.parentElement.style.display='none';">&times;</span>
+        {{ message }}
+      </div>
+      {% endfor %}
+      {% endif %}
+      {% endwith %}
+
+      <button type="submit">SIGN IN</button>
+    </form>
+
+    <footer>
+      Don’t have an account?
+      <a href="#">Sign Up here</a>
+    </footer>
+  </div>
+</body>
+
+</html>

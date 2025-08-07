@@ -1,0 +1,166 @@
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bootstrap Admin Layout</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" integrity="sha384-4LISF5TTJX/fLmGSxO53rV4miRxdg84mZsxmO8Rx5jGtp/LbrixFETvWa5a6sESd" crossorigin="anonymous">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+
+<body>
+
+  <!-- header -->
+  <header id="header" class="header fixed-top d-flex align-items-center">
+
+    <div class="d-flex align-items-center justify-content-between">
+      <a href="#" class="logo d-flex align-items-center">
+        <img src="{{ url_for('static', filename='fulllogo.png') }}" alt="logo" width="200px" height="40px">
+
+      </a>
+      <i class="bi bi-list toggle-sidebar-btn"></i>
+    </div>
+
+    <nav class="header-nav ms-auto">
+      <ul class="d-flex align-items-center">
+        <li class="nav-item dropdown pe-3">
+          <a class="nav-link nav-profile d-flex align-items-center pe-0" href="#" data-bs-toggle="dropdown">
+            <img src="https://dummyimage.com/400x400/444444/d3d3d3.png" alt="avatar" class="rounded-circle">
+            <span class="d-none d-md-block dropdown-toggle ps-2">Bhuvanesh</span>
+          </a>
+          <ul class="dropdown-menu dropdown-menu-end dropdown-menu-arrow profile">
+            <li class="dropdown-header">
+              <h6>Bhuvanesh</h6>
+              <span>Software Developer</span>
+            </li>
+            <li>
+              <hr class="dropdown-divider">
+            </li>
+            <li>
+              <a class="dropdown-item d-flex align-items-center" href="#">
+                <i class="bi bi-person"></i>
+                <span>My Profile</span>
+              </a>
+            </li>
+            <li>
+              <hr class="dropdown-divider">
+            </li>
+            <li>
+              <a class="dropdown-item d-flex align-items-center" href="#">
+                <i class="bi bi-gear"></i>
+                <span>Account Settings</span>
+              </a>
+            </li>
+            <li>
+              <hr class="dropdown-divider">
+            </li>
+            <li>
+              <a class="dropdown-item d-flex align-items-center" href="#">
+                <i class="bi bi-box-arrow-right"></i>
+                <span>Sign Out</span>
+              </a>
+            </li>
+          </ul>
+        </li>
+      </ul>
+    </nav>
+  </header> <!-- header ends -->
+
+  <!-- sidebar -->
+  <aside id="sidebar" class="sidebar">
+    <ul class="sidebar-nav" id="sidebar-nav">
+      <li class="nav-item">
+        <a href="#" class="nav-link active">
+          <i class="bi bi-house-door-fill"></i>
+          <span>Dashboard</span>
+        </a>
+      </li>
+
+      <li class="nav-item">
+        <a href="#" class="nav-link">
+          <i class="bi bi-amd"></i>
+          <span>AMD</span>
+        </a>
+      </li>
+
+      <li class="nav-item">
+        <a href="#" class="nav-link">
+          <i class="bi bi-alexa"></i>
+          <span>Alexa</span>
+        </a>
+      </li>
+
+      <li class="nav-item">
+        <a href="#" class="nav-link">
+          <i class="bi bi-amazon"></i>
+          <span>Amazon</span>
+        </a>
+      </li>
+
+      <li class="nav-heading">Settings</li>
+
+      <li class="nav-item">
+        <a href="#" class="nav-link">
+          <i class="bi bi-alipay"></i>
+          <span>Alipay</span>
+        </a>
+      </li>
+    </ul>
+  </aside> <!-- sidebar ends -->
+
+  <!-- main -->
+  <main id="main">
+    <div class="container-fluid table-index">
+      <div class="row g-3 justify-content-between mb-3">
+        <div class="col-md-4">
+          <h5>Dashboard</h5>
+        </div>
+      </div>
+
+      <section class="dash-overview">
+        <div class="row g-4">
+          <div class="col-lg-2 col-md-3 col-sm-4">
+            <a href="#" class="card">
+              <h1>10</h1>
+              <p>AMD</p>
+            </a>
+          </div>
+          <div class="col-lg-2 col-md-3 col-sm-4">
+            <a href="#" class="card">
+              <h1>20</h1>
+              <p>Alexa</p>
+            </a>
+          </div>
+          <div class="col-lg-2 col-md-3 col-sm-4">
+            <a href="#" class="card">
+              <h1>300</h1>
+              <p>Amazon</p>
+            </a>
+          </div>
+          <div class="col-lg-2 col-md-3 col-sm-4">
+            <a href="#" class="card">
+              <h1>25</h1>
+              <p>Alipay</p>
+            </a>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main> <!-- main ends -->
+
+  <div id="loader"></div>
+
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
+<script>$(document).ready(function () {
+  $("#loader").hide();
+
+  $(document).on("click", ".toggle-sidebar-btn", function () {
+    $("body").toggleClass("toggle-sidebar");
+  });
+});
+</script>
+</body>
+
+</html>

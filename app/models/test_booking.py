@@ -13,8 +13,8 @@ class TestBooking(db.Model):
     dob = db.Column(db.Date)
 
     referred_dr_id = db.Column(db.Integer)
-    branch_id = db.Column(db.Integer, db.ForeignKey('branch.id'))
-    create_by = db.Column(db.Integer, db.ForeignKey('user.id'))
+    branch_id = db.Column(db.Integer)
+    create_by = db.Column(db.Integer)
 
     create_at = db.Column(db.DateTime, default=datetime.utcnow)
     discount_type = db.Column(db.String(225))

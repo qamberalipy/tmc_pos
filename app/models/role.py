@@ -6,4 +6,3 @@ class Role(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     role_name = db.Column(db.String(225), nullable=False)
 
-    users = db.relationship('User', back_populates='role', lazy=True)
