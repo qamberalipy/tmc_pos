@@ -43,11 +43,12 @@ def login():
 
         user = get_user_by_email(email=email)
         print(user)
-        if user and check_password_hash(user.password, password):
-            session['user_id'] = user.id
-            session['user_email'] = user.email
+        if user and check_password_hash(user.get('password'), password):
+            session['user_id'] = user.get('id')
+            session['user_email'] = user.get('email')
+            session['user_role'] = user.get('role')
             flash('Login successful!', 'success')
-            return redirect(url_for('main.dashboard'))
+            return render_template('base.html')
         else:
             flash('Invalid email or password.', 'error')
             return redirect(url_for('main.login'))
