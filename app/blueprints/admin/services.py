@@ -90,4 +90,8 @@ def toggle_branch_status(branch_id, is_active):
 
     branch.is_active = bool(is_active)
     db.session.commit()
-    return {"message": f"Branch {'activated' if branch.is_active else 'deactivated'} successfully"}
+
+    return {
+        "message": f"Branch {'activated' if branch.is_active else 'deactivated'} successfully",
+        "is_active": branch.is_active
+    }
