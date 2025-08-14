@@ -2,7 +2,7 @@ from flask import flash, redirect, render_template, jsonify, request, session, u
 from app.blueprints.main import main_bp
 from app.blueprints.main.services import create_user, get_user_by_email
 from werkzeug.security import check_password_hash
-
+from app.decorators import login_required
 @main_bp.route('/')
 def home():
     return render_template('login.html')
@@ -10,6 +10,7 @@ def home():
 
 
 @main_bp.route('/dashboard')
+@login_required
 def dashboard():
     return render_template('base.html')
 
@@ -43,10 +44,23 @@ def login():
 
         user = get_user_by_email(email=email)
         print(user)
-        if user and check_password_hash(user.get('password'), password):
+
+        if not user:
+            flash('Invalid email or password.', 'error')
+            return redirect(url_for('main.login'))
+
+        # Check if user is active
+        if not user.get('is_active', False):
+            flash('User is deactivated by admin.', 'error')
+            return redirect(url_for('main.login'))
+
+        # Check password
+        if check_password_hash(user.get('password'), password):
             session['user_id'] = user.get('id')
+            session['user_name'] = user.get('name')
             session['user_email'] = user.get('email')
             session['user_role'] = user.get('role')
+            session['role_id'] = user.get('role_id')
             flash('Login successful!', 'success')
             return render_template('base.html')
         else:
@@ -54,3 +68,11 @@ def login():
             return redirect(url_for('main.login'))
 
     return render_template('login.html')
+
+
+@main_bp.route('/logout')
+def logout():
+    # Clear the user session
+    session.clear()
+    flash('You have been logged out successfully.', 'success')
+    return redirect(url_for('main.login'))  # redirect to login page

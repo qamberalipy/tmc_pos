@@ -1,6 +1,7 @@
+from venv import logger
 from app.extensions import db
-from app.models.branch import Branch
-from app.models.user import User
+from app.models import Branch, Role,User
+from sqlalchemy.exc import SQLAlchemyError
 
 # 1. Create Branch
 def create_branch(data):
@@ -95,3 +96,38 @@ def toggle_branch_status(branch_id, is_active):
         "message": f"Branch {'activated' if branch.is_active else 'deactivated'} successfully",
         "is_active": branch.is_active
     }
+
+def get_all_branches_service():
+    try:
+        branches = Branch.query.filter(Branch.is_active == True).all()
+        return [
+            {
+                "id": branch.id,
+                "name": branch.branch_name
+            }
+            for branch in branches
+        ]
+    except SQLAlchemyError as e:
+        print(f"Database error while fetching branches: {str(e)}")
+        raise
+    except Exception as e:
+        print(f"Unexpected error in get_all_branches_service: {str(e)}")
+        raise
+
+
+def get_all_roles_service():
+    try:
+        roles = Role.query.all()
+        return [
+            {
+                "id": role.id,
+                "name": role.role
+            }
+            for role in roles
+        ]
+    except SQLAlchemyError as e:
+        print(f"Database error while fetching roles: {str(e)}")
+        raise
+    except Exception as e:
+        print(f"Unexpected error in get_all_roles_service: {str(e)}")
+        raise
