@@ -132,3 +132,39 @@ def toggle_user_status(user_id, is_active):
     except SQLAlchemyError as e:
         db.session.rollback()
         return {"error": str(e.__dict__.get('orig', e))}, 500
+
+def update_user_email_and_name(user_id, new_email, new_name):
+    try:
+        user = User.query.get(user_id)
+        if not user:
+            return {"error": "User not found"}, 404
+
+        # Check if new email already exists
+        if User.query.filter(User.email == new_email, User.id != user_id).first():
+            return {"error": "Email already exists"}, 400
+        
+
+        user.email = new_email
+        user.name = new_name
+        db.session.commit()
+        return {"message": "Email and name updated successfully"}, 200
+
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        return {"error": str(e.__dict__.get('orig', e))}, 500
+
+
+    
+def update_user_password(user_id, new_password):
+    try:
+        user = User.query.get(user_id)
+        if not user:
+            return {"error": "User not found"}, 404
+
+        user.password = generate_password_hash(new_password)
+        db.session.commit()
+        return {"message": "Password updated successfully"}, 200
+
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        return {"error": str(e.__dict__.get('orig', e))}, 500

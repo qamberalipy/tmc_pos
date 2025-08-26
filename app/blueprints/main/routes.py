@@ -12,7 +12,14 @@ def home():
 @main_bp.route('/dashboard')
 @login_required
 def dashboard():
-    return render_template('base.html')
+    try:
+        return render_template('base.html')
+    except Exception as e:
+        return redirect(url_for('main.error_page'))
+
+@main_bp.route('/error', methods=['GET'])
+def error_page():
+    return render_template('error_page.html')
 
 @main_bp.route('/create_user', methods=['POST'])
 def create_user_route():
@@ -34,45 +41,52 @@ def create_user_route():
 
 @main_bp.route('/login', methods=['GET', 'POST'])
 def login():
-    if request.method == 'POST':
-        email = request.form.get('email')
-        password = request.form.get('password')
+    try:
+        if request.method == 'POST':
+            email = request.form.get('email')
+            password = request.form.get('password')
 
-        if not email or not password:
-            flash('Email and password are required.', 'error')
-            return redirect(url_for('main.login'))
+            if not email or not password:
+                flash('Email and password are required.', 'error')
+                return redirect(url_for('main.login'))
 
-        user = get_user_by_email(email=email)
-        print(user)
+            print("Hello")
+            user = get_user_by_email(email=email)
+            print("MyDATA", user)
 
-        if not user:
-            flash('Invalid email or password.', 'error')
-            return redirect(url_for('main.login'))
+            if not user:
+                flash('Invalid email or password.', 'error')
+                return redirect(url_for('main.login'))
 
-        # Check if user is active
-        if not user.get('is_active', False):
-            flash('User is deactivated by admin.', 'error')
-            return redirect(url_for('main.login'))
+            # Check if user is active
+            if not user.get('is_active', False):
+                flash('User is deactivated', 'error')
+                return redirect(url_for('main.login'))
 
-        # Check password
-        if check_password_hash(user.get('password'), password):
-            session['user_id'] = user.get('id')
-            session['user_name'] = user.get('name')
-            session['user_email'] = user.get('email')
-            session['user_role'] = user.get('role')
-            session['role_id'] = user.get('role_id')
-            flash('Login successful!', 'success')
-            return render_template('base.html')
-        else:
-            flash('Invalid email or password.', 'error')
-            return redirect(url_for('main.login'))
+            # Check password
+            if check_password_hash(user.get('password'), password):
+                session['user_id'] = user.get('id')
+                session['user_name'] = user.get('name')
+                session['user_email'] = user.get('email')
+                session['user_role'] = user.get('role')
+                session['role_id'] = user.get('role_id')
+                flash('Login successful!', 'success')
+                return redirect(url_for('admin.view_admin_dashboard'))
+            else:
+                flash('Invalid email or password.', 'error')
+                return redirect(url_for('main.login'))
 
-    return render_template('login.html')
-
+        return render_template('login.html')
+    except Exception as e:
+        print(f"Error in login: {str(e)}")
+        return redirect(url_for('main.error_page'))
 
 @main_bp.route('/logout')
 def logout():
-    # Clear the user session
-    session.clear()
-    flash('You have been logged out successfully.', 'success')
-    return redirect(url_for('main.login'))  # redirect to login page
+    try:
+        session.clear()
+        flash('You have been logged out successfully.', 'success')
+        return redirect(url_for('main.login'))  # redirect to login page
+    except Exception as e:
+        print(f"Error in logout: {str(e)}")
+        return redirect(url_for('main.error_page'))

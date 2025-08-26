@@ -1,4 +1,4 @@
-from flask import render_template,request,jsonify,session
+from flask import redirect, render_template,request,jsonify,session, url_for
 from . import admin_bp
 from app.blueprints.admin import services as admin_services
 from app.decorators import login_required
@@ -9,8 +9,20 @@ from app.decorators import login_required
 @admin_bp.route('/admin/branch')
 @login_required
 def view_branch():
-    return render_template('branch.html')
-
+    try:
+        return render_template('branch.html')
+    except Exception as e:
+        print(f"Error in view_branch: {str(e)}")
+        return redirect(url_for('main.error_page'))
+    
+@admin_bp.route('/admin/dashboard')
+@login_required
+def view_admin_dashboard():
+    try:
+        return render_template('admin_dashboard.html')
+    except Exception as e:
+        print(f"Error in dashboard: {str(e)}")
+        return redirect(url_for('main.error_page'))
 
 @admin_bp.route('/create/branch', methods=['POST'])
 def create_branch():

@@ -47,17 +47,17 @@
             <li>
               <hr class="dropdown-divider">
             </li>
-            <li>
+            <!-- <li>
               <a class="dropdown-item d-flex align-items-center" href="#">
                 <i class="bi bi-person"></i>
                 <span>My Profile</span>
               </a>
-            </li>
+            </li> -->
             <li>
               <hr class="dropdown-divider">
             </li>
             <li>
-              <a class="dropdown-item d-flex align-items-center" href="#">
+              <a class="dropdown-item d-flex align-items-center" href="{{ url_for('users.profile') }}">
                 <i class="bi bi-gear"></i>
                 <span>Account Settings</span>
               </a>
@@ -83,7 +83,7 @@
   <ul class="sidebar-nav" id="sidebar-nav">
     <!-- Dashboard -->
     <li class="nav-item">
-      <a href="#" class="nav-link active">
+      <a href="{{ url_for('admin.view_admin_dashboard') }}" class="nav-link active">
         <i class="bi bi-house-door-fill"></i>
         <span>Dashboard</span>
       </a>
@@ -130,10 +130,10 @@
 
     <!-- Settings -->
     <li class="nav-heading">Settings</li>
-    <li class="nav-item">
-      <a href="#" class="nav-link">
-        <i class="bi bi-alipay"></i>
-        <span>Alipay</span>
+    <li class="nav-item"></li>
+      <a href="{{ url_for('users.profile') }}" class="nav-link">
+        <i class="bi bi bi-gear"></i>
+        <span>Account Settings</span>
       </a>
     </li>
   </ul>
