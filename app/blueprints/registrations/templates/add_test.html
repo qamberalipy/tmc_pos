@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% block stylesheets %}
+
+<link rel="stylesheet" href="{{ url_for('registrations.static', filename='css/style.css') }}">
+{% endblock stylesheets %}
+
+{% block content %}
+{% endblock %}
+{% block user_page %}
+<div class="main-div">
+
+
+  <div class="jumbotron jumbotron-fluid rounded bg-white border-0 shadow-sm border-left py-3 px-4">
+    <div class="justify-content-between mb-3 row">
+      <div class="col-6 col-md-6">
+        <h5 class="text-pos">Test Registration</h5>
+      </div>
+      <div class="col-6 col-  md-6 text-end">
+      
+      </div>
+    </div>
+    <div class="text-dark">
+      <form>
+        <div class="row">
+          <div class="col-lg-6 col-md-6 col-sm-12 col-xl-6">
+            <label class="my-2">Test Name</label>
+            <input type="text" class="form-control" id="test_name" name="test_name">
+            <label class="my-2">Sample Collection</label>
+            <input type="text" class="form-control" id="sample_collection" name="sample_collection">
+            <label class="my-2">Department Name</label>
+            <select class="form-select" id="department_name" name="department_name">
+              <option value="">Select Department</option>
+              <option value="department1">Department 1</option>
+              <option value="department2">Department 2</option>
+            </select>
+            <!-- <label class="my-2">Category</label>
+            <select class="form-select" id="category" name="category">
+              <option value="">Select Category</option>
+              <option value="category1">Category 1</option>
+              <option value="category2">Category 2</option>
+            </select> -->
+            <label class="my-2">Charge</label>
+            <input type="text" class="form-control" id="charge" name="charge">
+                        <label class="my-2">Required Days</label>
+            <input type="text" class="form-control" id="required_days" name="required_days">
+          </div>
+          <div class="col-lg-6 col-md-6 col-sm-12 col-xl-6">
+
+          
+
+            <label class="my-2">Sequence No</label>
+            <input type="text" class="form-control" id="sequence" name="sequence">
+            <label class="my-2">No of Films required</label>
+            <input type="text" class="form-control" id="no_of_films" name="no_of_films" value="0">
+            <label class="my-2">Description</label>
+            <textarea class="form-control" id="description" name="description" rows="8"></textarea>
+          </div>
+        </div>
+        <div class="mt-3 w-100 text-end">
+          <button type="submit" class="btn w-25 btn-primary">Submit</button>
+        </div>
+
+
+      </form>
+
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block javascript %}
+<script>
+  $(document).ready(function () {
+    getAllDepartmentsList();
+    $("form").on("submit", function (e) {
+        e.preventDefault();
+
+        let payload = {
+            test_name: $("#test_name").val().trim(),
+            sample_collection: $("#sample_collection").val().trim(),
+            department_id: $("#department_name").val() || null,
+            charges: $("#charge").val().trim(),
+            required_days: $("#required_days").val().trim(),
+            sequence_no: $("#sequence").val().trim(),
+            no_of_films: $("#no_of_films").val().trim(),
+            description: $("#description").val().trim()
+        };
+
+        // 🔹 Basic 
+        
+        if (!payload.test_name) {
+            showToastMessage("error", "Test Name is required!");
+            return;
+        }
+        if (!payload.charges) {
+            showToastMessage("error", "Charges are required!");
+            return;
+        }
+        if (!payload.required_days) {
+            showToastMessage("error", "Required Days are required!");
+            return;
+        }
+
+        // 🔹 Send API Request
+        axios.post(`${baseUrl}/registrations/test-registration`, payload)
+            .then(res => {
+                let response = res.data;
+                showToastMessage("success", response.message || "Test Registration created successfully!");
+
+                // Reset form
+                $("form")[0].reset();
+            })
+            .catch(err => {
+                console.error("Error creating test registration:", err);
+                let msg = err.response?.data?.error || "Failed to create test registration!";
+                showToastMessage("error", msg);
+            });
+    });
+});
+
+  function getAllDepartmentsList() {
+    return axios.get(baseUrl + '/admin/department/list')
+        .then(res => {
+            let departments = res.data;
+            let $departmentSelect = $('#department_name');
+            $departmentSelect.empty();
+            if (!departments?.length) {
+                $departmentSelect.append('<option value="">No Department Found</option>').prop('disabled', true);
+                return;
+            }
+            $departmentSelect.append('<option value="">Select Department</option>').prop('disabled', false);
+            $.each(departments, (i, department) => {
+                $departmentSelect.append(`<option value="${department.id}">${department.name}</option>`);
+            });
+        });
+}
+</script>
+
+{% endblock %}

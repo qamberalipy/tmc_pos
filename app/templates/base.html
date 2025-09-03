@@ -81,52 +81,35 @@
  <!-- Sidebar -->
 <aside id="sidebar" class="sidebar">
   <ul class="sidebar-nav" id="sidebar-nav">
-    <!-- Dashboard -->
-    <li class="nav-item">
-      <a href="{{ url_for('admin.view_admin_dashboard') }}" class="nav-link active">
-        <i class="bi bi-house-door-fill"></i>
-        <span>Dashboard</span>
-      </a>
-    </li>
+   
 
-    <!-- AMD with Dropdown -->
-    <li class="nav-item">
-      <a class="nav-link collapsed" data-bs-toggle="collapse" href="#amdMenu" role="button" aria-expanded="false" aria-controls="amdMenu">
-        <i class="bi bi-bank2"></i>
-        <span>Department</span>
-        <i class="bi bi-chevron-down ms-auto"></i>
-      </a>
-      <ul class="collapse" id="amdMenu" data-bs-parent="#sidebar-nav">
-        <li>
-          <a href="{{ url_for('users.view_user') }}" class="nav-link">
-            <i class="bi bi-person-fill-add"></i>
-            <span>User</span>
-          </a>
-        </li>   
-        <li>
-         <a href="{{ url_for('admin.view_branch') }}" class="nav-link">
-            <i class="bi bi-house-add-fill"></i>
-            <span>Branch</span>
-          </a>
+    {% for item in menu %}
+        <li class="nav-item">
+          {% if item.endpoint %}
+            <a href="{{ url_for(item.endpoint) if item.endpoint != '#' else '#' }}" class="nav-link">
+              <i class="bi {{ item.icon }}"></i>
+              <span>{{ item.label }}</span>
+            </a>
+          {% else %}
+            <!-- Dropdown Menu -->
+            <a class="nav-link collapsed" data-bs-toggle="collapse" href="#menu{{ loop.index }}" role="button">
+              <i class="bi {{ item.icon }}"></i>
+              <span>{{ item.label }}</span>
+              <i class="bi bi-chevron-down ms-auto"></i>
+            </a>
+            <ul class="collapse" id="menu{{ loop.index }}" data-bs-parent="#sidebar-nav">
+              {% for sub in item.children %}
+                <li>
+                  <a href="{{ url_for(sub.endpoint) if sub.endpoint != '#' else '#' }}" class="nav-link">
+                    <i class="bi {{ sub.icon }}"></i>
+                    <span>{{ sub.label }}</span>
+                  </a>
+                </li>
+              {% endfor %}
+            </ul>
+          {% endif %}
         </li>
-      </ul>
-    </li>
-
-    <!-- Alexa -->
-    <li class="nav-item">
-      <a href="#" class="nav-link">
-        <i class="bi bi-alexa"></i>
-        <span>Alexa</span>
-      </a>
-    </li>
-
-    <!-- Amazon -->
-    <li class="nav-item">
-      <a href="#" class="nav-link">
-        <i class="bi bi-amazon"></i>
-        <span>Amazon</span>
-      </a>
-    </li>
+      {% endfor %}
 
     <!-- Settings -->
     <li class="nav-heading">Settings</li>

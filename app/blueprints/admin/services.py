@@ -1,6 +1,6 @@
 from venv import logger
 from app.extensions import db
-from app.models import Branch, Role,User
+from app.models import Branch, Role,User,Department
 from sqlalchemy.exc import SQLAlchemyError
 
 # 1. Create Branch
@@ -130,4 +130,21 @@ def get_all_roles_service():
         raise
     except Exception as e:
         print(f"Unexpected error in get_all_roles_service: {str(e)}")
+        raise
+
+def get_all_department_service():
+    try:
+        departments = Department.query.all()
+        return [
+            {
+                "id": department.id,
+                "name": department.department_name
+            }
+            for department in departments
+        ]
+    except SQLAlchemyError as e:
+        print(f"Database error while fetching departments: {str(e)}")
+        raise
+    except Exception as e:
+        print(f"Unexpected error in get_all_departments_service: {str(e)}")
         raise

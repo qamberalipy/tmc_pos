@@ -13,18 +13,19 @@
 {% block user_page %} 
 <div class="main-div">
 
-    <div class="row g-3 justify-content-between mb-3">  
-            <div class="col-md-4">
+   
+    <div class="jumbotron jumbotron-fluid rounded bg-white border-0 shadow-sm border-left py-3 px-4">
+      <div class="row g-3 justify-content-between mb-3">  
+            <div class="col-md-6 col-6">
               <h5 class="text-pos">Branch Management</h5>
             </div>
-            <div class="col-md-4 text-end">
+            <div class="col-md-6 col-6 text-end">
               <!-- <button class="btn btn-primary d-none" id="add_branch_btn" data-bs-toggle="modal" data-bs-target="#addBranchModal">HiddenButton</button> -->
               <button class="btn btn-primary" id="trigger_add_branch">Add Branch</button>
             </div>
     </div>
-    <div class="jumbotron jumbotron-fluid rounded bg-white border-0 shadow-sm border-left py-3 px-4">
     <div class="text-dark">
-        <div>
+        <div class="table-responsive">
             <table id="branch_table" class="table-responsive-sm border-0 dataTable no-footer table table-bordered table-hover" style="width:100%">
                 <thead>
                   <tr>
