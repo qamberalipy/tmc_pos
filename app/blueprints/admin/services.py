@@ -138,7 +138,7 @@ def get_all_department_service():
         return [
             {
                 "id": department.id,
-                "name": department.department_name
+                "name": department.name
             }
             for department in departments
         ]
