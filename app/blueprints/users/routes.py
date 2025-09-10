@@ -89,3 +89,5 @@ def update_user_password():
     result, status = users_services.update_user_password(session.get("user_id"), data["password"])
     return jsonify(result), status
 
+
+

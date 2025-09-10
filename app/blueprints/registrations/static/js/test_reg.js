@@ -33,7 +33,7 @@ function getAllTestRegistrations() {
                     t.sample_collection || "-",
                     t.department_id || "-",
                     t.charges || "-",
-                    t.required_days || "-",
+                    t.required_days == "0" ? "Same day" : (t.required_days || "-"),
                     t.sequence_no || "-",
                     t.description || "-",
                     statusToggle,

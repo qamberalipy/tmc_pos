@@ -122,6 +122,14 @@ def toggle_referred_status(referred_id):
     result, status = registrations_services.toggle_referred_status(referred_id, data.get("is_active"))
     return jsonify(result), status
 
+@registrations_bp.route('/referred/list', methods=['GET'])
+def get_all_referred_list():
+    try:
+        data = registrations_services.get_all_referred_service(session.get("branch_id"))
+        return jsonify(data), 200
+    except Exception as e:
+        print(f"Error in get_all_referred_list: {str(e)}")
+        return jsonify({"error": "An error occurred"}), 500
 
 
 # Create
@@ -163,3 +171,12 @@ def toggle_test_registration_status(test_id):
         return jsonify({"error": "is_active is required"}), 400
     result, status = registrations_services.toggle_test_registration_status(test_id, data.get("is_active"))
     return jsonify(result), status
+
+@registrations_bp.route('/test/list', methods=['GET'])
+def get_all_tests_list():
+    try:
+        data = registrations_services.get_all_test_list(session.get("branch_id"))
+        return jsonify(data), 200
+    except Exception as e:
+        print(f"Error in get_all_tests_list: {str(e)}")
+        return jsonify({"error": "An error occurred"}), 500

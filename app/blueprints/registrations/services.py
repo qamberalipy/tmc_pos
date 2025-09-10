@@ -258,6 +258,23 @@ def toggle_referred_status(referred_id, is_active):
     except SQLAlchemyError as e:
         db.session.rollback()
         return {"error": str(e.__dict__.get("orig", e))}, 500
+def get_all_referred_service(branch_id):
+    try:
+        referreds = Referred.query.filter(Referred.is_active == True, Referred.branch_id == branch_id).all()
+        return [
+            {
+                "id": referreds.id,
+                "name": referreds.name,
+                "type": referreds.is_doctor
+            }
+            for referreds in referreds
+        ]
+    except SQLAlchemyError as e:
+        print(f"Database error while fetching referreds: {str(e)}")
+        raise
+    except Exception as e:
+        print(f"Unexpected error in get_all_referred_service: {str(e)}")
+        raise
 
 # 🔹 Helper
 def _format_test_registration(t, branch_name=None, created_by_name=None):
@@ -316,7 +333,7 @@ def get_all_test_registrations(branch_id=None):
             db.session.query(
                 Test_registration,
                 Branch.branch_name.label("branch_name"),
-                User.name.label("created_by_name")
+                User.name.label("created_by_name")   
             )
             .outerjoin(Branch, Test_registration.branch_id == Branch.id)
             .outerjoin(User, Test_registration.created_by == User.id)
@@ -330,7 +347,7 @@ def get_all_test_registrations(branch_id=None):
     except SQLAlchemyError as e:
         return {"error": str(e.__dict__.get("orig", e))}, 500
 
-# 🔹 Get One
+# 🔹 Get 
 def get_test_registration_by_id(test_id):
     try:
         result = (
@@ -352,7 +369,22 @@ def get_test_registration_by_id(test_id):
 
     except SQLAlchemyError as e:
         return {"error": str(e.__dict__.get("orig", e))}, 500
-
+def get_all_test_list(branch_id):
+    try:
+        tests = Test_registration.query.filter(Test_registration.is_active == True, Test_registration.branch_id == branch_id).all()
+        return [
+            {
+                "id": tests.id,
+                "test_name": tests.test_name
+            }
+            for tests in tests
+        ]
+    except SQLAlchemyError as e:
+        print(f"Database error while fetching test registrations: {str(e)}")
+        raise
+    except Exception as e:
+        print(f"Unexpected error in get_all_test_list: {str(e)}")
+        raise
 # 🔹 Update
 def update_test_registration(test_id, data):
     try:

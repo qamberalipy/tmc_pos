@@ -10,7 +10,7 @@ class Test_registration(db.Model):
     department_id = db.Column(db.Integer, nullable=True)  
     charges = db.Column(db.Float, nullable=False)
     required_days = db.Column(db.String(225), nullable=False)
-    sequence_no = db.Column(db.String(225), nullable=False)
+    sequence_no = db.Column(db.String(225), nullable=True)
     no_of_films = db.Column(db.Integer, nullable=True)  
     description = db.Column(db.String(225), nullable=True)
     branch_id = db.Column(db.Integer, nullable=False)  
