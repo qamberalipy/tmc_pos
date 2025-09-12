@@ -5,6 +5,9 @@ class Branch(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     branch_name = db.Column(db.String(225), nullable=False) 
+    contact_number = db.Column(db.String(50), nullable=True)
+    additional_contact_number = db.Column(db.String(50), nullable=True)
+    address = db.Column(db.String(225), nullable=True)
     description = db.Column(db.String(225), nullable=True)
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=db.func.current_timestamp())

@@ -1,10 +1,12 @@
 from flask import session
 from app.extensions import db
-from app.models import TestBooking, TestBookingDetails
+from app.models import TestBooking, TestBookingDetails,User,Branch,Referred
 from werkzeug.security import generate_password_hash
 from sqlalchemy.exc import SQLAlchemyError
 from decimal import Decimal, InvalidOperation
 from datetime import datetime
+
+from app.models.test_registration import Test_registration
 
 
 def create_test_booking(data):
@@ -114,3 +116,115 @@ def create_test_booking(data):
         "booking_id": booking.id,
         "total_tests": len(test_details_list)
     }
+
+
+def get_booking_details(booking_id: int):
+    """
+    Fetch a booking with related branch, referred doctor, and test details.
+    Optimized for speed and safe error handling.
+    """
+
+    if not booking_id:
+        return {"error": "Invalid booking id"}, 400
+
+    try:
+        # --- Fetch booking, branch & referred doctor in ONE query ---
+        booking = (
+            db.session.query(TestBooking)
+            .filter(TestBooking.id == booking_id)
+            .first()
+        )
+
+        if not booking:
+            return {"error": "Booking not found"}, 404
+
+        # --- Fetch branch (cached if possible) ---
+        branch = (
+            db.session.query(Branch)
+            .with_entities(
+                Branch.branch_name,
+                Branch.contact_number,
+                Branch.address,
+                Branch.additional_contact_number,
+            )
+            .filter(Branch.id == booking.branch_id)
+            .first()
+        )
+
+        # --- Fetch referred doctor only if exists ---
+        referred_name = None
+        if booking.referred_dr:
+            referred = (
+                db.session.query(Referred)
+                .with_entities(Referred.name)
+                .filter(Referred.id == booking.referred_dr)
+                .first()
+            )
+            referred_name = referred.name if referred else None
+
+        # --- Fetch tests (bulk load, no ORM overhead) ---
+        tests = (
+            db.session.query(
+                TestBookingDetails.test_id,
+                TestBookingDetails.quantity,
+                TestBookingDetails.no_of_films,
+                TestBookingDetails.amount,
+                TestBookingDetails.reporting_date,
+                TestBookingDetails.sample_to_follow,
+            )
+            .filter(TestBookingDetails.booking_id == booking.id)
+            .all()
+        )
+
+        test_list = [
+            {
+                "test_id": t.test_id,
+                "quantity": t.quantity,
+                "no_of_films": t.no_of_films,
+                "amount": float(t.amount or 0),
+                "reporting_date": (
+                    t.reporting_date.strftime("%d-%b-%Y %I:%M %p")
+                    if t.reporting_date else None
+                ),
+                "sample_to_follow": t.sample_to_follow,
+            }
+            for t in tests
+        ]
+
+        # --- Final structured response ---
+        return {
+            "booking_id": booking.id,
+            "mr_no": booking.mr_no,
+            "patient_name": booking.patient_name,
+            "gender": booking.gender,
+            "age": booking.age,
+            "contact_no": booking.contact_no,
+            "referred_by": referred_name or "Self",
+            "branch": {
+                "name": branch.branch_name if branch else None,
+                "contact": branch.contact_number if branch else None,
+                "address": branch.address if branch else None,
+                "additional_contact": branch.additional_contact_number if branch else None,
+            },
+            "financials": {
+                "discount_type": booking.discount_type,
+                "discount_value": float(booking.discount_value or 0),
+                "net_payable": float(booking.net_receivable or 0),
+                "received": float(booking.paid_amount or 0),
+                "balance": float(booking.due_amount or 0),
+            },
+            "tests": test_list,
+            "printed_at": (
+                datetime.now().strftime("%d-%b-%Y %I:%M %p")
+            ),
+            "current_user": session.get("user_name")
+        }, 200
+
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        return {"error": "Database error: " + str(e.__dict__.get("orig", e))}, 500
+
+    except Exception as e:
+        return {"error": "Unexpected error: " + str(e)}, 500
+
+

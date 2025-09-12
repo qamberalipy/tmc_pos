@@ -47,7 +47,20 @@
         <!-- <button class="btn btn-primary" id="trigger_add_user">Add User</button> -->
       </div>
     </div>
+    <div id="receipt_box" class="p-3 px-3 rounded" style="background: #ececec;display: none;">
+      <div class="d-flex justify-content-between align-items-center">
+        <div class="fw-medium">You Have been registered!</div>
+        <button class="btn btn-sm btn-outline-danger" id="close_receipt_btn">
+          <i class="bi bi-x-lg"></i>
+        </button>
+      </div>
 
+      <div class="h2 my-2">(Booking ID: <span id="booking_id"></span>)</div>
+
+      <a class="btn btn-outline-secondary mb-3" id="print_receipt_btn" target="_blank" href="#">
+        <i class="bi bi-printer"></i> Print Receipt
+      </a>
+    </div>
     <div class="text-dark">
       <!-- MR Ref No -->
       <div class="mb-1">

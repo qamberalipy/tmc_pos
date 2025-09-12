@@ -245,6 +245,9 @@ function handleReceivableChange() {
 // -------------------------------
 // Submit Handler
 // -------------------------------
+ $(document).on("click", "#close_receipt_btn", function () {
+    $("#receipt_box").fadeOut(400); // 400ms fade out
+  });
 $(document).on("click", "#submit_booking", async function () {
     try {
         myshowLoader();
@@ -302,7 +305,13 @@ $(document).on("click", "#submit_booking", async function () {
 
         if (res.status === 201) {
             showToastMessage("success", res.data.message || "Booking created!");
+            $("#receipt_box").fadeIn(100);
+            console.log("Booking Response:", res.data);
+            $("#booking_id").text(res.data.booking_id);
+            $("#print_receipt_btn").attr("href", baseUrl + "/booking/receipt/" + res.data.booking_id);
+            $("html, body").animate({ scrollTop: 0 }, 500);
             resetBookingForm();
+
         } else {
             showToastMessage("error", "Unexpected response from server!");
         }

@@ -12,7 +12,14 @@ def view_test_booking():
     except Exception as e:
         print(f"Error in view_test_booking: {str(e)}")
         return redirect(url_for('main.error_page'))
+
+@booking_bp.route("/receipts")
+@login_required
+def views_receipt():
+
+    return render_template('receipt.html')
     
+
 @booking_bp.route('/create/', methods=['POST'])
 def create_booking():
     data = request.get_json()
@@ -25,3 +32,19 @@ def create_booking():
     except Exception as e:
         print(f"Error in create_booking: {str(e)}")
         return jsonify({"error": "Failed to create booking"}), 400
+    
+@booking_bp.route("/receipt/<int:booking_id>")
+@login_required
+def view_receipt(booking_id):
+    # try:
+    data, status = booking_services.get_booking_details(booking_id)
+
+    if status != 200:
+        # handle gracefully
+        return render_template("error.html", message=data.get("error", "Unknown error")), status
+    print("Receipt Data:", data)
+    return render_template("receipt.html", booking=data)
+
+    # except Exception as e:
+    #     print(f"Error in view_receipt: {str(e)}")
+    #     return redirect(url_for("main.error_page"))
