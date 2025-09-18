@@ -32,6 +32,7 @@ MENU = {
         ]},
         {"label": "Booking", "icon": "bi-bank2", "endpoint": None, "children": [
             {"label": "Test Booking", "icon": "bi-bag-plus-fill", "endpoint": "booking.view_test_booking"},
+            {"label": "View Booking", "icon": "bi bi-eye-fill", "endpoint": "booking.view_view_booking"},
         ]},
         {"label": "Transactions", "icon": "bi-currency-exchange", "endpoint": None, "children": [
             {"label": "Payment", "icon": "bi-cash-stack", "endpoint": "users.view_user"},

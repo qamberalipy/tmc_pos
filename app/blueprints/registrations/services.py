@@ -434,3 +434,5 @@ def toggle_test_registration_status(test_id, is_active):
     except SQLAlchemyError as e:
         db.session.rollback()
         return {"error": str(e.__dict__.get("orig", e))}, 500
+
+

@@ -1,4 +1,5 @@
 from flask import session
+from sqlalchemy import and_, func
 from app.extensions import db
 from app.models import TestBooking, TestBookingDetails,User,Branch,Referred
 from werkzeug.security import generate_password_hash
@@ -228,3 +229,60 @@ def get_booking_details(booking_id: int):
         return {"error": "Unexpected error: " + str(e)}, 500
 
 
+def _format_test_booking(row):
+    return {
+        "booking_id": row.id,
+        "patient_name": row.patient_name,
+        "date": row.create_at.strftime("%Y-%m-%d") if row.create_at else None,
+        "referred_dr": row.referred_dr,
+        "mr_no": row.mr_no,
+        "test_name": row.test_names,   # already aggregated string
+        "total_amount": float(row.net_receivable),
+        "discount": float(row.discount_value) if row.discount_value else 0,
+        "net_amount": float(row.net_receivable - row.discount_value) if row.discount_value else float(row.net_receivable),
+        "received": float(row.paid_amount),
+        "balance": float(row.due_amount),
+        "branch": row.branch_name,
+        "created_by": row.created_by_name,
+        "created_at": row.create_at,
+        "updated_at": row.update_at
+    }
+
+
+# 🔹 Get All Bookings (optimized with join + aggregation)
+def get_all_test_bookings(branch_id=None):
+    try:
+        # use group_concat to merge multiple test names
+        query = (
+            db.session.query(
+                TestBooking.id,
+                TestBooking.patient_name,
+                TestBooking.mr_no,
+                Referred.name.label("referred_dr"),
+                TestBooking.net_receivable,
+                TestBooking.discount_value,
+                TestBooking.paid_amount,
+                TestBooking.due_amount,
+                TestBooking.create_at,
+                TestBooking.update_at,
+                Branch.branch_name.label("branch_name"),
+                User.name.label("created_by_name"),
+                func.group_concat(Test_registration.test_name.distinct()).label("test_names")
+            )
+            .join(TestBookingDetails, TestBookingDetails.booking_id == TestBooking.id)
+            .join(Test_registration, Test_registration.id == TestBookingDetails.test_id)
+            .outerjoin(Referred, and_(Referred.id == TestBooking.referred_dr, Referred.is_doctor == True))
+            .outerjoin(Branch, Branch.id == TestBooking.branch_id)
+            .outerjoin(User, User.id == TestBooking.create_by)
+            .group_by(TestBooking.id, Branch.branch_name, User.name)
+            .order_by(TestBooking.create_at.desc())
+        )
+
+        if branch_id:
+            query = query.filter(TestBooking.branch_id == branch_id)
+
+        rows = query.all()
+        return [_format_test_booking(r) for r in rows], 200
+
+    except SQLAlchemyError as e:
+        return {"error": str(e.__dict__.get("orig", e))}, 500

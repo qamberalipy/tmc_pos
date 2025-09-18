@@ -13,6 +13,16 @@ def view_test_booking():
         print(f"Error in view_test_booking: {str(e)}")
         return redirect(url_for('main.error_page'))
 
+@booking_bp.route('/view/view-booking')
+@login_required
+def view_view_booking():
+    try:
+        return render_template('view_booking.html')
+    except Exception as e:
+        print(f"Error in view_view_booking: {str(e)}")
+        return redirect(url_for('main.error_page'))
+
+
 @booking_bp.route("/receipts")
 @login_required
 def views_receipt():
@@ -36,15 +46,22 @@ def create_booking():
 @booking_bp.route("/receipt/<int:booking_id>")
 @login_required
 def view_receipt(booking_id):
-    # try:
-    data, status = booking_services.get_booking_details(booking_id)
+    try:
+        data, status = booking_services.get_booking_details(booking_id)
 
-    if status != 200:
-        # handle gracefully
-        return render_template("error.html", message=data.get("error", "Unknown error")), status
-    print("Receipt Data:", data)
-    return render_template("receipt.html", booking=data)
+        if status != 200:
+            # handle gracefully
+            return render_template("error.html", message=data.get("error", "Unknown error")), status
+        print("Receipt Data:", data)
+        return render_template("receipt.html", booking=data)
 
-    # except Exception as e:
-    #     print(f"Error in view_receipt: {str(e)}")
-    #     return redirect(url_for("main.error_page"))
+    except Exception as e:
+        print(f"Error in view_receipt: {str(e)}")
+        return redirect(url_for("main.error_page"))
+
+@booking_bp.route("/test-booking", methods=["GET"])
+def get_all_test_bookings():
+    role = session.get("role", "").lower()
+    branch_id = None if role == "admin" else session.get("branch_id")
+    result, status = booking_services.get_all_test_bookings(branch_id)
+    return jsonify(result), status

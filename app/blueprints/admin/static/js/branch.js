@@ -3,17 +3,29 @@ function createMode(){
     $(".update-section").hide();
     $("#branch_id").val("");
     $("#branch_name").val("");
+    $("#contact-no").val("");
+    $("#contact-no2").val("");
+    $("#branch_address").val("");
     $("#branch_description").val("");
     $("#created_by").val("");
 }
+
 function updateMode() {
     $(".create-section").hide();
     $(".update-section").show();
-   $("#branch_id").val("");
+    $("#branch_id").val("");
     $("#branch_name").val("");
+    $("#contact-no").val("");
+    $("#contact-no2").val("");
+    $("#branch_address").val("");
     $("#branch_description").val("");
     $("#created_by").val("");
 }
+function truncateText(text, length = 10) {
+    if (!text) return "";
+    return text.length > length ? text.substring(0, length) + "..." : text;
+}
+
 $(document).on('click', "#trigger_add_branch", function() {
     createMode();
     $("#addBranchModal").modal("show");
@@ -23,7 +35,7 @@ $(document).ready(function () {
     getAllBranches();
 });
 
-function  getAllBranches() {
+function getAllBranches() {
     myshowLoader();
     axios({
         method: 'GET',
@@ -32,16 +44,14 @@ function  getAllBranches() {
         let data = res.data;
         console.log("branches data", data);
 
-        // Initialize or get DataTable
         var dtable = $('#branch_table').DataTable({
             "pageLength": 14,
             "lengthChange": false,
-            "destroy": true // Re-initialize safely
+            "destroy": true
         });
 
         dtable.clear().draw();
 
-        // Add rows
         $.each(data, function (i, branch) {
             let statusToggle = `
                 <label class="switch-toggle-table">
@@ -59,9 +69,10 @@ function  getAllBranches() {
             dtable.row.add([
                 `BR#${branch.id}`,
                 branch.branch_name,
-                branch.description,
-                branch.created_by,
-                formatDateOnly(branch.created_at),
+                branch.contact_number || "-",
+                truncateText(branch.address, 15) || "-",
+                truncateText(branch.description, 15) || "-",
+                branch.created_by || "-",
                 statusToggle,
                 editBtn
             ]).draw(false);
@@ -70,6 +81,7 @@ function  getAllBranches() {
         myhideLoader();
     }).catch(err => {
         myhideLoader();
+        console.error(err);
         showToastMessage('error', 'Something Went Wrong!')
     });
 }
@@ -90,7 +102,7 @@ $(document).on('change', '.status-toggle', function () {
     }).then((result) => {
         if (result.isConfirmed) {
             axios({
-                method: 'POST',  // if you want REST style, change to PATCH
+                method: 'POST',
                 url: baseUrl + `/admin/branches/${branchId}/toggle`,
                 data: { is_active: newStatus }
             }).then(res => {
@@ -99,22 +111,23 @@ $(document).on('change', '.status-toggle', function () {
             }).catch(err => {
                 console.error(err);
                 showToastMessage('error', 'Failed to update status!');
-                $checkbox.prop('checked', !newStatus); // revert if failed
+                $checkbox.prop('checked', !newStatus);
             });
         } else {
-            // revert if user cancelled
             $checkbox.prop('checked', !newStatus);
         }
     });
 });
 
 $(document).on('click', "#create_branch", function(e) {
-    e.preventDefault(); // stop form from submitting
+    e.preventDefault();
     myshowLoader();
-    console.log("BASE URL",baseUrl)
 
     let branch_name = $('#branch_name').val().trim();
-    let branch_description = $('#branch_description').val().trim();
+    let contact_number = $('#contact-no').val().trim();
+    let additional_contact_number = $('#contact-no2').val().trim();
+    let address = $('#branch_address').val().trim();
+    let description = $('#branch_description').val().trim();
 
     if (!branch_name) {
         myhideLoader();
@@ -128,11 +141,13 @@ $(document).on('click', "#create_branch", function(e) {
         url: baseUrl +'/admin/create/branch',
         data: {
             branch_name: branch_name,
-            description: branch_description
+            contact_number: contact_number,
+            additional_contact_number: additional_contact_number,
+            address: address,
+            description: description
         }
     }).then(res => {
         const response = res.data;
-        console.log(response);
         if (res.status === 201) {
             showToastMessage('success', response.message);
             window.location.reload();
@@ -146,27 +161,26 @@ $(document).on('click', "#create_branch", function(e) {
         showToastMessage('error', 'Something Went Wrong!');
     });
 });
+
 $(document).on('click', '.edit-branch', function () {
     let branchId = $(this).data('id');
     myshowLoader();
     axios.get(`${baseUrl}/admin/branch/${branchId}`)
         .then(res => {
-
             const branch = res.data;
 
-            // Call your updateMode function (assuming it opens the modal)
             updateMode();
 
-            // Populate modal fields
             $('#branch_id').val(branch.id);
             $('#branch_name').val(branch.branch_name);
+            $('#contact-no').val(branch.contact_number);
+            $('#contact-no2').val(branch.additional_contact_number);
+            $('#branch_address').val(branch.address);
             $('#branch_description').val(branch.description);
             $('#created_by').val(branch.created_by);
-            // $('#branch_created_at').val(branch.created_at);
+
             $("#addBranchModal").modal("show");
             myhideLoader();
-            // If you have a checkbox for status
-            // $('#branch_is_active').prop('checked', branch.is_active);
         })
         .catch(err => {
             console.error(err);
@@ -175,12 +189,14 @@ $(document).on('click', '.edit-branch', function () {
 });
 
 $(document).on('click', '#update_branch', function (e) {
-    e.preventDefault(); // stop form from submitting
+    e.preventDefault();
     let branchId = $('#branch_id').val();
     let branchName = $('#branch_name').val().trim();
+    let contact_number = $('#contact-no').val().trim();
+    let additional_contact_number = $('#contact-no2').val().trim();
+    let address = $('#branch_address').val().trim();
     let branchDescription = $('#branch_description').val().trim();
 
-    // Simple validation
     if (!branchName) {
         showToastMessage('error', 'Branch name is required');
         return;
@@ -188,19 +204,20 @@ $(document).on('click', '#update_branch', function (e) {
 
     axios.put(`${baseUrl}/admin/branch/${branchId}`, {
         branch_name: branchName,
+        contact_number: contact_number,
+        additional_contact_number: additional_contact_number,
+        address: address,
         description: branchDescription
     })
     .then(res => {
         const response = res.data;
-        console.log(response);
         if (response.error) {
             showToastMessage('error', response.error);
             return;
         }
 
         showToastMessage('success', response.message || 'Branch updated successfully');
-        $('#addBranchModal').modal('hide'); // Close modal if needed
-        // window.location.reload();
+        $('#addBranchModal').modal('hide');
         getAllBranches();
     })
     .catch(err => {
@@ -208,4 +225,3 @@ $(document).on('click', '#update_branch', function (e) {
         showToastMessage('error', 'Something went wrong while updating branch');
     });
 });
-

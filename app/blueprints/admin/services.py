@@ -3,12 +3,14 @@ from app.extensions import db
 from app.models import Branch, Role,User,Department
 from sqlalchemy.exc import SQLAlchemyError
 
-# 1. Create Branch
 def create_branch(data):
     branch = Branch(
         branch_name=data.get('branch_name'),
+        contact_number=data.get('contact_number'),
+        additional_contact_number=data.get('additional_contact_number'),
+        address=data.get('address'),
         description=data.get('description'),
-        created_by=data.get('created_by')
+        created_by=data.get('created_by')  # assuming this is a user.id
     )
     db.session.add(branch)
     db.session.commit()
@@ -21,6 +23,9 @@ def update_branch(branch_id, data):
         return {"error": "Branch not found"}
 
     branch.branch_name = data.get('branch_name', branch.branch_name)
+    branch.contact_number = data.get('contact_number', branch.contact_number)
+    branch.additional_contact_number = data.get('additional_contact_number', branch.additional_contact_number)
+    branch.address = data.get('address', branch.address)
     branch.description = data.get('description', branch.description)
     branch.updated_by = data.get('updated_by', branch.updated_by)
 
@@ -33,6 +38,9 @@ def get_all_branches():
         db.session.query(
             Branch.id,
             Branch.branch_name,
+            Branch.contact_number,
+            Branch.additional_contact_number,
+            Branch.address,
             Branch.description,
             User.name.label("created_by_name"),
             Branch.is_active,
@@ -46,6 +54,9 @@ def get_all_branches():
         {
             "id": b.id,
             "branch_name": b.branch_name,
+            "contact_number": b.contact_number,
+            "additional_contact_number": b.additional_contact_number,
+            "address": b.address,
             "description": b.description,
             "created_by": b.created_by_name,
             "is_active": b.is_active,
@@ -56,11 +67,13 @@ def get_all_branches():
 
 # 4. Get Branch by ID
 def get_branch_by_id(branch_id):
-    # Join Branch with User, filter by branch_id
     branch = (
         db.session.query(
             Branch.id,
             Branch.branch_name,
+            Branch.contact_number,
+            Branch.additional_contact_number,
+            Branch.address,
             Branch.description,
             User.name.label("created_by_name"),
             Branch.is_active,
@@ -77,6 +90,9 @@ def get_branch_by_id(branch_id):
     return {
         "id": branch.id,
         "branch_name": branch.branch_name,
+        "contact_number": branch.contact_number,
+        "additional_contact_number": branch.additional_contact_number,
+        "address": branch.address,
         "description": branch.description,
         "created_by": branch.created_by_name,
         "is_active": branch.is_active,
