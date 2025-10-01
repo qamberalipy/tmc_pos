@@ -1,3 +1,4 @@
+import json
 from flask import session
 from sqlalchemy import and_, func
 from app.blueprints import booking
@@ -7,6 +8,7 @@ from werkzeug.security import generate_password_hash
 from sqlalchemy.exc import SQLAlchemyError
 from decimal import Decimal, InvalidOperation
 from datetime import datetime
+from sqlalchemy.ext.mutable import MutableDict, MutableList
 
 from app.models.test_registration import Test_registration
 
@@ -130,7 +132,7 @@ def get_booking_details(booking_id: int):
         return {"error": "Invalid booking id"}, 400
 
     try:
-        # --- Fetch booking, branch & referred doctor in ONE query ---
+        # --- Fetch booking ---
         booking = (
             db.session.query(TestBooking)
             .filter(TestBooking.id == booking_id)
@@ -140,7 +142,7 @@ def get_booking_details(booking_id: int):
         if not booking:
             return {"error": "Booking not found"}, 404
 
-        # --- Fetch branch (cached if possible) ---
+        # --- Branch ---
         branch = (
             db.session.query(Branch)
             .with_entities(
@@ -153,7 +155,7 @@ def get_booking_details(booking_id: int):
             .first()
         )
 
-        # --- Fetch referred doctor only if exists ---
+        # --- Referred doctor ---
         referred_name = None
         if booking.referred_dr:
             referred = (
@@ -164,7 +166,7 @@ def get_booking_details(booking_id: int):
             )
             referred_name = referred.name if referred else None
 
-        # --- Fetch tests (bulk load, no ORM overhead) ---
+        # --- Tests ---
         tests = (
             db.session.query(
                 TestBookingDetails.test_id,
@@ -193,12 +195,22 @@ def get_booking_details(booking_id: int):
             for t in tests
         ]
 
+        # --- Deserialize technician comments ---
+        try:
+            technician_comments = (
+                json.loads(booking.technician_comments)
+                if booking.technician_comments
+                else {"comments": []}
+            )
+        except (json.JSONDecodeError, TypeError):
+            technician_comments = {"comments": []}
+
         # --- Final structured response ---
         return {
             "booking_id": booking.id,
             "mr_no": booking.mr_no,
             "patient_name": booking.patient_name,
-            "technician_comments": booking.technician_comments or {"comments": []},
+            "technician_comments": technician_comments,
             "gender": booking.gender,
             "age": booking.age,
             "contact_no": booking.contact_no,
@@ -217,10 +229,8 @@ def get_booking_details(booking_id: int):
                 "balance": float(booking.due_amount or 0),
             },
             "tests": test_list,
-            "printed_at": (
-                datetime.now().strftime("%d-%b-%Y %I:%M %p")
-            ),
-            "current_user": session.get("user_name")
+            "printed_at": datetime.now().strftime("%d-%b-%Y %I:%M %p"),
+            "current_user": session.get("user_name"),
         }, 200
 
     except SQLAlchemyError as e:
@@ -299,9 +309,11 @@ def add_booking_comment(booking_id: int, data):
 
         booking = TestBooking.query.get_or_404(booking_id)
 
-        # initialize JSON if empty
-        if booking.technician_comments is None:
-            booking.technician_comments = {"comments": []}
+        # load existing comments or init
+        if booking.technician_comments:
+            comments = json.loads(booking.technician_comments)
+        else:
+            comments = {"comments": []}
 
         new_comment = {
             "user_id": session.get("user_id"),
@@ -311,11 +323,15 @@ def add_booking_comment(booking_id: int, data):
             "datetime": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
         }
 
-        # mutate in-place so SQLAlchemy tracks it
-        booking.technician_comments["comments"].append(new_comment)
+        comments["comments"].append(new_comment)
 
+        # save back as string
+        booking.technician_comments = json.dumps(comments)
+
+        db.session.add(booking)
         db.session.commit()
         db.session.refresh(booking)
+
         print("Saved:", booking.technician_comments)
 
         return {"message": "Comment added successfully", "data": new_comment}, 201
@@ -327,3 +343,4 @@ def add_booking_comment(booking_id: int, data):
     except Exception as e:
         db.session.rollback()
         return {"error": str(e)}, 500
+
