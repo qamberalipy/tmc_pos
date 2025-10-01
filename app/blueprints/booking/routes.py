@@ -64,4 +64,26 @@ def get_all_test_bookings():
     role = session.get("role", "").lower()
     branch_id = None if role == "admin" else session.get("branch_id")
     result, status = booking_services.get_all_test_bookings(branch_id)
+    print("All Bookings Data:", result)
     return jsonify(result), status
+
+@booking_bp.route("/comments/<int:booking_id>", methods=["GET"])
+def get_booking_comments(booking_id):
+    data, status = booking_services.get_booking_details(booking_id)  # unpack tuple
+    # print("Booking Comments Data:", data, status)
+
+    if status != 200:
+        return jsonify(data), status
+
+    comments = data.get("technician_comments", {"comments": []})
+    return jsonify(comments), 200
+
+@booking_bp.route("/comments/<int:booking_id>", methods=["POST"])
+def add_booking_comment(booking_id):
+    data = request.get_json()
+    print("working data:",data)
+    result, status = booking_services.add_booking_comment(booking_id, data)
+    print("Add Comment Response:", result, status)
+    return jsonify(result), status
+
+

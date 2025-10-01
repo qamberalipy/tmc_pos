@@ -1,5 +1,6 @@
 from flask import session
 from sqlalchemy import and_, func
+from app.blueprints import booking
 from app.extensions import db
 from app.models import TestBooking, TestBookingDetails,User,Branch,Referred
 from werkzeug.security import generate_password_hash
@@ -197,6 +198,7 @@ def get_booking_details(booking_id: int):
             "booking_id": booking.id,
             "mr_no": booking.mr_no,
             "patient_name": booking.patient_name,
+            "technician_comments": booking.technician_comments or {"comments": []},
             "gender": booking.gender,
             "age": booking.age,
             "contact_no": booking.contact_no,
@@ -237,6 +239,7 @@ def _format_test_booking(row):
         "referred_dr": row.referred_dr,
         "mr_no": row.mr_no,
         "test_name": row.test_names,   # already aggregated string
+        "technician_comments": row.technician_comments,
         "total_amount": float(row.net_receivable),
         "discount": float(row.discount_value) if row.discount_value else 0,
         "net_amount": float(row.net_receivable - row.discount_value) if row.discount_value else float(row.net_receivable),
@@ -264,6 +267,7 @@ def get_all_test_bookings(branch_id=None):
                 TestBooking.paid_amount,
                 TestBooking.due_amount,
                 TestBooking.create_at,
+                TestBooking.technician_comments,
                 TestBooking.update_at,
                 Branch.branch_name.label("branch_name"),
                 User.name.label("created_by_name"),
@@ -286,3 +290,40 @@ def get_all_test_bookings(branch_id=None):
 
     except SQLAlchemyError as e:
         return {"error": str(e.__dict__.get("orig", e))}, 500
+
+def add_booking_comment(booking_id: int, data):
+    try:
+        comment_text = data.get("comment", "").strip()
+        if not comment_text:
+            return {"error": "Comment is required"}, 400
+
+        booking = TestBooking.query.get_or_404(booking_id)
+
+        # initialize JSON if empty
+        if booking.technician_comments is None:
+            booking.technician_comments = {"comments": []}
+
+        new_comment = {
+            "user_id": session.get("user_id"),
+            "user_name": session.get("user_name"),
+            "role": session.get("user_role"),
+            "comment": comment_text,
+            "datetime": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
+        }
+
+        # mutate in-place so SQLAlchemy tracks it
+        booking.technician_comments["comments"].append(new_comment)
+
+        db.session.commit()
+        db.session.refresh(booking)
+        print("Saved:", booking.technician_comments)
+
+        return {"message": "Comment added successfully", "data": new_comment}, 201
+
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        return {"error": str(e.__dict__.get("orig", e))}, 500
+
+    except Exception as e:
+        db.session.rollback()
+        return {"error": str(e)}, 500

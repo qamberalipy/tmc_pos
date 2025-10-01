@@ -10,46 +10,71 @@
 
 {% block content %}
 {% endblock %}
-{% block user_page %} 
+{% block user_page %}
 <div class="main-div">
 
-   
+
     <div class="jumbotron jumbotron-fluid rounded bg-white border-0 shadow-sm border-left py-3 px-4">
-    <div class="justify-content-between mb-3 row">  
-            <div class="col-6 col-md-6">  
-              <h5 class="text-pos">Test Booking Management</h5>
+        <div class="justify-content-between mb-3 row">
+            <div class="col-6 col-md-6">
+                <h5 class="text-pos">Test Booking Management</h5>
             </div>
             <div class="col-6 col-md-6 text-end">
-              
-            </div>
-    </div>
-    <div class="text-dark">
-        <div class="table-responsive">
-            <table id="testReg_table" class="table-responsive-sm table-responsive border-0 dataTable no-footer table table-bordered table-hover" style="width:100%">
-                <thead>
-                  <tr>
-                    <th>Booking ID</th>
-                    <th>Patient Name</th>
-                    <th>Date</th>
-                    <th>Referred Dr</th>
-                    <th>MR/Ref No</th>
-                    <th>Test Name</th>
-                    <th>Total Amount</th>
-                    <th>Discount</th>
-                    <th>Net Amount</th>
-                    <th>Recieved</th>
-                    <th>Balance</th>
-                    <th>Action</th>
-                  </tr>
-                </thead>
-                <tbody id="table_body" class=""></tbody>
-              </table>
 
-        </div>        
-        
+            </div>
+        </div>
+        <div class="text-dark">
+            <div class="table-responsive">
+                <table id="testReg_table"
+                    class="table-responsive-sm table-responsive border-0 dataTable no-footer table table-bordered table-hover"
+                    style="width:100%">
+                    <thead>
+                        <tr>
+                            <th>Booking ID</th>
+                            <th>Patient Name</th>
+                            <th>Date</th>
+                            <th>Referred Dr</th>
+                            <th>MR/Ref No</th>
+                            <th>Test Name</th>
+                            <th>Total Amount</th>
+                            <th>Discount</th>
+                            <th>Net Amount</th>
+                            <th>Recieved</th>
+                            <th>Balance</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="table_body" class=""></tbody>
+                </table>
+
+            </div>
+
+        </div>
     </div>
 </div>
+<!-- Technician Comments Modal -->
+<div class="modal fade" id="commentsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Technician Comments</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- History -->
+                <ul id="commentsHistory" class="list-group mb-3"></ul>
+
+                <!-- New Comment -->
+                <textarea id="newComment" class="form-control" placeholder="Write a new comment..."></textarea>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="saveCommentBtn">Save Comment</button>
+            </div>
+        </div>
+    </div>
 </div>
+
 
 {% endblock %}
 
@@ -59,65 +84,138 @@
 <script src="https://cdn.datatables.net/buttons/1.6.5/js/dataTables.buttons.min.js"></script>
 <script src="https://cdn.datatables.net/select/1.3.1/js/dataTables.select.min.js"></script>
 <script>
-$(document).ready(function () {
-  getAllTestBookings();
-});
-function getAllTestBookings() {
-    myshowLoader();
-    return axios.get(baseUrl + "/booking/test-booking")
-        .then(res => {
-            let data = res.data;
-            let dtable = $("#testReg_table").DataTable({
-                destroy: true,
-                responsive: true,
-                pageLength: 14,
-                lengthChange: false
-            });
-            dtable.clear().draw();
+    $(document).ready(function () {
+        getAllTestBookings();
 
-            $.each(data, function (i, t) {
-                // 🔹 Action buttons
-                let printBtn = `
-                    <a href="${baseUrl}/booking/receipt/${t.booking_id}" 
-                      target="_blank" 
-                      class="border btn print-booking" 
-                      data-id="${t.booking_id}">
-                        <i class="bi-printer-fill text-success"></i>
-                    </a>
-                `;
+        // Save comment event
+        $("#saveCommentBtn").on("click", function () {
+            let bookingId = $(this).data("booking-id");
+            let commentText = $("#newComment").val().trim();
 
-                let deleteBtn = `
-                    <button class="border btn delete-booking" data-id="${t.booking_id}">
-                        <i class="bi-trash-fill text-danger"></i>
-                    </button>
-                `;
+            if (!commentText) {
+                showToastMessage("error", "Please enter a comment before saving.");
+                return;
+            }
 
-                let actionBtns = printBtn;
+            let payload = { comment: commentText };
 
-                // 🔹 Add row to datatable
-                dtable.row.add([
-                    `B#${t.booking_id}`,
-                    t.patient_name || "-",
-                    t.date || "-",
-                    t.referred_dr || "-",
-                    t.mr_no || "-",
-                    t.test_name || "-",
-                    t.total_amount || "0",
-                    t.discount || "0",
-                    t.net_amount || "0",
-                    t.received || "0",
-                    t.balance || "0",
-                    actionBtns
-                ]).draw(false);
-            });
-
-            myhideLoader();
-        })
-        .catch(err => {
-            console.error("Error fetching test bookings:", err);
-            myhideLoader();
+            axios.post(baseUrl + "/booking/comments/" + bookingId, payload)
+                .then(res => {
+                    // reload history
+                    loadComments(bookingId);
+                    $("#newComment").val("");
+                })
+                .catch(err => {
+                    // Axios error object may have response or just request error
+                    if (err.response) {
+                        // Server responded with error
+                        let msg = err.response.data?.error || err.response.data?.message || "Unknown server error";
+                        showToastMessage("error", "Failed to save comment: " + msg);
+                        console.error("Server error:", err.response);
+                    } else if (err.request) {
+                        // No response received
+                        showToastMessage("error", "No response from server. Please check your connection.");
+                        console.error("Network error:", err.request);
+                    } else {
+                        // Other error
+                        showToastMessage("error", "Error: " + err.message);
+                        console.error("Error saving comment:", err.message);
+                    }
+                });
         });
-}
+
+    });
+
+    function getAllTestBookings() {
+        myshowLoader();
+        return axios.get(baseUrl + "/booking/test-booking")
+            .then(res => {
+                let data = res.data;
+                let dtable = $("#testReg_table").DataTable({
+                    destroy: true,
+                    responsive: true,
+                    pageLength: 14,
+                    lengthChange: false
+                });
+                dtable.clear().draw();
+
+                $.each(data, function (i, t) {
+                    // 🔹 Action buttons
+                    let printBtn = `
+          <a href="${baseUrl}/booking/receipt/${t.booking_id}" 
+            target="_blank" 
+            class="border btn print-booking" 
+            data-id="${t.booking_id}">
+              <i class="bi-printer-fill text-success"></i>
+          </a>
+        `;
+
+                    let commentBtn = `
+          <button class="border btn comment-booking" data-id="${t.booking_id}">
+            <i class="bi-chat-left-dots-fill text-primary"></i>
+          </button>
+        `;
+
+                    let actionBtns = printBtn + " " + commentBtn;
+
+                    // Add row
+                    dtable.row.add([
+                        `B#${t.booking_id}`,
+                        t.patient_name || "-",
+                        t.date || "-",
+                        t.referred_dr || "-",
+                        t.mr_no || "-",
+                        t.test_name || "-",
+                        t.total_amount || "0",
+                        t.discount || "0",
+                        t.net_amount || "0",
+                        t.received || "0",
+                        t.balance || "0",
+                        actionBtns
+                    ]).draw(false);
+                });
+
+                // Handle comment button click
+                $("#testReg_table").off("click", ".comment-booking").on("click", ".comment-booking", function () {
+                    let bookingId = $(this).data("id");
+                    $("#saveCommentBtn").data("booking-id", bookingId);
+                    loadComments(bookingId);
+                    $("#commentsModal").modal("show");
+                });
+
+                myhideLoader();
+            })
+            .catch(err => {
+                console.error("Error fetching test bookings:", err);
+                myhideLoader();
+            });
+    }
+
+    // 🔹 Load comments into modal
+    function loadComments(bookingId) {
+        axios.get(baseUrl + "/booking/comments/" + bookingId)
+            .then(res => {
+                let comments = res.data.comments || [];
+                let historyHtml = "";
+                if (comments.length === 0) {
+                    historyHtml = `<li class="list-group-item">No comments yet.</li>`;
+                } else {
+                    comments.forEach(c => {
+                        historyHtml += `
+            <li class="list-group-item">
+              <strong>${c.user_name} (${c.role})</strong> 
+              <small class="text-muted float-end">${c.datetime}</small>
+              <br>${c.comment}
+            </li>`;
+                    });
+                }
+                $("#commentsHistory").html(historyHtml);
+            })
+            .catch(err => {
+                console.error("Error loading comments:", err);
+            });
+    }
+
 </script>
 
 <!-- <script src="{{ url_for('registrations.static', filename='js/test_reg.js') }}"></script> -->

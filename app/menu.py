@@ -30,7 +30,7 @@ MENU = {
             {"label": "Referred Dr Reg", "icon": "bi-person-fill-add", "endpoint": "registrations.referred_registration"},
             {"label": "Expense Head Reg", "icon": "bi-house-add-fill", "endpoint": "registrations.expense_registration"},
         ]},
-        {"label": "Booking", "icon": "bi-bank2", "endpoint": None, "children": [
+        {"label": "Booking", "icon": "bi-book", "endpoint": None, "children": [
             {"label": "Test Booking", "icon": "bi-bag-plus-fill", "endpoint": "booking.view_test_booking"},
             {"label": "View Booking", "icon": "bi bi-eye-fill", "endpoint": "booking.view_view_booking"},
         ]},
