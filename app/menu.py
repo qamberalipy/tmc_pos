@@ -12,7 +12,7 @@ MENU = {
         ]},
         {"label": "Transactions", "icon": "bi-currency-exchange", "endpoint": None, "children": [
             {"label": "Payment", "icon": "bi-cash-stack", "endpoint": "users.view_user"},
-            {"label": "Expense", "icon": "bi-wallet2", "endpoint": "#"},
+            {"label": "Expense", "icon": "bi-wallet2", "endpoint": "transactions.view_expenses"},
         ]},
         {"label": "Reports", "icon": "bi-graph-up-arrow", "endpoint": None, "children": [
             {"label": "Daily Collection", "icon": "bi-journal-text", "endpoint": "users.view_user"},
@@ -36,7 +36,7 @@ MENU = {
         ]},
         {"label": "Transactions", "icon": "bi-currency-exchange", "endpoint": None, "children": [
             {"label": "Payment", "icon": "bi-cash-stack", "endpoint": "users.view_user"},
-            {"label": "Expense", "icon": "bi-wallet2", "endpoint": "#"},
+            {"label": "Expense", "icon": "bi-wallet2", "endpoint": "transactions.view_expenses"},
         ]},
         {"label": "Reports", "icon": "bi-graph-up-arrow", "endpoint": None, "children": [
             {"label": "Daily Collection", "icon": "bi-journal-text", "endpoint": "users.view_user"},

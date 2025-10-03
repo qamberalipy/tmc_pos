@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+
+{% block stylesheets %}
+<link rel="stylesheet" href="https://cdn.datatables.net/1.10.22/css/jquery.dataTables.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/responsive/2.2.6/css/responsive.dataTables.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/select/1.3.1/css/select.dataTables.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/buttons/1.6.5/css/buttons.dataTables.min.css">
+<link rel="stylesheet" href="{{ url_for('registrations.static', filename='css/style.css') }}">
+{% endblock stylesheets %}
+
+{% block user_page %}
+<div class="main-div">
+  <div class="jumbotron jumbotron-fluid rounded bg-white border-0 shadow-sm border-left py-3 px-4">
+    <div class="row justify-content-between mb-3">
+      <div class="col-6">
+        <h5 class="text-pos">Expense</h5>
+      </div>
+      <div class="col-6 text-end">
+        <button class="btn btn-primary" id="trigger_add_expensehead">Add Expenses</button>
+      </div>
+    </div>
+
+    <div class="text-dark">
+      <div class="table-responsive">
+        <table id="expense_table" class="table table-bordered table-hover w-100">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Expense Head</th>
+              <th>Amount</th>
+              <th>Paid To</th>
+              <th>Payment Method</th>
+              <th>Branch</th>
+              <th>Created By</th>
+              <th>Created At</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="table_body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add/Edit Expense Head Modal -->
+<div class="modal fade" id="expenseheadModal" tabindex="-1" aria-labelledby="expenseheadModalLabel" aria-hidden="true">
+ <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="expenseheadModalLabel">Add Expense Head</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form id="expensehead_form">
+          <input type="hidden" id="expensehead_id" name="expensehead_id" value="">
+          <div class="m-1 row">
+            <div class="col-md-6 mb-2">
+              <div class="mb-2">
+                <label for="expensehead" class="form-label">Expense Head</label>
+                <select class="form-select" id="expensehead" name="expensehead" required="">
+                  <option value="Utilities">Utilities</option>
+                  <option value="Office Supplies">Office Supplies</option>
+                  <option value="Travel">Travel</option>
+                </select>
+              </div>
+              <div class="mb-2">
+                <label for="expensehead_name" class="form-label">Expense Amount</label>
+                <input type="number" class="form-control" id="expense_amount" name="expense_amount" required="">
+              </div>
+               <div class="mb-2">
+                <label for="payment_method" class="form-label">Payment Method</label>
+                <select class="form-select" id="payment_method" name="payment_method" required="">
+                  <option value="Cash">Cash</option>
+                  <option value="Card">Card</option>
+                  <option value="Online">Online</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+               <div class="mb-2">
+                  <label for="ref_no" class="form-label">Ref No</label>
+                  <input type="text" class="form-control" id="ref_no" name="ref_no">
+
+                </div>
+            </div>
+            <div class="col-md-6 mb-2">
+               <div class="mb-2">
+                <label for="expensehead_description" class="form-label">Paid to</label>
+                <input class="form-control" id="expense_paid_to" name="expense_paid_to">
+              </div>
+             
+              <div class="mb-2">
+                <label for="expensehead_description" class="form-label">Description</label>
+               <textarea class="form-control" id="expensehead_description" name="expensehead_description" rows="8"></textarea>
+  
+              </div>
+          </div>
+
+
+
+
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button id="save_expensehead" type="submit" class="btn btn-primary">Save</button>
+          </div>
+        
+      </div></form>
+    </div>
+  </div>
+</div>
+</div>
+{% endblock %}
+
+{% block javascript %}
+<script src="https://cdn.datatables.net/1.10.22/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/responsive/2.2.6/js/dataTables.responsive.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/1.6.5/js/dataTables.buttons.min.js"></script>
+<script src="https://cdn.datatables.net/select/1.3.1/js/dataTables.select.min.js"></script>
+<script src="{{ url_for('registrations.static', filename='js/expense_head.js') }}"></script>
+{% endblock %}
