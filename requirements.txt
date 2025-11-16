@@ -20,7 +20,7 @@ greenlet==3.2.3
 GitPython==3.1.31
 smmap==5.0.2
 gitdb==4.0.12
-
+gunicorn
 typing_extensions==4.14.1
 click==8.2.2
 colorama==0.4.6
