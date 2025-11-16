@@ -88,7 +88,7 @@ def login():
         return render_template('login.html')
     except Exception as e:
         print(f"Error in login: {str(e)}")
-        return redirect(url_for('main.error_page'))
+        return e
 
 @main_bp.route('/logout')
 def logout():
