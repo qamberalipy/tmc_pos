@@ -1,6 +1,6 @@
 from flask import redirect, render_template,request,jsonify,session, url_for
 from . import transaction_bp
-from app.blueprints.registrations import services as registrations_services
+from app.blueprints.transactions import services as transactions_services
 from app.decorators import login_required
 
 
@@ -24,7 +24,7 @@ def create_expense():
     if bid is not None:
         data["Branch_id"] = str(bid)
 
-    result, status = registrations_services.create_expense(data)
+    result, status = transactions_services.create_expense(data)
     return jsonify(result), status
 
 
@@ -34,13 +34,13 @@ def fetch_expenses():
     branch_id = None if role == "admin" else session.get("branch_id")
     branch_id_str = None if branch_id is None else str(branch_id)
 
-    result, status = registrations_services.get_all_expenses(branch_id_str)
+    result, status = transactions_services.get_all_expenses(branch_id_str)
     return jsonify(result), status
 
 
 @transaction_bp.route("/expenses/<int:expense_id>", methods=["GET"])
 def get_expense_by_id(expense_id):
-    result, status = registrations_services.get_expense_by_id(expense_id)
+    result, status = transactions_services.get_expense_by_id(expense_id)
     return jsonify(result), status
 
 
@@ -51,7 +51,7 @@ def update_expense(expense_id):
     if uid is not None:
         data["updated_by"] = str(uid)
 
-    result, status = registrations_services.update_expense(expense_id, data)
+    result, status = transactions_services.update_expense(expense_id, data)
     return jsonify(result), status
 
 
@@ -60,5 +60,5 @@ def toggle_expense_deleted(expense_id):
     data = request.get_json() or {}
     if "is_deleted" not in data:
         return jsonify({"error": "is_deleted is required"}), 400
-    result, status = registrations_services.toggle_expense_deleted(expense_id, data.get("is_deleted"))
+    result, status = transactions_services.toggle_expense_deleted(expense_id, data.get("is_deleted"))
     return jsonify(result), status

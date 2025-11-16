@@ -1,7 +1,8 @@
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import cast, String
 from app.extensions import db
-from app.models import Expenses, Expense_head, Branch, User  # adjust import paths if needed
+from app.models import Expense_head, Branch, User 
+from app.models.expenses import Expenses
 
 ALLOWED_PAYMENT_METHODS = {"Cash", "Card", "Online", "Other"}
 

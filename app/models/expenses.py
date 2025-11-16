@@ -1,7 +1,7 @@
 from app.extensions import db
 
 class Expenses(db.Model):
-    __tablename__ = 'Expenses'
+    __tablename__ = 'expenses'
 
     id = db.Column(db.Integer, primary_key=True)
     Branch_id = db.Column(db.String(225), nullable=False)
