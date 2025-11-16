@@ -1,0 +1,73 @@
+/* 
+#user_table .switch-toggle-table {
+    position: relative;
+    display: inline-block;
+    width: 40px;
+    height: 20px;
+}
+
+#user_table .switch-toggle-table input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+#user_table .slider-toggle {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: 0.4s;
+    border-radius: 20px;
+}
+
+#user_table .slider-toggle:before {
+    position: absolute;
+    content: "";
+    height: 14px;
+    width: 14px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: 0.4s;
+    border-radius: 50%;
+}
+
+#user_table input:checked + .slider-toggle {
+    background-color: #28a745;
+}
+
+#user_table input:checked + .slider-toggle:before {
+    transform: translateX(20px);
+} */
+/* Make table head black with white text */
+/* Header: black background + white text (targeting table by ID) */
+#test_booking_table thead th {
+  background-color: #1b285d !important;
+  color: #fff !important;
+  border-color: #000 !important;
+}
+
+/* Final row: light greyish background and slightly bolder text.
+   Targets the <tr id="final_fields"> and its <td> children to override Bootstrap/DataTables. */
+#test_booking_table tbody tr#final_fields,
+#test_booking_table tbody tr#final_fields td {
+  background-color: #f2f2f2 !important;
+  font-weight: 600 !important;
+  color: #212529 !important;
+}
+
+/* Optional: subtle top border to separate the final row */
+#test_booking_table tbody tr#final_fields td {
+  border-top: 2px solid #dee2e6 !important;
+}
+#border-top-left {
+  border-top-left-radius: 0.375rem !important;
+}
+
+#border-top-right {
+  border-top-right-radius: 0.375rem !important;
+}

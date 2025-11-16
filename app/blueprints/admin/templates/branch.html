@@ -13,26 +13,28 @@
 {% block user_page %} 
 <div class="main-div">
 
-    <div class="row g-3 justify-content-between mb-3">  
-            <div class="col-md-4">
+   
+    <div class="jumbotron jumbotron-fluid rounded bg-white border-0 shadow-sm border-left py-3 px-4">
+      <div class="row g-3 justify-content-between mb-3">  
+            <div class="col-md-6 col-6">
               <h5 class="text-pos">Branch Management</h5>
             </div>
-            <div class="col-md-4 text-end">
+            <div class="col-md-6 col-6 text-end">
               <!-- <button class="btn btn-primary d-none" id="add_branch_btn" data-bs-toggle="modal" data-bs-target="#addBranchModal">HiddenButton</button> -->
               <button class="btn btn-primary" id="trigger_add_branch">Add Branch</button>
             </div>
     </div>
-    <div class="jumbotron jumbotron-fluid rounded bg-white border-0 shadow-sm border-left py-3 px-4">
     <div class="text-dark">
-        <div>
+        <div class="table-responsive">
             <table id="branch_table" class="table-responsive-sm border-0 dataTable no-footer table table-bordered table-hover" style="width:100%">
                 <thead>
                   <tr>
                     <th>ID</th>
                     <th>Branch</th>
+                    <th>Contact No</th>
+                    <th>Address</th>
                     <th>Description</th>
                     <th>Created By</th>
-                    <th>Created at</th>
                     <th>Status</th>
                     <th>Action</th>
                   </tr>
@@ -47,7 +49,7 @@
 </div>
 <!-- Add Branch Modal -->
 <div class="modal fade" id="addBranchModal" tabindex="-1" aria-labelledby="addBranchModalLabel" aria-hidden="true">
-  <div class="modal-dialog">
+  <div class="modal-dialog modal-lg">
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title" id="addBranchModalLabel">Add Branch</h5>
@@ -55,20 +57,32 @@
       </div>
       <div class="modal-body">
         <form>
-           <div class="mb-3 update-section">
-            <label for="branch_id" class="form-label">Branch ID</label>
+           <div class="mb-2 update-section">
+            <label for="branch_id" class="form-label m-0">Branch ID</label>
             <input type="text" class="form-control" id="branch_id" name="branch_id" disabled>
           </div> 
-          <div class="mb-3">
-            <label for="branch_name" class="form-label">Branch Name</label>
+          <div class="mb-2">
+            <label for="branch_name" class="form-label m-0">Branch Name</label>
             <input type="text" class="form-control" id="branch_name" name="branch_name">
           </div>
-          <div class="mb-3">
-            <label for="branch_description" class="form-label">Description</label>
-            <textarea class="form-control" id="branch_description" name="branch_description" rows="3"></textarea>
+           <div class="mb-2">
+            <label for="contact-no" class="form-label m-0">Contact No</label>
+            <input type="text" class="form-control" id="contact-no" name="contact-no">
           </div>
-          <div class="mb-3 update-section">
-            <label for="created_by" class="form-label">Created By</label>
+          <div class="mb-2">
+            <label for="contact-no2" class="form-label m-0">Additional Contact No</label>
+            <input type="text" class="form-control" id="contact-no2" name="contact-no2">
+          </div>
+          <div class="mb-2">
+            <label for="branch_address" class="form-label m-0">Address</label>
+            <textarea class="form-control" id="branch_address" name="branch_address" rows="2"></textarea>
+          </div>
+          <div class="mb-2">
+            <label for="branch_description" class="form-label m-0">Description</label>
+            <textarea class="form-control" id="branch_description" name="branch_description" rows="2"></textarea>
+          </div>
+          <div class="mb-2 update-section">
+            <label for="created_by" class="form-label m-0">Created By</label>
             <input type="text" class="form-control" id="created_by" name="created_by" disabled>
           </div>
           <button id="create_branch" type="button" class="btn btn-primary create-section">Add Branch</button>

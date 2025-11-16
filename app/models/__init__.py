@@ -3,3 +3,7 @@ from .user import User
 from .test_booking import TestBooking
 from .test_booking_details import TestBookingDetails
 from .role import Role
+from .expense_head import Expense_head
+from .referred import Referred
+from .test_registration import Test_registration
+from .department import Department

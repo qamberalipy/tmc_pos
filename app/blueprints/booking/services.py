@@ -1,0 +1,346 @@
+import json
+from flask import session
+from sqlalchemy import and_, func
+from app.blueprints import booking
+from app.extensions import db
+from app.models import TestBooking, TestBookingDetails,User,Branch,Referred
+from werkzeug.security import generate_password_hash
+from sqlalchemy.exc import SQLAlchemyError
+from decimal import Decimal, InvalidOperation
+from datetime import datetime
+from sqlalchemy.ext.mutable import MutableDict, MutableList
+
+from app.models.test_registration import Test_registration
+
+
+def create_test_booking(data):
+    # --- Required fields validation ---
+    required_fields = ["patient_name", "gender", "contact_no", "branch_id", "net_receivable", "create_by"]
+    missing = [f for f in required_fields if not data.get(f)]
+    if missing:
+        raise ValueError(f"Missing required fields: {', '.join(missing)}")
+
+    # --- Validate gender ---
+    if data["gender"] not in ["Male", "Female", "Other"]:
+        raise ValueError("Invalid gender value. Must be Male, Female, or Other.")
+
+    # --- Validate discount type ---
+    if data.get("discount_type") and data["discount_type"] not in ["None", "Amount", "Percentage"]:
+        raise ValueError("Invalid discount_type. Must be None, Amount, or Percentage.")
+
+    # --- Validate payment type ---
+    if data.get("payment_type") and data["payment_type"] not in ["Cash", "Card", "Online", "Other"]:
+        raise ValueError("Invalid payment_type. Must be Cash, Card, Online, or Other.")
+
+    # --- Safe Decimal conversion helper ---
+    def to_decimal(value, field_name):
+        if value is None:
+            return Decimal("0.00")
+        try:
+            return Decimal(str(value))
+        except (InvalidOperation, ValueError):
+            raise ValueError(f"{field_name} must be a valid number")
+
+    net_receivable = to_decimal(data["net_receivable"], "net_receivable")
+    discount_value = to_decimal(data.get("discount_value", 0), "discount_value")
+    paid_amount = to_decimal(data.get("paid_amount", 0), "paid_amount")
+    due_amount = to_decimal(data.get("due_amount", 0), "due_amount")
+
+    # --- Start transaction ---
+    with db.session.begin():
+        # Create booking
+        booking = TestBooking(
+            mr_no=data.get('mr_no'),
+            patient_name=data['patient_name'],
+            gender=data['gender'],
+            age=data.get('age'),
+            contact_no=data['contact_no'],
+
+            referred_dr=data.get('referred_dr'),
+            referred_non_dr=data.get('referred_non_dr'),
+            give_share_to=data.get('give_share_to', None),
+
+            branch_id=data['branch_id'],
+            total_no_of_films=data.get('total_no_of_films', 0),
+            total_no_of_films_used=data.get('total_no_of_films', 0),
+            discount_type=data.get('discount_type', 'None'),
+            discount_value=discount_value,
+            net_receivable=net_receivable,
+            payment_type=data.get('payment_type', 'Cash'),
+            paid_amount=paid_amount,
+            due_date=data.get('due_date'),
+            due_amount=due_amount,
+
+            create_by=data['create_by']
+        )
+
+        db.session.add(booking)
+        db.session.flush()  # ensures booking.id is available
+
+        # Prepare test details
+        test_details_list = data.get('tests', [])
+        details = []
+
+        for idx, test in enumerate(test_details_list, start=1):
+            if not test.get("test_id"):
+                raise ValueError(f"Test #{idx} missing test_id")
+            if not test.get("amount"):
+                raise ValueError(f"Test #{idx} missing amount")
+
+            amount = to_decimal(test["amount"], f"tests[{idx}].amount")
+
+            reporting_date = None
+            if test.get("reporting_date"):
+                try:
+                    reporting_date = (
+                        datetime.strptime(test["reporting_date"], "%Y-%m-%d").date()
+                        if isinstance(test["reporting_date"], str)
+                        else test["reporting_date"]
+                    )
+                except ValueError:
+                    raise ValueError(f"tests[{idx}].reporting_date must be YYYY-MM-DD")
+
+            details.append(TestBookingDetails(
+                booking_id=booking.id,
+                test_id=test["test_id"],
+                quantity=test.get("quantity", 1),
+                amount=amount,
+                no_of_films=test.get("no_of_films"),
+                required_days=test.get("required_days"),
+                reporting_date=reporting_date,
+                sample_to_follow=test.get("sample_to_follow")
+            ))
+
+        if details:
+            db.session.add_all(details)
+
+    # --- Commit happens automatically at the end of with block ---
+    return {
+        "message": "Booking created successfully",
+        "booking_id": booking.id,
+        "total_tests": len(test_details_list)
+    }
+
+
+def get_booking_details(booking_id: int):
+    """
+    Fetch a booking with related branch, referred doctor, and test details.
+    Optimized for speed and safe error handling.
+    """
+
+    if not booking_id:
+        return {"error": "Invalid booking id"}, 400
+
+    try:
+        # --- Fetch booking ---
+        booking = (
+            db.session.query(TestBooking)
+            .filter(TestBooking.id == booking_id)
+            .first()
+        )
+
+        if not booking:
+            return {"error": "Booking not found"}, 404
+
+        # --- Branch ---
+        branch = (
+            db.session.query(Branch)
+            .with_entities(
+                Branch.branch_name,
+                Branch.contact_number,
+                Branch.address,
+                Branch.additional_contact_number,
+            )
+            .filter(Branch.id == booking.branch_id)
+            .first()
+        )
+
+        # --- Referred doctor ---
+        referred_name = None
+        if booking.referred_dr:
+            referred = (
+                db.session.query(Referred)
+                .with_entities(Referred.name)
+                .filter(Referred.id == booking.referred_dr)
+                .first()
+            )
+            referred_name = referred.name if referred else None
+
+        # --- Tests ---
+        tests = (
+            db.session.query(
+                TestBookingDetails.test_id,
+                TestBookingDetails.quantity,
+                TestBookingDetails.no_of_films,
+                TestBookingDetails.amount,
+                TestBookingDetails.reporting_date,
+                TestBookingDetails.sample_to_follow,
+            )
+            .filter(TestBookingDetails.booking_id == booking.id)
+            .all()
+        )
+
+        test_list = [
+            {
+                "test_id": t.test_id,
+                "quantity": t.quantity,
+                "no_of_films": t.no_of_films,
+                "amount": float(t.amount or 0),
+                "reporting_date": (
+                    t.reporting_date.strftime("%d-%b-%Y %I:%M %p")
+                    if t.reporting_date else None
+                ),
+                "sample_to_follow": t.sample_to_follow,
+            }
+            for t in tests
+        ]
+
+        # --- Deserialize technician comments ---
+        try:
+            technician_comments = (
+                json.loads(booking.technician_comments)
+                if booking.technician_comments
+                else {"comments": []}
+            )
+        except (json.JSONDecodeError, TypeError):
+            technician_comments = {"comments": []}
+
+        # --- Final structured response ---
+        return {
+            "booking_id": booking.id,
+            "mr_no": booking.mr_no,
+            "patient_name": booking.patient_name,
+            "technician_comments": technician_comments,
+            "gender": booking.gender,
+            "age": booking.age,
+            "contact_no": booking.contact_no,
+            "referred_by": referred_name or "Self",
+            "branch": {
+                "name": branch.branch_name if branch else None,
+                "contact": branch.contact_number if branch else None,
+                "address": branch.address if branch else None,
+                "additional_contact": branch.additional_contact_number if branch else None,
+            },
+            "financials": {
+                "discount_type": booking.discount_type,
+                "discount_value": float(booking.discount_value or 0),
+                "net_payable": float(booking.net_receivable or 0),
+                "received": float(booking.paid_amount or 0),
+                "balance": float(booking.due_amount or 0),
+            },
+            "tests": test_list,
+            "printed_at": datetime.now().strftime("%d-%b-%Y %I:%M %p"),
+            "current_user": session.get("user_name"),
+        }, 200
+
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        return {"error": "Database error: " + str(e.__dict__.get("orig", e))}, 500
+
+    except Exception as e:
+        return {"error": "Unexpected error: " + str(e)}, 500
+
+
+def _format_test_booking(row):
+    return {
+        "booking_id": row.id,
+        "patient_name": row.patient_name,
+        "date": row.create_at.strftime("%Y-%m-%d") if row.create_at else None,
+        "referred_dr": row.referred_dr,
+        "mr_no": row.mr_no,
+        "test_name": row.test_names,   # already aggregated string
+        "technician_comments": row.technician_comments,
+        "total_amount": float(row.net_receivable),
+        "discount": float(row.discount_value) if row.discount_value else 0,
+        "net_amount": float(row.net_receivable - row.discount_value) if row.discount_value else float(row.net_receivable),
+        "received": float(row.paid_amount),
+        "balance": float(row.due_amount),
+        "branch": row.branch_name,
+        "created_by": row.created_by_name,
+        "created_at": row.create_at,
+        "updated_at": row.update_at
+    }
+
+
+# 🔹 Get All Bookings (optimized with join + aggregation)
+def get_all_test_bookings(branch_id=None):
+    try:
+        # use group_concat to merge multiple test names
+        query = (
+            db.session.query(
+                TestBooking.id,
+                TestBooking.patient_name,
+                TestBooking.mr_no,
+                Referred.name.label("referred_dr"),
+                TestBooking.net_receivable,
+                TestBooking.discount_value,
+                TestBooking.paid_amount,
+                TestBooking.due_amount,
+                TestBooking.create_at,
+                TestBooking.technician_comments,
+                TestBooking.update_at,
+                Branch.branch_name.label("branch_name"),
+                User.name.label("created_by_name"),
+                func.group_concat(Test_registration.test_name.distinct()).label("test_names")
+            )
+            .join(TestBookingDetails, TestBookingDetails.booking_id == TestBooking.id)
+            .join(Test_registration, Test_registration.id == TestBookingDetails.test_id)
+            .outerjoin(Referred, and_(Referred.id == TestBooking.referred_dr, Referred.is_doctor == True))
+            .outerjoin(Branch, Branch.id == TestBooking.branch_id)
+            .outerjoin(User, User.id == TestBooking.create_by)
+            .group_by(TestBooking.id, Branch.branch_name, User.name)
+            .order_by(TestBooking.create_at.desc())
+        )
+
+        if branch_id:
+            query = query.filter(TestBooking.branch_id == branch_id)
+
+        rows = query.all()
+        return [_format_test_booking(r) for r in rows], 200
+
+    except SQLAlchemyError as e:
+        return {"error": str(e.__dict__.get("orig", e))}, 500
+
+def add_booking_comment(booking_id: int, data):
+    try:
+        comment_text = data.get("comment", "").strip()
+        if not comment_text:
+            return {"error": "Comment is required"}, 400
+
+        booking = TestBooking.query.get_or_404(booking_id)
+
+        # load existing comments or init
+        if booking.technician_comments:
+            comments = json.loads(booking.technician_comments)
+        else:
+            comments = {"comments": []}
+
+        new_comment = {
+            "user_id": session.get("user_id"),
+            "user_name": session.get("user_name"),
+            "role": session.get("user_role"),
+            "comment": comment_text,
+            "datetime": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
+        }
+
+        comments["comments"].append(new_comment)
+
+        # save back as string
+        booking.technician_comments = json.dumps(comments)
+
+        db.session.add(booking)
+        db.session.commit()
+        db.session.refresh(booking)
+
+        print("Saved:", booking.technician_comments)
+
+        return {"message": "Comment added successfully", "data": new_comment}, 201
+
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        return {"error": str(e.__dict__.get("orig", e))}, 500
+
+    except Exception as e:
+        db.session.rollback()
+        return {"error": str(e)}, 500
+

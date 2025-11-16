@@ -1,0 +1,318 @@
+{% extends "base.html" %}
+{% block stylesheets %}
+<!-- <link rel="stylesheet" href="https://cdn.datatables.net/1.10.22/css/jquery.dataTables.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/responsive/2.2.6/css/responsive.dataTables.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/select/1.3.1/css/select.dataTables.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/buttons/1.6.5/css/buttons.dataTables.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/buttons/1.6.5/css/buttons.dataTables.min.css"> -->
+<!-- Select2 CSS -->
+<style>
+  .select2-container {
+    width: 100% !important;
+    /* full width on all screens */
+  }
+
+  @media (max-width: 576px) {
+    .select2-container .select2-selection--single {
+      font-size: 14px;
+      /* smaller font for mobile */
+      padding: 0.25rem 0.5rem;
+      height: auto;
+    }
+
+    .select2-dropdown {
+      font-size: 14px;
+    }
+  }
+</style>
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+
+<!-- Bootstrap 5 theme for Select2 -->
+<link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css"
+  rel="stylesheet" />
+
+<link rel="stylesheet" href="{{ url_for('booking.static', filename='css/style.css') }}">
+{% endblock stylesheets %}
+
+{% block content %}
+{% endblock %}
+{% block user_page %}
+<div class="main-div">
+  <div class="jumbotron jumbotron-fluid rounded bg-white border-0 shadow-sm border-left py-3 px-4">
+    <div class="justify-content-between mb-3 row">
+      <div class="col-6">
+        <h5 class="text-pos">Test Booking</h5>
+      </div>
+      <div class="col-6 text-end">
+        <!-- <button class="btn btn-primary" id="trigger_add_user">Add User</button> -->
+      </div>
+    </div>
+    <div id="receipt_box" class="p-3 px-3 rounded" style="background: #ececec;display: none;">
+      <div class="d-flex justify-content-between align-items-center">
+        <div class="fw-medium">You Have been registered!</div>
+        <button class="btn btn-sm btn-outline-danger" id="close_receipt_btn">
+          <i class="bi bi-x-lg"></i>
+        </button>
+      </div>
+
+      <div class="h2 my-2">(Booking ID: <span id="booking_id"></span>)</div>
+
+      <a class="btn btn-outline-secondary mb-3" id="print_receipt_btn" target="_blank" href="#">
+        <i class="bi bi-printer"></i> Print Receipt
+      </a>
+    </div>
+    <div class="text-dark">
+      <!-- MR Ref No -->
+      <div class="mb-1">
+        <label for="mr_ref_no" class="mb-1">MR/Ref No:</label>
+        <input type="text" id="mr_ref_no" name="mr_ref_no" class="form-control">
+      </div>
+
+      <div class="row">
+        <!-- Left Column -->
+        <div class="col-lg-6 col-md-6 col-sm-12">
+          <!-- Patient Name -->
+          <div class="mb-1">
+            <label for="patient_name" class="mb-1">Patient Name:</label>
+            <div class="d-flex m-0 p-0">
+              <div class="col-3">
+                <select id="patient_title" name="patient_title" class="form-control form-select">
+                  <option value="mr">Mr.</option>
+                  <option value="mrs">Mrs.</option>
+                  <option value="ms">Ms.</option>
+                  <option value="miss">Miss</option>
+                </select>
+              </div>
+              <div class="col-9 ps-2">
+                <input type="text" id="patient_name" name="patient_name" placeholder="Patient Name"
+                  class="form-control">
+              </div>
+            </div>
+          </div>
+
+          <!-- Gender -->
+          <div class="mb-1">
+            <label for="gender" class="mb-1">Gender:</label>
+            <select id="gender" name="gender" class="form-control form-select">
+              <option value="male">Male</option>
+              <option value="female">Female</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+
+          <!-- Age -->
+          <div class="mb-1">
+            <label for="age" class="mb-1">Age:</label>
+            <div class="d-flex">
+              <div class="col-7">
+                <input type="number" id="age" name="age" placeholder="Age" class="form-control">
+              </div>
+              <div class="col-5 ps-2">
+                <select id="age_type" name="age_type" class="form-select">
+                  <option value="years">Years</option>
+                  <option value="months">Months</option>
+                  <option value="days">Days</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Contact No -->
+          <div class="mb-1">
+            <label for="contact_no" class="mb-1">Contact No:</label>
+            <input type="text" id="contact_no" name="contact_no" class="form-control">
+          </div>
+        </div>
+
+        <!-- Right Column -->
+        <div class="col-lg-6 col-md-6 col-sm-12">
+          <!-- Referred Doctor -->
+          <div class="mb-1">
+            <label for="referred_dr" class="mb-1">Referred Dr.:</label>
+            <div class="d-flex m-0 p-0">
+              <div class="col-10">
+                <select id="referred_dr" name="referred_dr" class="form-control form-select">
+                  <option value="ali">Ali</option>
+                  <option value="sara">Sara</option>
+                  <option value="john">John</option>
+                  <option value="doe">Doe</option>
+                </select>
+              </div>
+              <div class="col-2 ps-2">
+                <button type="button"
+                  class="align-items-center btn btn-outline-dark d-flex h-100 justify-content-center w-100">
+                  <i class="bi bi-plus fs-4"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Referred Non-Doctor -->
+          <div class="mb-1">
+            <label for="referred_non_dr" class="mb-1">Referred Non-Dr.:</label>
+            <div class="d-flex">
+              <div class="col-10">
+                <select id="referred_non_dr" name="referred_non_dr" class="form-control form-select">
+                  <option value="hassan">Hassan</option>
+                  <option value="sara">Sara</option>
+                  <option value="john">John</option>
+                  <option value="doe">Doe</option>
+                </select>
+              </div>
+              <div class="col-2 ps-2">
+                <button type="button"
+                  class="align-items-center btn btn-outline-dark d-flex h-100 justify-content-center w-100">
+                  <i class="bi bi-plus fs-4"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Give Share To -->
+          <div class="mb-1">
+            <label class="mb-1">Give Share To:</label>
+            <div class="d-flex my-2">
+              <div class="form-check me-3">
+                <input class="form-check-input" type="radio" name="shareType" id="nobody" value="nobody" checked>
+                <label class="form-check-label" for="nobody">Nobody</label>
+              </div>
+              <div class="form-check me-3">
+                <input class="form-check-input" type="radio" name="shareType" id="doctor" value="doctor">
+                <label class="form-check-label" for="doctor">Referred Doctor</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="shareType" id="nonDoctor" value="nonDoctor">
+                <label class="form-check-label" for="nonDoctor">Referred Non-Doctor</label>
+              </div>
+            </div>
+          </div>
+
+          <!-- Test Name -->
+          <div class="mb-1">
+            <label for="select_test">Test Name:</label>
+            <div class="d-flex">
+              <div class="col-10">
+                <select id="select_test" name="select_test" class="form-control form-select">
+                  <option value="ecg">ECG</option>
+                  <option value="xray">X-Ray</option>
+                  <option value="blood">Blood Test</option>
+                  <option value="mri">MRI</option>
+                </select>
+              </div>
+              <div class="col-2 ps-2">
+                <button type="button" id="add_test_btn"
+                  class="align-items-center btn btn-dark d-flex h-100 justify-content-center w-100">
+                  <i class="bi bi-plus fs-4"></i>
+                </button>
+
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Test Booking Table -->
+      <div class="mt-3 table-section">
+        <table id="test_booking_table" class="table">
+          <thead>
+            <tr>
+              <th class="w-25">Test Name</th>
+              <th class="w-auto">Qty</th>
+              <th>Rate</th>
+              <th>Total</th>
+              <th>Days</th>
+              <th>Sample</th>
+              <th class="d-none">No. of Films</th> <!-- 🔒 Hidden column -->
+              <th>Action</th> <!-- ✅ Added -->
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+
+      </div>
+      <div class="mt-3">
+        <!-- Extra Fields After Table -->
+        <div class="m-0 row">
+          <!-- Left Side -->
+          <div class="col-lg-6 col-md-6 col-sm-12">
+            <!-- Discount -->
+            <div class="mb-2">
+              <label class="form-label">Discount:</label>
+              <div class="d-flex mb-2">
+                <select id="discount_type" class="form-select me-2">
+                  <option value="None">Discount</option>
+                  <option value="Percentage">Percentage</option>
+                  <option value="Amount">Amount</option>
+                </select>
+                <input type="number" id="discount_value" class="form-control" placeholder="Discount Amount">
+              </div>
+            </div>
+
+            <!-- Net Receivable -->
+            <!-- Net Receivable -->
+            <div class="mb-2">
+              <label class="form-label">Net Receivable:</label>
+              <div class="d-flex">
+                <input type="number" id="net_receivable" class="form-control me-2" value="0">
+                <select class="form-select">
+                  <option>Cash</option>
+                  <option>Card</option>
+                  <option>Online</option>
+                </select>
+              </div>
+            </div>
+
+
+
+            <!-- Coupon -->
+            <div class="mb-2">
+              <label class="form-label">Coupon:</label>
+              <div class="d-flex">
+                <input type="text" class="form-control me-2" placeholder="Discount Coupon">
+                <button class="btn btn-success">Apply!</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right Side -->
+          <div class="col-lg-6 col-md-6 col-sm-12">
+            <!-- Net Amount -->
+            <div class="mb-2">
+              <label class="form-label">Net Amount:</label>
+              <input type="number" id="net_amount" class="form-control" value="0" readonly disabled>
+            </div>
+            <!-- Dues -->
+            <div class="mb-2">
+              <label class="form-label">Dues:</label>
+              <input type="number" id="dues" class="form-control" value="" disabled>
+            </div>
+          </div>
+        </div>
+
+        <!-- Submit Button -->
+        <div class="mt-3 text-center">
+          <button class="btn btn-primary px-5 w-100" id="submit_booking">Submit</button>
+
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block javascript %}
+<!-- <script src="https://cdn.datatables.net/1.10.22/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/responsive/2.2.6/js/dataTables.responsive.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/1.6.5/js/dataTables.buttons.min.js"></script>
+<script src="https://cdn.datatables.net/select/1.3.1/js/dataTables.select.min.js"></script> -->
+<!-- Select2 JS -->
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+<script src="{{ url_for('booking.static', filename='js/test_booking.js') }}"></script>
+
+
+
+{% endblock %}

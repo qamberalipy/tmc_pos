@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block stylesheets %}
+<link rel="stylesheet" href="https://cdn.datatables.net/1.10.22/css/jquery.dataTables.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/responsive/2.2.6/css/responsive.dataTables.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/select/1.3.1/css/select.dataTables.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/buttons/1.6.5/css/buttons.dataTables.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/buttons/1.6.5/css/buttons.dataTables.min.css">
+<link rel="stylesheet" href="{{ url_for('registrations.static', filename='css/style.css') }}">
+{% endblock stylesheets %}
+
+{% block content %}
+{% endblock %}
+{% block user_page %} 
+<div class="main-div">
+
+   
+    <div class="jumbotron jumbotron-fluid rounded bg-white border-0 shadow-sm border-left py-3 px-4">
+    <div class="justify-content-between mb-3 row">  
+            <div class="col-6 col-md-6">  
+              <h5 class="text-pos">Test Registration Management</h5>
+            </div>
+            <div class="col-6 col-md-6 text-end">
+              
+            </div>
+    </div>
+    <div class="text-dark">
+        <div class="table-responsive">
+            <table id="testReg_table" class="table-responsive-sm table-responsive border-0 dataTable no-footer table table-bordered table-hover" style="width:100%">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Test Name</th>
+                    <th>Sample Collection</th>
+                    <th>Department</th>
+                    <th>Charges</th>
+                    <th>Required Days</th>
+                    <th>Seq No</th>
+                    <th>Description</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="table_body" class=""></tbody>
+              </table>
+
+        </div>        
+        
+    </div>
+</div>
+</div>
+<!-- Add testReg Modal -->
+<div class="modal fade" id="addtestRegModal" tabindex="-1" aria-labelledby="addtestRegModalLabel" aria-hidden="true">
+  <div class="modal-dialog  modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="addtestRegModalLabel">Update Test</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form>        <div class="row">
+          <div class="col-lg-6 col-md-6 col-sm-12 col-xl-6">
+            <label class="my-2">Test Name</label>
+            <input type="text" class="form-control" id="test_name" name="test_name">
+            <label class="my-2">Sample Collection</label>
+            <input type="text" class="form-control" id="sample_collection" name="sample_collection">
+            <label class="my-2">Department Name</label>
+            <select class="form-select" id="department_name" name="department_name">
+              <option value="">Select Department</option>
+              <option value="department1">Department 1</option>
+              <option value="department2">Department 2</option>
+            </select>
+           
+            <label class="my-2">Charge</label>
+            <input type="text" class="form-control" id="charge" name="charge">
+                        <label class="my-2">Required Days</label>
+            <input type="number" class="form-control" id="required_days" name="required_days">
+          </div>
+          <div class="col-lg-6 col-md-6 col-sm-12 col-xl-6">
+
+          
+
+            <label class="my-2">Sequence No</label>
+            <input type="text" class="form-control" id="sequence" name="sequence">
+            <label class="my-2">No of Films required</label>
+            <input type="number" class="form-control" id="no_of_films" name="no_of_films" value="0">
+            <label class="my-2">Description</label>
+            <textarea class="form-control" id="description" name="description" rows="8"></textarea>
+          </div>
+        </div>
+      
+
+
+         
+          <button id="update_testReg" type="button" class="btn btn-primary update-section">Save</button>
+
+
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block javascript %}
+<script src="https://cdn.datatables.net/1.10.22/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/responsive/2.2.6/js/dataTables.responsive.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/1.6.5/js/dataTables.buttons.min.js"></script>
+<script src="https://cdn.datatables.net/select/1.3.1/js/dataTables.select.min.js"></script>
+<script src="{{ url_for('registrations.static', filename='js/test_reg.js') }}"></script>
+
+
+
+{% endblock %}

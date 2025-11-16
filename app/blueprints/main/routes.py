@@ -70,6 +70,7 @@ def login():
                 session['user_email'] = user.get('email')
                 session['user_role'] = user.get('role')
                 session['role_id'] = user.get('role_id')
+                session['branch_id'] = user.get('branch_id')
                 flash('Login successful!', 'success')
                 return redirect(url_for('admin.view_admin_dashboard'))
             else:

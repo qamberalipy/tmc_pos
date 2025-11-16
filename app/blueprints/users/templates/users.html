@@ -13,18 +13,19 @@
 {% block user_page %} 
 <div class="main-div">
 
-    <div class="row g-3 justify-content-between mb-3">  
-            <div class="col-md-4">
+   
+    <div class="jumbotron jumbotron-fluid rounded bg-white border-0 shadow-sm border-left py-3 px-4">
+    <div class="justify-content-between mb-3 row">  
+            <div class="col-6 col-md-6">
               <h5 class="text-pos">User Management</h5>
             </div>
-            <div class="col-md-4 text-end">
+            <div class="col-6 col-md-6 text-end">
               <button class="btn btn-primary" id="trigger_add_user">Add User</button>
             </div>
     </div>
-    <div class="jumbotron jumbotron-fluid rounded bg-white border-0 shadow-sm border-left py-3 px-4">
     <div class="text-dark">
-        <div>
-            <table id="user_table" class="table-responsive-sm border-0 dataTable no-footer table table-bordered table-hover" style="width:100%">
+        <div class="table-responsive">
+            <table id="user_table" class="table-responsive-sm table-responsive border-0 dataTable no-footer table table-bordered table-hover" style="width:100%">
                 <thead>
                   <tr>
                     <th>ID</th>

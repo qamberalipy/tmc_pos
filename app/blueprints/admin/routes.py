@@ -71,3 +71,12 @@ def get_all_roles():
     except Exception as e:
         print(f"Error fetching roles: {str(e)}")
         return jsonify({"status": "error", "message": "Something went wrong"}), 500
+
+@admin_bp.route('/department/list', methods=['GET'])
+def get_all_departments():
+    try:
+        data = admin_services.get_all_department_service()
+        return jsonify(data), 200
+    except Exception as e:
+        print(f"Error fetching departments: {str(e)}")
+        return jsonify({"status": "error", "message": "Something went wrong"}), 500
