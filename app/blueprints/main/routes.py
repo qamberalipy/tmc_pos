@@ -3,11 +3,19 @@ from app.blueprints.main import main_bp
 from app.blueprints.main.services import create_user, get_user_by_email
 from werkzeug.security import check_password_hash
 from app.decorators import login_required
+import git
+
 @main_bp.route('/')
 def home():
     return render_template('login.html')
 
-
+@main_bp.route('/git_update', methods=['POST'])
+def git_update():
+    repo = git.Repo('./tmc_pos')
+    origin = repo.remotes.origin
+    repo.create_head('main',origin.refs.main).set_tracking_branch(origin.refs.main).checkout()
+    origin.pull()
+    return '', 200
 
 @main_bp.route('/dashboard')
 @login_required
