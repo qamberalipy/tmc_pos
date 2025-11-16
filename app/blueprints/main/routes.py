@@ -9,14 +9,6 @@ import git
 def home():
     return render_template('login.html')
 
-@main_bp.route('/git_update', methods=['POST'])
-def git_update():
-    repo = git.Repo('./tmc_pos')
-    origin = repo.remotes.origin
-    repo.create_head('main',origin.refs.main).set_tracking_branch(origin.refs.main).checkout()
-    origin.pull()
-    return '', 200
-
 @main_bp.route('/dashboard')
 @login_required
 def dashboard():
