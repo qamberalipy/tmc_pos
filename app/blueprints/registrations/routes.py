@@ -83,6 +83,14 @@ def toggle_expense_head_status(head_id):
         return jsonify({"error": "is_active is required"}), 400
     result, status = registrations_services.toggle_expense_head_status(head_id, data.get("is_active"))
     return jsonify(result), status
+@registrations_bp.route('/expense-head/list', methods=['GET'])
+def get_all_expense_heads_list():
+    try:
+        data = registrations_services.get_all_expense_head_list(session.get("branch_id"))
+        return jsonify(data), 200
+    except Exception as e:
+        print(f"Error in get_all_expense_heads_list: {str(e)}")
+        return jsonify({"error": "An error occurred"}), 500
 
 @registrations_bp.route("/referred", methods=["POST"])
 def create_referred():

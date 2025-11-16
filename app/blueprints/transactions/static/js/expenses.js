@@ -6,7 +6,39 @@ $(document).on("click", "#trigger_add_expense", function () {
     $("#expense_id").val(""); // clear hidden ID
     $("#expenseModalLabel").text("Add Expense");
     $("#expenseModal").modal("show");
+    $('#payment_method').val('').trigger('change'); // Reset select2
 });
+function loadExpenseHeads() {
+    const $select = $("#expense_head_id");
+    $select.html('<option value="">Loading...</option>');
+    axios.get(`${baseUrl}/registrations/expense-head/list`)
+        .then(function (response) {
+            const data = response.data;
+
+            // If no records
+            if (!data || data.length === 0) {
+                $select.html('<option value="">--No Record--</option>');
+                return;
+            }
+
+            // Clear and set default first option
+            $select.html('<option value="">--Select Expense Head--</option>');
+
+            // Populate options
+            data.forEach(function (item) {
+                $select.append(
+                    `<option value="${item.id}">${item.name}</option>`
+                );
+            });
+        })
+        .catch(function (error) {
+            console.error("Error loading expense heads:", error);
+
+            // Show an error message in the select
+            $select.html('<option value="">Error loading data</option>');
+        });
+}
+
 
 // Load all Expenses into DataTable
 function getAllExpenses() {
@@ -160,7 +192,7 @@ $(document).on("click", ".edit-expense", function () {
     axios.get(`${baseUrl}/transactions/expenses/${expId}`)
         .then(res => {
             const exp = res.data;
-
+            console.log("Update data",exp);
             $("#expenseModalLabel").text("Edit Expense");
             $("#expense_id").val(exp.id);
             $("#expense_head_id").val(exp.expense_head_id);  // Assumes ID is in response
@@ -183,5 +215,7 @@ $(document).on("click", ".edit-expense", function () {
 
 // Load expenses on page ready
 $(document).ready(function () {
+
+    loadExpenseHeads()
     getAllExpenses();
 });

@@ -10,7 +10,8 @@ def _format_expense(exp, branch_name=None, created_by_name=None, expense_head_na
     return {
         "id": exp.id,
         "branch": branch_name,                        # from Branch
-        "expense_head": expense_head_name,            # from Expense_head
+        "expense_head": expense_head_name, 
+        "expense_head_id": exp.expense_head_id,                  # from Expense_head
         "amount": exp.amount,
         "description": exp.description,
         "is_deleted": exp.is_deleted,

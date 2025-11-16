@@ -11,7 +11,7 @@ MENU = {
             {"label": "Expense Head Reg", "icon": "bi-house-add-fill", "endpoint": "registrations.expense_registration"},
         ]},
         {"label": "Transactions", "icon": "bi-currency-exchange", "endpoint": None, "children": [
-            {"label": "Payment", "icon": "bi-cash-stack", "endpoint": "users.view_user"},
+            {"label": "Payment", "icon": "bi-cash-stack", "endpoint": "#"},
             {"label": "Expense", "icon": "bi-wallet2", "endpoint": "transactions.view_expenses"},
         ]},
         {"label": "Reports", "icon": "bi-graph-up-arrow", "endpoint": None, "children": [
@@ -35,7 +35,7 @@ MENU = {
             {"label": "View Booking", "icon": "bi bi-eye-fill", "endpoint": "booking.view_view_booking"},
         ]},
         {"label": "Transactions", "icon": "bi-currency-exchange", "endpoint": None, "children": [
-            {"label": "Payment", "icon": "bi-cash-stack", "endpoint": "users.view_user"},
+            {"label": "Payment", "icon": "bi-cash-stack", "endpoint": "#"},
             {"label": "Expense", "icon": "bi-wallet2", "endpoint": "transactions.view_expenses"},
         ]},
         {"label": "Reports", "icon": "bi-graph-up-arrow", "endpoint": None, "children": [

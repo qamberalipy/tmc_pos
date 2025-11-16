@@ -142,6 +142,23 @@ def _format_referred(r, branch_name=None, created_by_name=None):
         "updated_at": r.updated_at
     }
 
+def get_all_expense_head_list(branch_id):
+    try:
+        heads = Expense_head.query.filter(Expense_head.is_active == True, Expense_head.branch_id == branch_id).all()
+        return [
+            {
+                "id": heads.id,
+                "name": heads.name
+            }
+            for heads in heads
+        ]
+    except SQLAlchemyError as e:
+        print(f"Database error while fetching expense heads: {str(e)}")
+        raise
+    except Exception as e:
+        print(f"Unexpected error in get_all_expense_head_list: {str(e)}")
+        raise
+
 # 🔹 Create
 def create_referred(data):
     try:
