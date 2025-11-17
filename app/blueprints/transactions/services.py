@@ -53,7 +53,7 @@ def create_expense(data):
             return {"error": f"payment_method must be one of {sorted(ALLOWED_PAYMENT_METHODS)}"}, 400
 
         exp = Expenses(
-            Branch_id=str(data["Branch_id"]),
+            branch_id=str(data["Branch_id"]),
             expense_head_id=expense_head_id,
             amount=amount,
             description=data.get("description"),
@@ -81,14 +81,15 @@ def get_all_expenses(branch_id_str=None):
                 User.name.label("created_by_name"),
                 Expense_head.name.label("expense_head_name")
             )
-            .join(Branch, cast(Branch.id, String) == Expenses.Branch_id)
-            .join(User, cast(User.id, String) == Expenses.created_by)
+            .join(Branch, Branch.id == Expenses.branch_id)
+            .join(User, User.id == Expenses.created_by)
             .join(Expense_head, Expense_head.id == Expenses.expense_head_id)
-            .filter(Expenses.is_deleted == False)  # show only active by default
+            .filter(Expenses.is_deleted == False)
         )
 
+        # If branch_id_str comes as string, convert to int
         if branch_id_str:
-            query = query.filter(Expenses.Branch_id == str(branch_id_str))
+            query = query.filter(Expenses.branch_id == int(branch_id_str))
 
         results = query.all()
 
@@ -96,8 +97,10 @@ def get_all_expenses(branch_id_str=None):
             _format_expense(e, branch_name, created_by_name, expense_head_name)
             for e, branch_name, created_by_name, expense_head_name in results
         ], 200
+
     except SQLAlchemyError as e:
         db.session.rollback()
+        print({"error": str(e.__dict__.get("orig", e))})
         return {"error": str(e.__dict__.get("orig", e))}, 500
 
 # Get One by ID (joined)
@@ -110,8 +113,8 @@ def get_expense_by_id(expense_id):
                 User.name.label("created_by_name"),
                 Expense_head.name.label("expense_head_name")
             )
-            .outerjoin(Branch, cast(Branch.id, String) == Expenses.Branch_id)
-            .outerjoin(User, cast(User.id, String) == Expenses.created_by)
+            .outerjoin(Branch, Branch.id == Expenses.branch_id)
+            .outerjoin(User, User.id == Expenses.created_by)
             .outerjoin(Expense_head, Expense_head.id == Expenses.expense_head_id)
             .filter(Expenses.id == expense_id)
             .first()
@@ -132,7 +135,7 @@ def update_expense(expense_id, data):
             return {"error": "Expense not found"}, 404
 
         if "Branch_id" in data and data["Branch_id"] is not None:
-            exp.Branch_id = str(data["Branch_id"])
+            exp.branch_id = str(data["Branch_id"])
 
         if "expense_head_id" in data and data["expense_head_id"] is not None:
             try:
@@ -170,6 +173,7 @@ def update_expense(expense_id, data):
         return {"message": "Expense updated successfully"}, 200
     except SQLAlchemyError as e:
         db.session.rollback()
+        print({"error": str(e.__dict__.get("orig", e))})
         return {"error": str(e.__dict__.get("orig", e))}, 500
 
 # Toggle soft delete
