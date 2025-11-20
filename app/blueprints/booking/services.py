@@ -179,12 +179,19 @@ def inventory_transaction(quantity, transaction_type, handled_by, branch_id, boo
     db.session.add(txn)
     return txn
 
-def edit_film_usage_by_booking(booking_id, new_films_used,usage_type,edited_by, reason="Edited film usage"):
+def edit_film_usage_by_booking(booking_id, new_films_used, usage_type, edited_by, reason="Edited film usage"):
     print("Editing film usage:", booking_id, new_films_used, usage_type, edited_by, reason)
+
+    # ---- Basic Validations ----
+    if not booking_id:
+        return {"error": "booking_id is required"}, 400
+        
     if new_films_used is None or new_films_used < 0:
         return {"error": "Invalid new_films_used value"}, 400
+
     if usage_type not in ['Normal', 'Extra', 'Repeat', 'Error']:
         return {"error": "Invalid usage_type value"}, 400
+
     usage = TestFilmUsage.query.filter_by(booking_id=booking_id).first()
     if not usage:
         return {"error": "Film usage not found for this booking"}, 404
@@ -192,32 +199,36 @@ def edit_film_usage_by_booking(booking_id, new_films_used,usage_type,edited_by, 
     old_value = usage.films_used
     difference = new_films_used - old_value
 
-    with db.session.begin():
+    try:
+        # ❗ NO db.session.begin() HERE ❗
 
-        # STORE ONE-LEVEL HISTORY
+        # STORE LAST EDIT
         usage.last_edited_old_value = old_value
         usage.last_edited_at = datetime.utcnow()
         usage.last_edited_by = edited_by
         usage.usage_type = usage_type
-        # UPDATE THE FILMS USED
+
+        # UPDATE REQUIRED FIELDS
+        usage.used_by = edited_by
+        usage.used_at = datetime.utcnow()
+
+        # UPDATE FILMS USED
         usage.films_used = new_films_used
         usage.reason = reason
         db.session.add(usage)
 
         # INVENTORY IMPACT
         if difference > 0:
-            # MORE FILMS USED
             inventory_transaction(
                 quantity=difference,
                 transaction_type="OUT",
-                handled_by=edited_by,  
+                handled_by=edited_by,
                 branch_id=usage.branch_id,
                 booking_id=booking_id,
                 reason="Film usage increased"
             )
 
         elif difference < 0:
-            # LESS FILMS USED
             inventory_transaction(
                 quantity=abs(difference),
                 transaction_type="ADJUST",
@@ -227,16 +238,24 @@ def edit_film_usage_by_booking(booking_id, new_films_used,usage_type,edited_by, 
                 reason="Film usage reduced"
             )
 
-        # UPDATE TOTAL FILMS IN BOOKING
+        # UPDATE BOOKING TOTAL FILMS
         update_booking_total_films(booking_id)
 
-    return {
-        "message": "Film usage updated",
-        "old_value": old_value,
-        "new_value": new_films_used,
-        "difference": difference,
-        "previous_edit_stored": usage.last_edited_old_value
-    }
+        # FINAL COMMIT
+        db.session.commit()
+
+        return {
+            "message": "Film usage updated",
+            "old_value": old_value,
+            "new_value": new_films_used,
+            "difference": difference,
+            "previous_edit_stored": old_value
+        },201
+
+    except Exception as e:
+        db.session.rollback()
+        print("Film usage update error:", str(e))
+        return {"error": str(e)}, 500
 
 
 def get_booking_details(booking_id: int):

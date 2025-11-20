@@ -319,6 +319,8 @@
                 $("#testReg_table").off("click", ".edit-films").on("click", ".edit-films", function () {
                     let bookingId = $(this).data("id");
                     let currentFilms = $(this).data("films");
+                    $("#changedFilmsInput").val("");
+                    $("#reasonInput").val("");
                     $("#currentFilmsInput").val(currentFilms);
                     $("#bookingIdInput").val(bookingId);
                     $("#filmsModal").modal("show");
