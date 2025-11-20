@@ -49,3 +49,33 @@ class TestBooking(db.Model):
     create_at = db.Column(db.DateTime, default=datetime.utcnow)
     update_by = db.Column(db.Integer)
     update_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class TestFilmUsage(db.Model):
+    __tablename__ = "test_film_usage"
+
+    id = db.Column(db.Integer, primary_key=True)
+    booking_id = db.Column(db.Integer, db.ForeignKey('test_booking.id'), nullable=False)
+    films_required = db.Column(db.Integer, default=0)
+    films_used = db.Column(db.Integer, nullable=False)
+    last_edited_old_value = db.Column(db.Integer, nullable=True)
+    usage_type = db.Column(db.Enum('Normal', 'Extra', 'Repeat', 'Error', name='usage_type_enum'), nullable=False)
+    reason = db.Column(db.String(255))  
+    used_by = db.Column(db.Integer, nullable=False)
+    used_at = db.Column(db.DateTime, default=datetime.utcnow)
+    branch_id = db.Column(db.Integer, nullable=False)
+    last_edited_by = db.Column(db.Integer, nullable=True)
+    last_edited_at = db.Column(db.DateTime, nullable=True)
+
+
+class FilmInventoryTransaction(db.Model):
+    __tablename__ = "film_inventory_transactions"
+
+    id = db.Column(db.Integer, primary_key=True)
+    transaction_date = db.Column(db.DateTime, default=datetime.utcnow)
+    transaction_type = db.Column(db.Enum('IN', 'OUT', 'ADJUST', name='trans_type_enum'),nullable=False)
+    quantity = db.Column(db.Integer, nullable=False)
+    booking_id = db.Column(db.Integer, db.ForeignKey('test_booking.id'), nullable=True)
+    reason = db.Column(db.String(255))
+    handled_by = db.Column(db.Integer, nullable=False)
+    branch_id = db.Column(db.Integer, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)

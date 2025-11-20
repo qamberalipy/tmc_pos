@@ -86,4 +86,19 @@ def add_booking_comment(booking_id):
     print("Add Comment Response:", result, status)
     return jsonify(result), status
 
+@booking_bp.route("/films/", methods=["POST"])
+def edit_film_usage():
+    data = request.get_json()
+    edited_by = session.get("user_id")
+
+    result, status = booking_services.edit_film_usage_by_booking(
+        data.get("booking_id"),
+        data.get("new_films_used"),
+        data.get("usage_type"),
+        edited_by,
+        data.get("reason")
+    )
+
+    print("Edit Film Usage Response:", result, status)
+    return jsonify(result), status
 
