@@ -101,6 +101,37 @@
         </div>
     </div>
 </div>
+<div class="modal fade" id="filmsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit Films</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="bookingIdInput">
+                <label class="mb-1">Current Films:</label>
+                <input type="number" class="form-control" id="currentFilmsInput" disabled>
+                <label class="mb-1">Changed To *</label>
+                <input type="number" class="form-control" id="changedFilmsInput">
+                <label class="mb-1">Cause *</label>
+                <select id="causeSelect" class="form-control ">
+                    <option value="Extra">Extra</option>
+                    <option value="Repeat">Repeat</option>
+                    <option value="Error">Error</option>
+                </select>
+                <label class="mb-1">Reason *</label>
+                <textarea name="" id="reasonInput" rows="5" class="form-control"></textarea>
+
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="SaveEditfilms">Save Comment</button>
+            </div>
+        </div>
+    </div>
+</div>
 
 
 {% endblock %}
@@ -145,6 +176,79 @@
                     myhideLoader();
                 });
         });
+        $("#SaveEditfilms").on("click", function () {
+
+            const bookingId = $("#bookingIdInput").val();
+            const currentFilms = Number($("#currentFilmsInput").val());
+            const newFilms = Number($("#changedFilmsInput").val());
+            const usageType = $("#causeSelect").val();
+            const reason = $("#reasonInput").val().trim();
+
+            // -------------------------
+            // VALIDATION
+            // -------------------------
+
+            if (!bookingId) {
+                showToastMessage("error", "Invalid booking ID.");
+                return;
+            }
+
+            if (isNaN(newFilms)) {
+                showToastMessage("error", "Please enter a valid number for films.");
+                return;
+            }
+
+            if (newFilms <= 0) {
+                showToastMessage("error", "Films cannot be zero or negative.");
+                return;
+            }
+
+            if (!usageType) {
+                showToastMessage("error", "Please select a usage type.");
+                return;
+            }
+
+            if (!reason) {
+                showToastMessage("error", "Please enter reason.");
+                return;
+            }
+
+            // -------------------------
+            // CREATE PAYLOAD
+            // -------------------------
+            const payload = {
+                booking_id: parseInt(bookingId),
+                new_films_used: newFilms,
+                usage_type: usageType,
+                reason: reason
+            };
+
+            myshowLoader();
+
+            axios.post(baseUrl + "/booking/films/", payload)
+                .then((res) => {
+                    showToastMessage("success", "Film usage updated successfully!");
+
+                    // Optional: update UI fields
+                    $("#currentFilmsInput").val(newFilms);
+
+                    // Close modal
+                    $(".modal").modal("hide");
+                })
+                .catch((err) => {
+                    const msg =
+                        err.response?.data?.error ||
+                        err.response?.data?.message ||
+                        err.message;
+
+                    showToastMessage("error", "Failed to update: " + msg);
+                    console.error("Error updating film usage:", err);
+                })
+                .finally(() => {
+                    myhideLoader();
+                });
+        });
+
     });
 
     function getAllTestBookings() {
@@ -176,8 +280,12 @@
                            <i class="bi-chat-left-dots-fill text-primary"></i>
                         </button>
                     `;
+                    let filmsBtn = `
+                        <button class="border btn edit-films" data-id="${t.booking_id}" data-films="${t.total_films || 0}">
+                           <i class="bi-pencil-square text-dark"></i>
+                        </button>`; // Placeholder for future film usage button
 
-                    let actionBtns = printBtn + " " + commentBtn;
+                    let actionBtns = printBtn + " " + commentBtn + " " + filmsBtn;
 
                     // Add row
                     dtable.row.add([
@@ -205,6 +313,19 @@
                     fetchComments(bookingId);
 
                     $("#commentsModal").modal("show");
+                });
+
+                // Handle edit films button click
+                $("#testReg_table").off("click", ".edit-films").on("click", ".edit-films", function () {
+                    let bookingId = $(this).data("id");
+                    let currentFilms = $(this).data("films");
+                    $("#changedFilmsInput").val("");
+                    $("#reasonInput").val("");
+                    $("#currentFilmsInput").val(currentFilms);
+                    $("#bookingIdInput").val(bookingId);
+                    $("#filmsModal").modal("show");
+                    // You can now use bookingId and currentFilms to show a modal or prompt for editing
+                    console.log("Edit films for booking:", bookingId, "Current films:", currentFilms);
                 });
 
                 myhideLoader();
