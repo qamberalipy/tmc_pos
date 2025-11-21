@@ -1,6 +1,6 @@
 import json
 from flask import session
-from sqlalchemy import func, and_, cast, String
+from sqlalchemy import func, and_, cast, String,case
 from app.blueprints import booking
 from app.extensions import db
 from app.models import TestBookingDetails,User,Branch,Referred
@@ -177,7 +177,89 @@ def inventory_transaction(quantity, transaction_type, handled_by, branch_id, boo
     )
     
     db.session.add(txn)
+    db.session.flush()  # ← REQ
     return txn
+
+
+
+
+def get_inventory_summary(from_date, to_date, branch_id):
+    base_query = FilmInventoryTransaction.query.filter(
+        FilmInventoryTransaction.branch_id == branch_id
+    )
+    print("Base Query:", base_query)
+    # Apply date filters
+    if from_date:
+        base_query = base_query.filter(FilmInventoryTransaction.transaction_date >= from_date)
+    if to_date:
+        base_query = base_query.filter(FilmInventoryTransaction.transaction_date <= to_date)
+
+    # Separate queries
+    total_in = base_query.filter(
+        FilmInventoryTransaction.transaction_type == "IN"
+    ).with_entities(func.coalesce(func.sum(FilmInventoryTransaction.quantity), 0)).scalar()
+
+    total_out = base_query.filter(
+        FilmInventoryTransaction.transaction_type == "OUT"
+    ).with_entities(func.coalesce(func.sum(FilmInventoryTransaction.quantity), 0)).scalar()
+
+    balance = (total_in or 0) - (total_out or 0)
+
+    return {
+        "total_in": int(total_in or 0),
+        "total_out": int(total_out or 0),
+        "balance": balance
+    }
+
+def get_films_audit(branch_id=None, from_date=None, to_date=None):
+    try:
+        query = (
+            db.session.query(
+                TestFilmUsage.id.label("usage_id"),
+                TestFilmUsage.booking_id,
+                TestFilmUsage.films_required,
+                TestFilmUsage.films_used,
+                TestFilmUsage.usage_type,
+                TestFilmUsage.reason,
+                TestFilmUsage.used_at,
+                User.name.label("used_by_name")
+            )
+            .join(User, User.id == TestFilmUsage.used_by, isouter=True)
+        )
+
+        # Filter branch
+        if branch_id:
+            query = query.filter(TestFilmUsage.branch_id == branch_id)
+
+        # Filter by date range
+        if from_date:
+            query = query.filter(TestFilmUsage.used_at >= from_date)
+
+        if to_date:
+            query = query.filter(TestFilmUsage.used_at <= to_date)
+
+        query = query.order_by(TestFilmUsage.used_at.desc())
+
+        records = query.all()
+
+        result = []
+        for r in records:
+            result.append({
+                "booking_id": r.booking_id,
+                "films_required": r.films_required,
+                "films_used": r.films_used,
+                "usage_type": r.usage_type,
+                "reason": r.reason,
+                "used_by": r.used_by_name or "Unknown",
+                "used_at": r.used_at.strftime("%Y-%m-%d %H:%M:%S") if r.used_at else None
+            })
+
+        return {"data": result}, 200
+
+    except Exception as e:
+        print("Error in get_films_audit:", str(e))
+        return {"error": str(e)}, 500
+
 
 def edit_film_usage_by_booking(booking_id, new_films_used, usage_type, edited_by, reason="Edited film usage"):
     print("Editing film usage:", booking_id, new_films_used, usage_type, edited_by, reason)
