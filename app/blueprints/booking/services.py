@@ -1,13 +1,14 @@
 import json
 from flask import session
-from sqlalchemy import func, and_, cast, String,case
+from sqlalchemy import func, and_, cast, String,case,Date
 from app.blueprints import booking
 from app.extensions import db
 from app.models import TestBookingDetails,User,Branch,Referred
 from werkzeug.security import generate_password_hash
 from sqlalchemy.exc import SQLAlchemyError
 from decimal import Decimal, InvalidOperation
-from datetime import datetime
+from datetime import datetime, date, time
+from werkzeug.exceptions import BadRequest
 from sqlalchemy.ext.mutable import MutableDict, MutableList
 from app.models.test_booking import TestFilmUsage, TestBooking,FilmInventoryTransaction
 from app.models.test_registration import Test_registration
@@ -181,35 +182,125 @@ def inventory_transaction(quantity, transaction_type, handled_by, branch_id, boo
     return txn
 
 
+def get_inventory_summary(from_date, to_date, branch_id=None):
+    try:
+        # ---------------------------
+        # Validate date inputs
+        # ---------------------------
+        if not from_date or not to_date:
+            raise BadRequest("Both from_date and to_date are required.")
 
+        # Convert → date
+        try:
+            from_date = datetime.strptime(from_date, "%Y-%m-%d").date()
+            to_date   = datetime.strptime(to_date, "%Y-%m-%d").date()
+        except ValueError:
+            raise BadRequest("Date format must be YYYY-MM-DD.")
 
-def get_inventory_summary(from_date, to_date, branch_id):
-    base_query = FilmInventoryTransaction.query.filter(
-        FilmInventoryTransaction.branch_id == branch_id
+        if from_date > to_date:
+            raise BadRequest("from_date cannot be greater than to_date.")
+
+        start_dt = datetime.combine(from_date, time.min)
+        end_dt   = datetime.combine(to_date, time.max)
+
+        q = FilmInventoryTransaction
+
+        # ---------------------------
+        # Correct CASE usage
+        # ---------------------------
+        query = db.session.query(
+            func.sum(case((q.transaction_type == "IN", q.quantity), else_=0)).label("total_in"),
+            func.sum(case((q.transaction_type == "OUT", q.quantity), else_=0)).label("total_out")
+        ).filter(
+            q.transaction_date >= start_dt,
+            q.transaction_date <= end_dt
+        )
+
+        if branch_id is not None:
+            query = query.filter(q.branch_id == branch_id)
+
+        results = query.one()
+
+        total_in = int(results.total_in or 0)
+        total_out = int(results.total_out or 0)
+
+        return {
+            "total_in": total_in,
+            "total_out": total_out,
+            "balance": total_in - total_out,
+            "status": "success"
+        }
+
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": str(e)
+        }
+
+def get_film_inventory_report(branch_id=None, from_date=None, to_date=None):
+    
+        # Convert to date
+    print("Generating report for:", branch_id, from_date, to_date)
+    from_date = datetime.strptime(from_date, "%Y-%m-%d").date()
+    to_date = datetime.strptime(to_date, "%Y-%m-%d").date()
+
+    # Fetch all transactions
+    query = (
+        db.session.query(
+            cast(FilmInventoryTransaction.transaction_date, Date).label("tdate"),
+            FilmInventoryTransaction.transaction_type,
+            func.sum(FilmInventoryTransaction.quantity).label("qty")
+        )
+        .filter(cast(FilmInventoryTransaction.transaction_date, Date)
+                .between(from_date, to_date))
     )
-    print("Base Query:", base_query)
-    # Apply date filters
-    if from_date:
-        base_query = base_query.filter(FilmInventoryTransaction.transaction_date >= from_date)
-    if to_date:
-        base_query = base_query.filter(FilmInventoryTransaction.transaction_date <= to_date)
 
-    # Separate queries
-    total_in = base_query.filter(
-        FilmInventoryTransaction.transaction_type == "IN"
-    ).with_entities(func.coalesce(func.sum(FilmInventoryTransaction.quantity), 0)).scalar()
+    if branch_id:
+        query = query.filter(FilmInventoryTransaction.branch_id == branch_id)
 
-    total_out = base_query.filter(
-        FilmInventoryTransaction.transaction_type == "OUT"
-    ).with_entities(func.coalesce(func.sum(FilmInventoryTransaction.quantity), 0)).scalar()
+    query = query.group_by("tdate", FilmInventoryTransaction.transaction_type)
+    records = query.all()
 
-    balance = (total_in or 0) - (total_out or 0)
+    # Convert to date → daily buckets
+    day_map = {}
+    for r in records:
+        dt = r.tdate
+        if dt not in day_map:
+            day_map[dt] = {"IN": 0, "OUT": 0}
+        day_map[dt][r.transaction_type] = r.qty
 
-    return {
-        "total_in": int(total_in or 0),
-        "total_out": int(total_out or 0),
-        "balance": balance
-    }
+    # Generate final rows
+    report = []
+    previous_closing = 0
+
+    for dt in sorted(day_map.keys()):
+        opening = previous_closing
+        used = day_map[dt]["OUT"]
+        new_packets = day_map[dt]["IN"]
+        closing = (opening + new_packets) - used
+
+        # If IN, add yellow row (New Packet Insert)
+        if new_packets > 0:
+            report.append({
+                "type": "packet", 
+                "date": dt.strftime("%Y-%m-%d"),
+                "message": f"New Packet Insert {new_packets} Films"
+            })
+
+        report.append({
+            "type": "normal",
+            "date": dt.strftime("%Y-%m-%d"),
+            "opening": opening,
+            "closing": closing,
+            "used": used,
+            "total_use": used
+        })
+
+        previous_closing = closing
+
+    return {"data": report}, 200
+
+
 
 def get_films_audit(branch_id=None, from_date=None, to_date=None):
     try:

@@ -23,13 +23,21 @@ def view_view_booking():
         return redirect(url_for('main.error_page'))
 @booking_bp.route('/view/films-audit')
 @login_required
-def view_films_audit():
+def view_films_usage():
     try:
-        return render_template('films_audit.html')
+        return render_template('films_usage.html')
     except Exception as e:
-        print(f"Error in view_films_audit: {str(e)}")
+        print(f"Error in view_films_usage: {str(e)}")
         return redirect(url_for('main.error_page'))
 
+@booking_bp.route('/view/films-inventory-audit')
+@login_required
+def view_films_inventory_audit():
+    try:
+        return render_template('films_inventory.html')
+    except Exception as e:
+        print(f"Error in view_films_inventory_audit: {str(e)}")
+        return redirect(url_for('main.error_page'))
 
 @booking_bp.route("/receipts")
 @login_required
@@ -149,7 +157,7 @@ def fetch_films_audit_data():
         branch_id = session.get("branch_id")
         from_date = request.args.get("from_date")
         to_date = request.args.get("to_date")
-
+       
         result, status = booking_services.get_films_audit(
             branch_id=branch_id,
             from_date=from_date,
@@ -161,3 +169,17 @@ def fetch_films_audit_data():
     except Exception as e:
         print("Error in fetch_films_audit_data:", str(e))
         return jsonify({"error": "Something went wrong"}), 500
+
+
+@booking_bp.route("/get-film-inventory-report", methods=["GET"])
+def get_inventory_report():
+    branch_id = session.get("branch_id")
+    from_date = request.args.get("from_date")
+    to_date = request.args.get("to_date")
+    print("Fetching films audit data for:", branch_id, from_date, to_date)
+    result, status = booking_services.get_film_inventory_report(
+        branch_id=branch_id,
+        from_date=from_date,
+        to_date=to_date
+    )
+    return jsonify(result), status

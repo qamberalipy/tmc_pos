@@ -33,7 +33,10 @@ MENU = {
         {"label": "Booking", "icon": "bi-book", "endpoint": None, "children": [
             {"label": "Test Booking", "icon": "bi-bag-plus-fill", "endpoint": "booking.view_test_booking"},
             {"label": "View Booking", "icon": "bi bi-eye-fill", "endpoint": "booking.view_view_booking"},
-            {"label": "Films Audit", "icon": "bi bi-file-medical", "endpoint": "booking.view_films_audit"},
+        ]},
+        {"label": "Films", "icon": "bi bi-file-medical", "endpoint": None, "children": [
+            {"label": "Inventory Audit", "icon": "bi-file-earmark-post", "endpoint": "booking.view_films_inventory_audit"},
+            {"label": "Films Usage", "icon": "bi-file-earmark-text", "endpoint": "booking.view_films_usage"},
         ]},
         {"label": "Transactions", "icon": "bi-currency-exchange", "endpoint": None, "children": [
             {"label": "Payment", "icon": "bi-cash-stack", "endpoint": "#"},
