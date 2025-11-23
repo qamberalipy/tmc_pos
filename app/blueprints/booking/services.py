@@ -226,6 +226,7 @@ def get_films_audit(branch_id=None, from_date=None, to_date=None):
             )
             .join(User, User.id == TestFilmUsage.used_by, isouter=True)
         )
+        
 
         # Filter branch
         if branch_id:
