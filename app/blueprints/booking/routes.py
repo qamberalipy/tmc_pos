@@ -2,7 +2,7 @@ from flask import redirect, render_template,request,jsonify,session, url_for
 from . import booking_bp
 from app.blueprints.booking import services as booking_services
 from app.decorators import login_required
-
+from app.extensions import db
 
 @booking_bp.route('/view/test-booking')
 @login_required
@@ -21,7 +21,23 @@ def view_view_booking():
     except Exception as e:
         print(f"Error in view_view_booking: {str(e)}")
         return redirect(url_for('main.error_page'))
+@booking_bp.route('/view/films-audit')
+@login_required
+def view_films_usage():
+    try:
+        return render_template('films_usage.html')
+    except Exception as e:
+        print(f"Error in view_films_usage: {str(e)}")
+        return redirect(url_for('main.error_page'))
 
+@booking_bp.route('/view/films-inventory-audit')
+@login_required
+def view_films_inventory_audit():
+    try:
+        return render_template('films_inventory.html')
+    except Exception as e:
+        print(f"Error in view_films_inventory_audit: {str(e)}")
+        return redirect(url_for('main.error_page'))
 
 @booking_bp.route("/receipts")
 @login_required
@@ -102,3 +118,68 @@ def edit_film_usage():
     print("Edit Film Usage Response:", result, status)
     return jsonify(result), status
 
+@booking_bp.route("/inventory/", methods=["POST"])
+def create_inventory():
+    data = request.get_json()
+    result= booking_services.inventory_transaction(
+        data.get("quantity"), 
+        data.get("transaction_type"),
+        session.get("user_id"), 
+        session.get("branch_id")
+    )
+
+    if not result.id:
+        return jsonify({"message": "Failed to create inventory transaction"}), 400
+    print("Inventory Adjustment Response:", result)
+    db.session.commit()
+    return jsonify({"message": "Inventory transaction created successfully"}), 201
+
+@booking_bp.route("/inventory/summary", methods=["GET"])
+def inventory_summary():
+    try:
+        from_date = request.args.get("from_date")
+        to_date = request.args.get("to_date")
+        branch_id = session.get("branch_id")
+
+        result = booking_services.get_inventory_summary(
+            from_date, to_date, branch_id
+        )
+
+        return jsonify(result), 200
+
+    except Exception as e:
+        print("Error:", e)
+        return jsonify({"message": "Failed to fetch summary"}), 500
+
+@booking_bp.route("/films-audit/data", methods=["GET"])
+def fetch_films_audit_data():
+    try:
+        branch_id = session.get("branch_id")
+        from_date = request.args.get("from_date")
+        to_date = request.args.get("to_date")
+       
+        result, status = booking_services.get_films_audit(
+            branch_id=branch_id,
+            from_date=from_date,
+            to_date=to_date
+        )
+
+        return jsonify(result), status
+
+    except Exception as e:
+        print("Error in fetch_films_audit_data:", str(e))
+        return jsonify({"error": "Something went wrong"}), 500
+
+
+@booking_bp.route("/get-film-inventory-report", methods=["GET"])
+def get_inventory_report():
+    branch_id = session.get("branch_id")
+    from_date = request.args.get("from_date")
+    to_date = request.args.get("to_date")
+    print("Fetching films audit data for:", branch_id, from_date, to_date)
+    result, status = booking_services.get_film_inventory_report(
+        branch_id=branch_id,
+        from_date=from_date,
+        to_date=to_date
+    )
+    return jsonify(result), status

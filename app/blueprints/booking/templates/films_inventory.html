@@ -1,0 +1,244 @@
+{% extends "base.html" %}
+{% block stylesheets %}
+
+<link rel="stylesheet" href="{{ url_for('registrations.static', filename='css/style.css') }}">
+<style>
+    /* Quick Range Buttons */
+    .range-btn {
+        border: 1px solid #198754;
+        background: #fff;
+        color: #198754;
+        padding: 6px 15px;
+        border-radius: 30px;
+        font-size: 14px;
+        transition: 0.2s ease;
+    }
+
+    .range-btn:hover {
+        background: #198754;
+        color: #fff;
+    }
+
+    /* Cards */
+    .mri-card {
+        border-radius: 16px;
+        background: #fff;
+        border: 1px solid #eee;
+        transition: 0.2s ease;
+    }
+
+    .mri-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 22px rgba(0, 0, 0, 0.06);
+    }
+
+    /* Icon box */
+    .mri-icon {
+        width: 55px;
+        height: 55px;
+        border-radius: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 26px;
+        color: white;
+    }
+
+    input[type="date"],
+    input[type="text"] {
+        min-height: 45px;
+    }
+</style>
+{% endblock stylesheets %}
+
+{% block content %}
+{% endblock %}
+{% block user_page %}
+<div class="container-fluid py-3 rounded bg-white border-0 shadow-sm border-left">
+
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 class="fw-bold text-dark m-0">Films Inventory Audit</h4>
+
+        <button class="btn btn-success px-4" data-bs-toggle="modal" data-bs-target="#addfilmModal">
+            <i class="bi bi-plus-circle"></i> Add Films
+        </button>
+    </div>
+
+    <!-- Quick Filters -->
+    <div class="d-flex flex-wrap gap-2 mb-3">
+        <button class="range-btn">Last 7 Days</button>
+        <button class="range-btn">Last 30 Days</button>
+        <button class="range-btn">This Month</button>
+        <button class="range-btn">Custom Range</button>
+    </div>
+
+    <!-- Date Range -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-6">
+            <label class="form-label fw-semibold">From Date</label>
+            <input type="date" class="form-control shadow-sm" id="from_date">
+        </div>
+
+        <div class="col-md-6">
+            <label class="form-label fw-semibold">To Date</label>
+            <div class="d-flex">
+                <input type="date" class="form-control shadow-sm" id="to_date" placeholder="dd/mm/yyyy - dd/mm/yyyy">
+                <button class="btn btn-dark ms-2" id="searchBtn">
+                    <i class="bi bi-search"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="row g-4">
+
+        <!-- MRI IN -->
+        <div class="col-md-4">
+            <div class="mri-card p-4 shadow-sm">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h2 id="total_in">0</h2>
+                        <p class="text-muted small m-0">MRI Films IN</p>
+                    </div>
+
+                    <div class="mri-icon bg-primary">
+                        <i class="bi bi-box-arrow-in-down"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MRI OUT -->
+        <div class="col-md-4">
+            <div class="mri-card p-4 shadow-sm">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h2 id="total_out">0</h2>
+                        <p class="text-muted small m-0">MRI Films OUT</p>
+                    </div>
+
+                    <div class="mri-icon bg-info">
+                        <i class="bi bi-box-arrow-up"></i>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- BALANCE -->
+        <div class="col-md-4">
+            <div class="mri-card p-4 shadow-sm">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h2 id="balance">0</h2>
+                        <p class="text-muted small m-0">Balance Films</p>
+                    </div>
+
+                    <div class="mri-icon bg-success">
+                        <i class="bi bi-file-medical"></i>
+                    </div>
+                </div>
+
+
+            </div>
+        </div>
+
+    </div>
+</div>
+<!-- Data Table For films Usage-->
+<!-- <div class="container-fluid py-3 rounded bg-white border-0 shadow-sm border-left mt-1">
+        <div class="text-dark">
+            <div class="table-responsive">
+                <table id="testReg_table"
+                    class="table-responsive-sm table-responsive border-0 dataTable no-footer table table-bordered table-hover"
+                    style="width:100%">
+                    <thead>
+                        <tr>
+                            <th>Booking ID</th>
+                            <th>Films Required</th>
+                            <th>Films Used</th>
+                            <th>Usage Type</th>
+                            <th>Reason For Usage</th>
+                            <th>Used by</th>
+                            <th>Used at</th>
+                            
+                        </tr>
+                    </thead>
+                    <tbody id="table_body" class=""></tbody>
+                </table>
+
+            </div>
+
+        </div>
+    </div> -->
+
+<div class="container-fluid py-3 rounded bg-white border-0 shadow-sm border-left mt-1">
+
+    <div class="d-flex justify-content-end mb-2 gap-2">
+        <button class="btn btn-success" id="exportExcel">
+            <i class="bi bi-file-earmark-excel"></i> Excel
+        </button>
+
+        <button class="btn btn-danger" id="exportPDF">
+            <i class="bi bi-file-earmark-pdf"></i> PDF
+        </button>
+    </div>
+
+    <table id="inventory_report" class="table table-bordered table-hover table-striped display nowrap">
+        <thead class="bg-dark text-white">
+            <tr>
+                <th>Date</th>
+                <th>Opening Films</th>
+                <th>Closing Films</th>
+                <th>Used Films</th>
+                <th>Total Film Use</th>
+            </tr>
+        </thead>
+        <tbody id="inventory_body"></tbody>
+    </table>
+</div>
+
+
+
+
+
+<!-- Technician Comments Modal -->
+<div class="modal fade" id="addfilmModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Update Film Inventory</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <label for="Add-films" class="">No of Films</label>
+                <input type="number" id="no_of_films" class="form-control mb-3" min="1">
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="Addfilms">Save Comment</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+{% endblock %}
+
+{% block javascript %}
+<!-- Excel (SheetJS) -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+
+<!-- jsPDF + autoTable -->
+<!-- jsPDF -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<!-- jsPDF AutoTable Plugin -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+
+<script src="{{ url_for('booking.static', filename='js/films_inventory_audit.js') }}"></script>
+
+{% endblock %}
