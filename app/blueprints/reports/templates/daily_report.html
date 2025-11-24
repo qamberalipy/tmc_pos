@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+
+{% block stylesheets %}
+<link rel="stylesheet" href="https://cdn.datatables.net/1.10.22/css/jquery.dataTables.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/responsive/2.2.6/css/responsive.dataTables.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/buttons/1.6.5/css/buttons.dataTables.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+
+<style>
+  /* Quick Range Buttons */
+  .range-btn {
+      border: 1px solid #198754;
+      background: white;
+      color: #198754;
+      padding: 6px 15px;
+      border-radius: 30px;
+      font-size: 14px;
+      transition: 0.15s ease;
+  }
+  .range-btn:hover, .range-btn:focus {
+      background: #198754;
+      color: #fff;
+      outline: none;
+  }
+
+  /* Layout */
+  #exportButtons {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+  }
+
+  .top-controls {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      align-items: center;
+      margin-bottom: 0.75rem;
+  }
+
+  input[type="date"] {
+      min-height: 45px;
+  }
+
+  /* Table responsive container tweak */
+  .table-responsive {
+      overflow-x: auto;
+  }
+
+ /* Force Bootstrap colors on DataTable buttons */
+.dt-buttons .buttons-excel {
+    background-color: #198754 !important;  /* Bootstrap success */
+    border-color: #198754 !important;
+    color: #fff !important;
+}
+
+.dt-buttons .buttons-excel:hover {
+    background-color: #157347 !important;
+    border-color: #146c43 !important;
+    color: #fff !important;
+}
+
+.dt-buttons .buttons-pdf {
+    background-color: #dc3545 !important;  /* Bootstrap danger */
+    border-color: #dc3545 !important;
+    color: #fff !important;
+}
+
+.dt-buttons .buttons-pdf:hover {
+    background-color: #bb2d3b !important;
+    border-color: #b02a37 !important;
+    color: #fff !important;
+}
+
+/* Keep buttons horizontal and aligned */
+.dt-buttons .dt-button {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 5px !important;
+    padding: 6px 12px !important;
+    border-radius: 6px !important;
+    font-size: 14px !important;
+    margin-left: 5px !important;
+}
+
+
+
+  /* Title + export buttons container */
+  .report-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+  }
+</style>
+{% endblock stylesheets %}
+
+{% block content %}{% endblock %}
+
+{% block user_page %}
+<div class="container-fluid py-3 rounded bg-white shadow-sm border-0">
+
+    <!-- Title + export buttons -->
+    <div class="report-header">
+        <h4 class="fw-bold text-dark m-0">Films Usage Logs</h4>
+        <div id="exportButtons"></div>
+    </div>
+
+    <!-- Top controls: date range buttons and date inputs + search -->
+    <div class="top-controls">
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+            <button class="range-btn" data-range="today" type="button">Today</button>
+            <button class="range-btn" data-range="7" type="button">Last 7 Days</button>
+            <button class="range-btn" data-range="30" type="button">Last 30 Days</button>
+        </div>
+
+        <div class="d-flex align-items-end gap-2">
+            <div class="me-2">
+                <label class="form-label small mb-1">From</label>
+                <input type="date" id="from_date" class="form-control">
+            </div>
+
+            <div class="me-2">
+                <label class="form-label small mb-1">To</label>
+                <input type="date" id="to_date" class="form-control">
+            </div>
+
+            <div class="d-flex align-items-end gap-2">
+                <button class="btn btn-dark" id="searchBtn" title="Search">
+                    <i class="bi bi-search"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Data Table -->
+    <div class="table-responsive">
+        <table id="testReg_table" class="table table-bordered table-hover w-100" cellspacing="0" width="100%">
+            <thead>
+                <tr>
+                    <th>Booking ID</th>
+                    <th>Films Required</th>
+                    <th>Films Used</th>
+                    <th>Usage Type</th>
+                    <th>Reason</th>
+                    <th>Used By</th>
+                    <th>Used At</th>
+                </tr>
+            </thead>
+            <tbody id="table_body"></tbody>
+        </table>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block javascript %}
+<!-- DataTables core -->
+<script src="https://cdn.datatables.net/1.10.22/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/responsive/2.2.6/js/dataTables.responsive.min.js"></script>
+
+<!-- Buttons extension + dependencies for Excel & PDF -->
+<script src="https://cdn.datatables.net/buttons/1.6.5/js/dataTables.buttons.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.3/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdfmake@0.1.36/build/pdfmake.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdfmake@0.1.36/build/vfs_fonts.js"></script>
+<script src="https://cdn.datatables.net/buttons/1.6.5/js/buttons.html5.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/1.6.5/js/buttons.print.min.js"></script>
+
+<!-- Your page script -->
+<script src="{{ url_for('booking.static', filename='js/films_usage.js') }}"></script>
+{% endblock %}
