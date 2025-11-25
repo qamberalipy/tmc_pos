@@ -15,7 +15,7 @@ MENU = {
             {"label": "Expense", "icon": "bi-wallet2", "endpoint": "transactions.view_expenses"},
         ]},
         {"label": "Reports", "icon": "bi-graph-up-arrow", "endpoint": None, "children": [
-            {"label": "Daily Collection", "icon": "bi-journal-text", "endpoint": "users.view_user"},
+            {"label": "Daily Report", "icon": "bi-journal-text", "endpoint": "reports.view_daily_reports"},
             {"label": "Test Wise Report", "icon": "bi-file-earmark-bar-graph", "endpoint": "#"},
             {"label": "Doctor Wise Report", "icon": "bi-file-earmark-bar-graph", "endpoint": "#"},
             {"label": "Expense Report", "icon": "bi-file-earmark-bar-graph", "endpoint": "#"},
@@ -43,7 +43,7 @@ MENU = {
             {"label": "Expense", "icon": "bi-wallet2", "endpoint": "transactions.view_expenses"},
         ]},
         {"label": "Reports", "icon": "bi-graph-up-arrow", "endpoint": None, "children": [
-            {"label": "Daily Collection", "icon": "bi-journal-text", "endpoint": "users.view_user"},
+             {"label": "Daily Report", "icon": "bi-journal-text", "endpoint": "reports.view_daily_reports"},
             {"label": "Test Wise Report", "icon": "bi-file-earmark-bar-graph", "endpoint": "#"},
             {"label": "Doctor Wise Report", "icon": "bi-file-earmark-bar-graph", "endpoint": "#"},
             {"label": "Expense Report", "icon": "bi-file-earmark-bar-graph", "endpoint": "#"},

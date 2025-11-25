@@ -1,19 +1,18 @@
-from flask import redirect, render_template,request,jsonify,session, url_for
+from flask import redirect, render_template, request, jsonify, session, url_for
 from . import reports_bp
 from app.blueprints.reports import services as report_services
 from app.decorators import login_required
-from app.extensions import db
 import datetime
+
 
 @reports_bp.route('/view/test-report')
 @login_required
 def view_daily_reports():
-    try:
-        return render_template('daily_reports.html')
-    except Exception as e:
-        print(f"Error in view_daily_reports: {str(e)}")
-        return redirect(url_for('main.error_page'))
-
+    # try:
+    return render_template('daily_report.html')
+    # except Exception as e:
+    #     print(f"Error in view_daily_reports: {str(e)}")
+    #     return redirect(url_for('main.error_page'))
 
 
 def _parse_date(date_str):
@@ -37,11 +36,11 @@ def api_expenses():
 
     try:
         result = report_services.get_expenses_report(branch_id=branch_id, date=date)
+        print("Expenses Report Result:", result)
         return jsonify(result), 200
     except ValueError as ve:
         return jsonify({"error": str(ve)}), 400
     except Exception as e:
-        # production: log stacktrace
         return jsonify({"error": "Internal server error", "detail": str(e)}), 500
 
 
