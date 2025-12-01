@@ -7,6 +7,8 @@ from datetime import datetime, date
 from sqlalchemy.exc import SQLAlchemyError
 from app.models.test_booking import TestFilmUsage, TestBooking, FilmInventoryTransaction
 from app.models.test_registration import Test_registration
+from app.models.doctor_reporting_details import DoctorReportingdetails
+from app.models.user import User
 from app.models.expenses import Expenses
 from app.models.branch import Branch
 from app.models.expense_head import Expense_head
@@ -170,3 +172,62 @@ def get_test_report(branch_id: int, date):
     except SQLAlchemyError:
         db.session.rollback()
         raise
+
+def assign_bookings_to_doctor(booking_ids, doctor_id, assigned_by, branch_id):
+    assigned_count = 0
+    for booking_id in booking_ids:
+        # Check if already exists
+        existing = db.session.query(DoctorReportingdetails).filter_by(
+            booking_id=booking_id, doctor_id=doctor_id
+        ).first()
+
+        if not existing:
+            new_record = DoctorReportingdetails(
+                booking_id=booking_id,
+                doctor_id=doctor_id,
+                branch_id=branch_id,
+                assign_by=assigned_by,
+                status="Pending"
+            )
+            db.session.add(new_record)
+            assigned_count += 1
+    db.session.commit()
+    return assigned_count
+
+
+def get_doctor_bookings(doctor_id):
+    # Fetch all booking details for this doctor
+    records = (
+        db.session.query(
+            DoctorReportingdetails,
+            TestBooking,
+            User
+        )
+        .join(TestBooking, TestBooking.id == DoctorReportingdetails.booking_id)
+        .join(User, User.id == DoctorReportingdetails.assign_by)
+        .filter(DoctorReportingdetails.doctor_id == doctor_id)
+        .all()
+    )
+
+    result = []
+    for dr_detail, booking, user in records:
+        # Fetch list of test names
+        test_details = (
+            db.session.query(TestBookingDetails, Test_registration)
+            .join(Test_registration, Test_registration.id == TestBookingDetails.test_id)
+            .filter(TestBookingDetails.booking_id == dr_detail.booking_id)
+            .all()
+        )
+
+        tests = [t.test_registration.test_name for t, t_reg in test_details]
+
+        result.append({
+            "booking_id": dr_detail.booking_id,
+            "status": dr_detail.status,
+            "assigned_by": user.name,
+            "assigned_at": dr_detail.report_at.strftime("%Y-%m-%d %H:%M:%S") if dr_detail.report_at else None,
+            "technician_comments": booking.technician_comments,
+            "tests": tests
+        })
+
+    return result

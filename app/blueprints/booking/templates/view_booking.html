@@ -49,6 +49,22 @@
 
             </div>
         </div>
+        <div class="row g-3 mb-4">
+        <div class="col-md-6">
+            <label class="form-label fw-semibold">From Date</label>
+            <input type="date" class="form-control shadow-sm" id="from_date">
+        </div>
+
+        <div class="col-md-6">
+            <label class="form-label fw-semibold">To Date</label>
+            <div class="d-flex">
+                <input type="date" class="form-control shadow-sm" id="to_date" placeholder="dd/mm/yyyy - dd/mm/yyyy">
+                <button class="btn btn-dark ms-2" id="searchBtn">
+                    <i class="bi bi-search"></i>
+                </button>
+            </div>
+        </div>
+    </div>
         <div class="text-dark">
             <div class="table-responsive">
                 <table id="testReg_table"
@@ -141,253 +157,7 @@
 <script src="https://cdn.datatables.net/responsive/2.2.6/js/dataTables.responsive.min.js"></script>
 <script src="https://cdn.datatables.net/buttons/1.6.5/js/dataTables.buttons.min.js"></script>
 <script src="https://cdn.datatables.net/select/1.3.1/js/dataTables.select.min.js"></script>
-<script>
-    $(document).ready(function () {
-        getAllTestBookings();
-
-        // Save comment event
-        $("#saveCommentBtn").on("click", function () {
-            let bookingId = $(this).data("booking-id");
-            let commentText = $("#newComment").val().trim();
-
-            if (!commentText) {
-                showToastMessage("error", "Please enter a comment before saving.");
-                return;
-            }
-
-            let payload = { comment: commentText };
-
-            myshowLoader();
-            axios.post(baseUrl + "/booking/comments/" + bookingId, payload)
-                .then(res => {
-                    let newComment = res.data.data;
-                    let existingComments = $("#commentsHistory").data("comments") || [];
-                    existingComments.unshift(newComment);
-                    $("#commentsHistory").data("comments", existingComments);
-                    loadComments(existingComments);
-                    $("#newComment").val("");
-                })
-                .catch(err => {
-                    let msg = err.response?.data?.error || err.response?.data?.message || err.message;
-                    showToastMessage("error", "Failed to save comment: " + msg);
-                    console.error("Error saving comment:", err);
-                })
-                .finally(() => {
-                    myhideLoader();
-                });
-        });
-        $("#SaveEditfilms").on("click", function () {
-
-            const bookingId = $("#bookingIdInput").val();
-            const currentFilms = Number($("#currentFilmsInput").val());
-            const newFilms = Number($("#changedFilmsInput").val());
-            const usageType = $("#causeSelect").val();
-            const reason = $("#reasonInput").val().trim();
-
-            // -------------------------
-            // VALIDATION
-            // -------------------------
-
-            if (!bookingId) {
-                showToastMessage("error", "Invalid booking ID.");
-                return;
-            }
-
-            if (isNaN(newFilms)) {
-                showToastMessage("error", "Please enter a valid number for films.");
-                return;
-            }
-
-            if (newFilms <= 0) {
-                showToastMessage("error", "Films cannot be zero or negative.");
-                return;
-            }
-
-            if (!usageType) {
-                showToastMessage("error", "Please select a usage type.");
-                return;
-            }
-
-            if (!reason) {
-                showToastMessage("error", "Please enter reason.");
-                return;
-            }
-
-            // -------------------------
-            // CREATE PAYLOAD
-            // -------------------------
-            const payload = {
-                booking_id: parseInt(bookingId),
-                new_films_used: newFilms,
-                usage_type: usageType,
-                reason: reason
-            };
-
-            myshowLoader();
-
-            axios.post(baseUrl + "/booking/films/", payload)
-                .then((res) => {
-                    showToastMessage("success", "Film usage updated successfully!");
-
-                    // Optional: update UI fields
-                    $("#currentFilmsInput").val(newFilms);
-
-                    // Close modal
-                    $(".modal").modal("hide");
-                })
-                .catch((err) => {
-                    const msg =
-                        err.response?.data?.error ||
-                        err.response?.data?.message ||
-                        err.message;
-
-                    showToastMessage("error", "Failed to update: " + msg);
-                    console.error("Error updating film usage:", err);
-                })
-                .finally(() => {
-                    myhideLoader();
-                });
-        });
-
-    });
-
-    function getAllTestBookings() {
-        myshowLoader();
-        return axios.get(baseUrl + "/booking/test-booking")
-            .then(res => {
-                let data = res.data;
-                let dtable = $("#testReg_table").DataTable({
-                    destroy: true,
-                    responsive: true,
-                    pageLength: 14,
-                    lengthChange: false
-                });
-                dtable.clear().draw();
-
-                $.each(data, function (i, t) {
-                    // 🔹 Action buttons
-                    let printBtn = `
-                        <a href="${baseUrl}/booking/receipt/${t.booking_id}" 
-                           target="_blank" 
-                           class="border btn print-booking" 
-                           data-id="${t.booking_id}">
-                           <i class="bi-printer-fill text-success"></i>
-                        </a>
-                    `;
-
-                    let commentBtn = `
-                        <button class="border btn comment-booking" data-id="${t.booking_id}">
-                           <i class="bi-chat-left-dots-fill text-primary"></i>
-                        </button>
-                    `;
-                    let filmsBtn = `
-                        <button class="border btn edit-films" data-id="${t.booking_id}" data-films="${t.total_films || 0}">
-                           <i class="bi-pencil-square text-dark"></i>
-                        </button>`; // Placeholder for future film usage button
-
-                    let actionBtns = printBtn + " " + commentBtn + " " + filmsBtn;
-
-                    // Add row
-                    dtable.row.add([
-                        `B#${t.booking_id}`,
-                        t.patient_name || "-",
-                        t.date || "-",
-                        t.referred_dr || "-",
-                        t.mr_no || "-",
-                        t.test_name || "-",
-                        t.total_amount || "0",
-                        t.discount || "0",
-                        t.net_amount || "0",
-                        t.received || "0",
-                        t.balance || "0",
-                        actionBtns
-                    ]).draw(false);
-                });
-
-                // Handle comment button click
-                $("#testReg_table").off("click", ".comment-booking").on("click", ".comment-booking", function () {
-                    let bookingId = $(this).data("id");
-                    $("#saveCommentBtn").data("booking-id", bookingId);
-
-                    // fetch comments (GET only once when modal opens)
-                    fetchComments(bookingId);
-
-                    $("#commentsModal").modal("show");
-                });
-
-                // Handle edit films button click
-                $("#testReg_table").off("click", ".edit-films").on("click", ".edit-films", function () {
-                    let bookingId = $(this).data("id");
-                    let currentFilms = $(this).data("films");
-                    $("#changedFilmsInput").val("");
-                    $("#reasonInput").val("");
-                    $("#currentFilmsInput").val(currentFilms);
-                    $("#bookingIdInput").val(bookingId);
-                    $("#filmsModal").modal("show");
-                    // You can now use bookingId and currentFilms to show a modal or prompt for editing
-                    console.log("Edit films for booking:", bookingId, "Current films:", currentFilms);
-                });
-
-                myhideLoader();
-            })
-            .catch(err => {
-                console.error("Error fetching test bookings:", err);
-                myhideLoader();
-            });
-    }
-
-    // 🔹 Render comments from array
-    function loadComments(comments) {
-        let historyHtml = "";
-
-        if (!comments || comments.length === 0) {
-            historyHtml = `<div class="text-muted">No comments yet.</div>`;
-        } else {
-            comments.forEach(c => {
-                historyHtml += `
-                    <div class="timeline-item d-flex">
-                        <div class="timeline-icon">
-                            <span class="rounded-circle bg-success d-inline-flex align-items-center justify-content-center">
-                                <i class="bi bi-person-fill-check text-white"></i>
-                            </span>
-                        </div>
-                        <div class="timeline-content ms-3 flex-grow-1">
-                            <div class="card pb-2 px-2">
-                                <div class="d-flex justify-content-between">
-                                    <strong>${c.user_name} (${c.role})</strong>
-                                    <small class="text-muted">${c.datetime}</small>
-                                </div>
-                                <div class="mt-1">${c.comment}</div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            });
-        }
-
-        $("#commentsHistory").html(historyHtml);
-    }
-
-    // 🔹 Fetch comments (GET) once on modal open
-    function fetchComments(bookingId) {
-        myshowLoader();
-        axios.get(baseUrl + "/booking/comments/" + bookingId)
-            .then(res => {
-                let comments = res.data.comments || [];
-                $("#commentsHistory").data("comments", comments);
-                loadComments(comments);
-            })
-            .catch(err => {
-                console.error("Error loading comments:", err);
-            })
-            .finally(() => {
-                myhideLoader();
-            });
-    }
-</script>
-
-
-<!-- <script src="{{ url_for('registrations.static', filename='js/test_reg.js') }}"></script> -->
+<script src="{{ url_for('booking.static', filename='js/view_booking.js') }}"></script>
 
 
 

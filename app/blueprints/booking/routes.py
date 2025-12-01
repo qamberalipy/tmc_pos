@@ -79,7 +79,9 @@ def view_receipt(booking_id):
 def get_all_test_bookings():
     role = session.get("role", "").lower()
     branch_id = None if role == "admin" else session.get("branch_id")
-    result, status = booking_services.get_all_test_bookings(branch_id)
+    from_date = request.args.get("from_date")
+    to_date = request.args.get("to_date")
+    result, status = booking_services.get_all_test_bookings(branch_id, from_date, to_date)
     print("All Bookings Data:", result)
     return jsonify(result), status
 

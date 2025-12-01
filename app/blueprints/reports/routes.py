@@ -82,3 +82,37 @@ def api_test_report():
     except Exception as e:
         print(f"Error in api_test_report: {str(e)}")
         return jsonify({"error": "Internal server error", "detail": str(e)}), 500
+
+@reports_bp.route("/assign-bookings", methods=["POST"])
+def assign_bookings():
+    data = request.get_json()
+    booking_ids = data.get("bookingids")
+    doctor_id = data.get("doctor_id")
+    user_id = session.get("user_id")
+    branch_id = session.get("branch_id")
+
+    if not booking_ids or not doctor_id:
+        return jsonify({"error": "bookingids and doctor_id are required"}), 400
+
+    try:
+        result = report_services.assign_bookings_to_doctor(
+            booking_ids=booking_ids,
+            doctor_id=doctor_id,
+            assigned_by=user_id,
+            branch_id=branch_id
+        )
+        return jsonify({"message": "Bookings assigned successfully", "assigned_count": result}), 200
+    except Exception as e:
+        print(f"Error in assign_bookings: {str(e)}")
+        return jsonify({"error": "Internal server error", "detail": str(e)}), 500
+
+
+# API to fetch all bookings assigned to a doctor
+@reports_bp.route("/bookings/<int:doctor_id>", methods=["GET"])
+def get_doctor_bookings(doctor_id):
+    try:
+        result = report_services.get_doctor_bookings(doctor_id=doctor_id)
+        return jsonify(result), 200
+    except Exception as e:
+        print(f"Error in get_doctor_bookings: {str(e)}")
+        return jsonify({"error": "Internal server error", "detail": str(e)}), 500

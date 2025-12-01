@@ -101,6 +101,23 @@ def get_all_users():
     except SQLAlchemyError as e:
         return {"error": str(e.__dict__.get('orig', e))}, 500
 
+
+def get_all_doctors(branch_id=None):
+    try:
+       
+        query = db.session.query(User.id, User.name).filter(User.role_id == 4)
+        if branch_id:
+            query = query.filter(User.branch_id == branch_id)
+        results = query.all()
+
+        # 4. Return result
+        return [{"id": u.id, "name": u.name} for u in results], 200
+
+    except SQLAlchemyError as e:
+        # It is good practice to log the specific error on the server side
+        print(f"Database Error: {str(e)}") 
+        return {"error": "An error occurred while fetching doctors."}, 500
+
 # 4. Get User by ID
 def get_user_by_id(user_id):
     try:

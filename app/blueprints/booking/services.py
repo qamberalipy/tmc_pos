@@ -576,10 +576,29 @@ def _format_test_booking(row):
     }
 
 
-# 🔹 Get All Bookings (optimized with join + aggregation)
-def get_all_test_bookings(branch_id=None):
+def get_all_test_bookings(branch_id=None, from_date=None, to_date=None):
     try:
-        # PostgreSQL-compatible aggregation of test names
+
+        start_dt = None
+        end_dt = None
+
+        if from_date and to_date:
+            try:
+                from_date_obj = datetime.strptime(from_date, "%Y-%m-%d").date()
+                to_date_obj   = datetime.strptime(to_date, "%Y-%m-%d").date()
+            except ValueError:
+                raise BadRequest("Date format must be YYYY-MM-DD.")
+
+            if from_date_obj > to_date_obj:
+                raise BadRequest("from_date cannot be greater than to_date.")
+
+            start_dt = datetime.combine(from_date_obj, time.min)
+            end_dt   = datetime.combine(to_date_obj, time.max)
+
+        elif from_date or to_date:
+            raise BadRequest("Both from_date and to_date are required for date filtering.")
+
+
         query = (
             db.session.query(
                 TestBooking.id,
@@ -612,11 +631,20 @@ def get_all_test_bookings(branch_id=None):
                 User.name,
                 Referred.name
             )
-            .order_by(TestBooking.create_at.desc())
         )
-
         if branch_id:
             query = query.filter(TestBooking.branch_id == branch_id)
+
+
+        if start_dt and end_dt:
+            query = query.filter(
+                and_(
+                    TestBooking.create_at >= start_dt,
+                    TestBooking.create_at <= end_dt
+                )
+            )
+
+        query = query.order_by(TestBooking.create_at.desc())
 
         rows = query.all()
         return [_format_test_booking(r) for r in rows], 200

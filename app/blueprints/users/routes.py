@@ -89,5 +89,7 @@ def update_user_password():
     result, status = users_services.update_user_password(session.get("user_id"), data["password"])
     return jsonify(result), status
 
-
-
+@users_bp.route("/get_all_doctors/<branch_id>", methods=["GET"])
+def get_all_doctors(branch_id):
+    result, status = users_services.get_all_doctors(branch_id)
+    return jsonify(result), status
