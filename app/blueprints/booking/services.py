@@ -9,6 +9,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from decimal import Decimal, InvalidOperation
 from datetime import datetime, date, time
 from werkzeug.exceptions import BadRequest
+from app.helper import convert_to_utc
 from sqlalchemy.ext.mutable import MutableDict, MutableList
 from app.models.test_booking import TestFilmUsage, TestBooking,FilmInventoryTransaction
 from app.models.test_registration import Test_registration
@@ -75,13 +76,15 @@ def create_test_booking(data):
                 reporting_date = None
                 if test.get("reporting_date"):
                     try:
+                        test["reporting_date"] = convert_to_utc(test["reporting_date"])
                         reporting_date = (
-                            datetime.strptime(test["reporting_date"], "%Y-%m-%d").date()
-                            if isinstance(test["reporting_date"], str)
-                            else test["reporting_date"]
+                            test["reporting_date"].date()
+                            if isinstance(test["reporting_date"], datetime)
+                            else datetime.strptime(test["reporting_date"], "%Y-%m-%d").date()
                         )
                     except ValueError:
                         raise ValueError(f"tests[{idx}].reporting_date must be YYYY-MM-DD")
+
 
                 details.append(TestBookingDetails(
                     booking_id=booking.id,
@@ -539,7 +542,7 @@ def get_booking_details(booking_id: int):
                 "balance": float(booking.due_amount or 0),
             },
             "tests": test_list,
-            "printed_at": datetime.now().strftime("%d-%b-%Y %I:%M %p"),
+            "printed_at": datetime.utcnow().strftime("%d-%b-%Y %I:%M %p"),
             "current_user": session.get("user_name"),
         }, 200
 

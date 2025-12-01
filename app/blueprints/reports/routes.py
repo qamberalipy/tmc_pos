@@ -41,6 +41,7 @@ def api_expenses():
     except ValueError as ve:
         return jsonify({"error": str(ve)}), 400
     except Exception as e:
+        print(f"Error in api_expenses: {str(e)}")
         return jsonify({"error": "Internal server error", "detail": str(e)}), 500
 
 
@@ -56,8 +57,10 @@ def api_films():
 
     try:
         result = report_services.get_films_report(branch_id=branch_id, date=date)
+        print("Films Report Result:", result)
         return jsonify(result), 200
     except Exception as e:
+        print(f"Error in api_films: {str(e)}")
         return jsonify({"error": "Internal server error", "detail": str(e)}), 500
 
 
@@ -72,7 +75,10 @@ def api_test_report():
         return jsonify({"error": "valid date (YYYY-MM-DD) is required"}), 400
 
     try:
+        
         result = report_services.get_test_report(branch_id=branch_id, date=date)
+        print("Test Report Result:", result)
         return jsonify(result), 200
     except Exception as e:
+        print(f"Error in api_test_report: {str(e)}")
         return jsonify({"error": "Internal server error", "detail": str(e)}), 500

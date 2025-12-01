@@ -1,5 +1,6 @@
 from app.extensions import db
 from sqlalchemy import JSON
+from datetime import datetime
 
 class Referred(db.Model):
     __tablename__ = "referred"
@@ -20,7 +21,7 @@ class Referred(db.Model):
 
     is_active = db.Column(db.Boolean, default=True)
 
-    created_at = db.Column(db.DateTime, default=db.func.now())
-    updated_at = db.Column(db.DateTime, default=db.func.now(), onupdate=db.func.now())
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     created_by = db.Column(db.Integer)
     updated_by = db.Column(db.Integer)

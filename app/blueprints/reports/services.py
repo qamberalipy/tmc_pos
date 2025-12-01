@@ -8,7 +8,9 @@ from sqlalchemy.exc import SQLAlchemyError
 from app.models.test_booking import TestFilmUsage, TestBooking, FilmInventoryTransaction
 from app.models.test_registration import Test_registration
 from app.models.expenses import Expenses
+from app.models.branch import Branch
 from app.models.expense_head import Expense_head
+from app.helper import convert_to_utc
 
 
 def _to_float(value):
@@ -22,54 +24,58 @@ def _to_float(value):
         return 0.0
 
 
-    def get_expenses_report(branch_id: int, date):
-        if not branch_id or not date:
-            raise ValueError("branch_id and date are required")
-
-        try:
-            q = (
-                db.session.query(
-                    Expenses.expense_head_id.label("head_id"),
-                    Expense_head.name.label("head_name"),
-                    func.coalesce(func.sum(Expenses.amount), 0).label("amount")
-                )
-                .join(Expense_head, Expense_head.id == Expenses.expense_head_id)
-                .filter(
-                    Expenses.is_deleted.isnot(True),
-                    Expenses.branch_id == branch_id,
-                    cast(Expenses.created_at, Date) == date
-                )
-                .group_by(Expenses.expense_head_id, Expense_head.name)
-                .order_by(Expense_head.name)
+def get_expenses_report(branch_id: int, date):
+    if not branch_id or not date:
+        raise ValueError("branch_id and date are required")
+    # date = convert_to_utc(date.strftime("%Y-%m-%d"))
+    print("Converted date to UTC:", date)
+    try:
+        q = (
+            db.session.query(
+                Expenses.expense_head_id.label("head_id"),
+                Expense_head.name.label("head_name"),
+                func.coalesce(func.sum(Expenses.amount), 0).label("amount")
             )
+            .join(Expense_head, Expense_head.id == Expenses.expense_head_id)
+            .filter(
+                Expenses.is_deleted.isnot(True),
+                Expenses.branch_id == branch_id,
+                cast(Expenses.created_at, Date) == date
+            )
+            .group_by(Expenses.expense_head_id, Expense_head.name)
+            .order_by(Expense_head.name)
+        )
 
-            rows = q.all()
-            items = []
-            total = 0
+        rows = q.all()
+        items = []
+        total = 0
 
-            for r in rows:
-                amt = _to_float(r.amount)
-                items.append({
-                    "id": int(r.head_id),
-                    "name": r.head_name,
-                    "amount": amt
-                })
-                total += amt
+        for r in rows:
+            amt = _to_float(r.amount)
+            items.append({
+                "id": int(r.head_id),
+                "name": r.head_name,
+                "amount": amt
+            })
+            total += amt
+        user_branch=db.session.query(Branch).filter(Branch.id == branch_id).first()
+        return {
+            "branch_id": branch_id,
+            "branch_name": user_branch.branch_name if user_branch else None,
+            "date": date.strftime("%Y-%m-%d"),
+            "total_expenses": total,
+            "items": items
+        }
 
-            return {
-                "date": date.strftime("%Y-%m-%d"),
-                "total_expenses": total,
-                "items": items
-            }
-
-        except SQLAlchemyError:
-            db.session.rollback()
-            raise
+    except SQLAlchemyError as e:
+        print(f"Error in get_expenses_report: {str(e)}")
+        db.session.rollback()
+        raise
 
 
 def get_films_report(branch_id: int, date):
     """date is a datetime.date object."""
-
+    # date = convert_to_utc(date.strftime("%Y-%m-%d"))
     target_date = date
 
     # 1) Opening stock
@@ -117,7 +123,7 @@ def get_films_report(branch_id: int, date):
 def get_test_report(branch_id: int, date):
     if not branch_id or not date:
         raise ValueError("branch_id and date are required")
-
+    # date = convert_to_utc(date.strftime("%Y-%m-%d"))
     try:
         # 1) Total income
         income_row = (
