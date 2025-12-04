@@ -82,6 +82,14 @@ def api_test_report():
     except Exception as e:
         print(f"Error in api_test_report: {str(e)}")
         return jsonify({"error": "Internal server error", "detail": str(e)}), 500
+@reports_bp.route("/pending_cases", methods=["POST", "GET"])
+@login_required
+def view_pending_cases():
+    try:
+        return render_template("doctor_pending_cases.html")
+    except Exception as e:
+        print(f"Error in pending_cases: {str(e)}")
+        return render_template("error.html", message="An error occurred while loading pending cases.")
 
 @reports_bp.route("/assign-bookings", methods=["POST"])
 def assign_bookings():
@@ -107,12 +115,36 @@ def assign_bookings():
         return jsonify({"error": "Internal server error", "detail": str(e)}), 500
 
 
-# API to fetch all bookings assigned to a doctor
-@reports_bp.route("/bookings/<int:doctor_id>", methods=["GET"])
-def get_doctor_bookings(doctor_id):
+
+@reports_bp.route("/bookings/pendingcase", methods=["GET"])
+def get_doctor_bookings():
     try:
+        doctor_id = session.get("user_id")
+        print("Doctor ID",doctor_id)
         result = report_services.get_doctor_bookings(doctor_id=doctor_id)
         return jsonify(result), 200
     except Exception as e:
         print(f"Error in get_doctor_bookings: {str(e)}")
         return jsonify({"error": "Internal server error", "detail": str(e)}), 500
+
+@reports_bp.route("/save-report", methods=["POST"])
+def save_report():
+    try:
+        data = request.get_json(force=True)
+        user_id = session.get("user_id")
+        result=report_services.save_doctor_report(data, user_id)
+        return jsonify(result), 200
+    
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+@reports_bp.route("/update-report/<int:report_id>", methods=["PUT"])
+def update_report(report_id):
+    try:
+        data = request.get_json(force=True)
+        user_id = session.get("user_id")
+        result = report_services.update_doctor_report(report_id, data, user_id)
+        return jsonify(result), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400

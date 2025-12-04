@@ -22,6 +22,7 @@ MENU = {
         ]},
         
     ],
+    
     "staff": [
         {"label": "Dashboard", "icon": "bi-house-door-fill", "endpoint": "admin.view_admin_dashboard"},
         {"label": "Registration", "icon": "bi-bank2", "endpoint": None, "children": [
@@ -50,6 +51,11 @@ MENU = {
         ]},
         
     ],
+    
+    "doctor": [
+        {"label": "Pending Cases", "icon": "bi-bag-plus-fill", "endpoint": "reports.view_pending_cases"},
+        {"label": "View Cases Report", "icon": "bi bi-eye-fill", "endpoint": "registrations.view_test_registration"},
+        ],
     "default": [
         {"label": "Amazon", "icon": "bi-amazon", "endpoint": "#"},
     ]

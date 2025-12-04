@@ -85,6 +85,17 @@ def get_all_test_bookings():
     print("All Bookings Data:", result)
     return jsonify(result), status
 
+@booking_bp.route("/test-booking/<int:booking_id>", methods=["GET"])
+def get_test_booking(booking_id):
+    try:
+        print("Fetching booking details for ID:", booking_id)
+        result, status = booking_services.get_booking_details(booking_id)
+        print("Single Booking Data:", result)
+        return jsonify(result), status
+    except Exception as e:
+        print(f"Error in get_test_booking: {str(e)}")
+        return jsonify({"error": "Failed to fetch booking details"}), 400
+
 @booking_bp.route("/comments/<int:booking_id>", methods=["GET"])
 def get_booking_comments(booking_id):
     data, status = booking_services.get_booking_details(booking_id)  # unpack tuple

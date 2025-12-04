@@ -503,6 +503,9 @@ def get_booking_details(booking_id: int):
                     t.reporting_date.strftime("%d-%b-%Y %I:%M %p")
                     if t.reporting_date else None
                 ),
+                "test_name": db.session.query(Test_registration.test_name)
+                                .filter(Test_registration.id == t.test_id)
+                                .scalar(),  
                 "sample_to_follow": t.sample_to_follow,
             }
             for t in tests
