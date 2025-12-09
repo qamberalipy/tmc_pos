@@ -1,45 +1,19 @@
 {% extends "base.html" %}
 {% block stylesheets %}
 <style>
-  .heading {
-    font-size: 1.5rem;
-    margin-bottom: 2rem;
-  }
-
-  .section {
-    margin-bottom: 2rem;
-  }
-
-  .sub-heading {
-    font-size: 1.2rem;
-    font-weight: 600;
-    margin-bottom: 0.5rem;
-  }
-
-  a {
-    color: #021a71;
-    font-weight: 600;
-    text-decoration: none;
-  }
-
-  a:hover {
-    text-decoration: underline;
-  }
-
-  hr {
-    border: none;
-    border-top: 1px solid #202142;
-    margin: 0.85rem 0;
-  }
-
-  input[type="password"] {
+  .heading { font-size: 1.5rem; margin-bottom: 2rem; }
+  .section { margin-bottom: 2rem; }
+  .sub-heading { font-size: 1.2rem; font-weight: 600; margin-bottom: 0.5rem; }
+  a { color: #021a71; font-weight: 600; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  hr { border: none; border-top: 1px solid #202142; margin: 0.85rem 0; }
+  input[type="password"], input[type="text"] {
     padding: 0.5rem;
     border: 1px solid #ccc;
     border-radius: 4px;
     width: 100%;
     margin-top: 0.3rem;
   }
-
   button {
     background: #202142;
     color: #fff;
@@ -49,27 +23,20 @@
     cursor: pointer;
     font-size: 1rem;
   }
-
-  button:hover {
-    opacity: 0.9;
-  }
-
-  .delete a {
-    color: #ef5480;
-  }
+  button:hover { opacity: 0.9; }
+  .delete a { color: #ef5480; }
 </style>
-
 {% endblock stylesheets %}
 
 {% block content %}
 {% endblock %}
+
 {% block user_page %} 
 <div class="main-div">
   <div class="jumbotron jumbotron-fluid rounded bg-white border-0 shadow-sm border-left py-3 px-4">
     <div>
       <h2 class="heading">Account Settings</h2>
 
-      <!-- Email -->
       <div class="email mb-4">
         <h3 class="h5">Email address</h3>
         <div class="d-flex align-items-center">
@@ -80,7 +47,6 @@
 
       <hr>
 
-      <!-- Password -->
       <div class="password section mb-4">
         <h3 class="h5">Password</h3>
         <div class="mb-2">
@@ -98,9 +64,35 @@
         <button type="button" id="save_password" class="btn btn-primary">Save password</button>
       </div>
 
+      {% if session.get('user_role') == 'doctor' %}
+      <hr>
+      <div class="signature section mb-4">
+        <h3 class="h5">Digital Signature</h3>
+        <p class="small text-muted mb-3">This information will appear on patient prescriptions and reports.</p>
+        
+        <div class="mb-2">
+          <label for="sig_name" class="form-label">Full Name (for Signature)</label>
+          <input type="text" id="sig_name" class="form-control" placeholder="e.g. Dr. John Doe" 
+                 value="{{ session_doctor_signature.name if session_doctor_signature else '' }}">
+        </div>
+
+        <div class="mb-2">
+          <label for="sig_degrees" class="form-label">Degrees / Qualifications</label>
+          <input type="text" id="sig_degrees" class="form-control" placeholder="e.g. MBBS, FCPS (Cardiology)" 
+                 value="{{ session_doctor_signature.degrees if session_doctor_signature else '' }}">
+        </div>
+
+        <div class="mb-2">
+          <label for="sig_title" class="form-label">Official Title / Designation</label>
+          <input type="text" id="sig_title" class="form-control" placeholder="e.g. Senior Consultant Cardiologist" 
+                 value="{{ session_doctor_signature.title if session_doctor_signature else '' }}">
+        </div>
+
+        <button type="button" id="save_signature" class="btn btn-primary mt-2">Update Signature</button>
+      </div>
+      {% endif %}
       <hr>
 
-      <!-- Delete -->
       <div class="delete section">
         <h3 class="h5">Deactivate account</h3>
         <p>
@@ -113,7 +105,6 @@
   </div>
 </div>
 
-<!-- Update User Modal -->
 <div class="modal fade" id="updateUserModal" tabindex="-1" aria-labelledby="updateUserModalLabel" aria-hidden="true">
   <div class="modal-dialog">
     <div class="modal-content">
@@ -124,7 +115,6 @@
       <div class="modal-body">
         <form>
           <input type="hidden" id="user_id" value="{{ session_user_id }}">
-
           <div class="mb-3">
             <label for="user_name" class="form-label">User Name</label>
             <input type="text" value="{{session_user_name}}" class="form-control" id="user_name">
@@ -133,20 +123,17 @@
             <label for="user_email" class="form-label">Email</label>
             <input type="text" value="{{session_user_email}}" class="form-control" id="user_email">
           </div>
-
           <button id="update_user" type="button" class="btn btn-primary">Update data</button>
         </form>
       </div>
     </div>
   </div>
 </div>
-
 {% endblock %}
 
 {% block javascript %}
-
 <script>
-  // =============================
+// =============================
 // Update Email + Name
 // =============================
 $(document).on("click", "#update_user", function () {
@@ -160,14 +147,12 @@ $(document).on("click", "#update_user", function () {
 
     axios.patch(`${baseUrl}/users/profile/email`, { name, email })
         .then(res => {
-            let response = res.data;
-            showToastMessage("success", response.message || "Profile updated!");
+            showToastMessage("success", res.data.message || "Profile updated!");
             window.location.reload();
         })
         .catch(err => {
-            console.error("Error updating profile:", err);
-            console.log(err.response);
-            showToastMessage("error", err.response.data.error);
+            console.error("Error:", err);
+            showToastMessage("error", err.response?.data?.error || "Update failed");
         });
 });
 
@@ -178,7 +163,6 @@ $(document).on("click", "#save_password", function () {
     let newPassword = $("#new_password").val().trim();
     let rePassword = $("#re_new_password").val().trim();
 
-    // Validation
     if (!newPassword || !rePassword) {
         showToastMessage("error", "Both password fields are required!");
         return;
@@ -192,22 +176,54 @@ $(document).on("click", "#save_password", function () {
         return;
     }
 
-    // Call API
     axios.patch(`${baseUrl}/users/profile/password`, { password: newPassword })
         .then(res => {
-            let response = res.data;
-            showToastMessage("success", response.message || "Password updated!");
-
-            // Clear inputs
+            showToastMessage("success", res.data.message || "Password updated!");
             $("#new_password").val("");
             $("#re_new_password").val("");
         })
         .catch(err => {
-            console.error("Error updating password:", err);
+            console.error("Error:", err);
             showToastMessage("error", "Failed to update password!");
         });
 });
 
+// =============================
+// NEW: Update Signature
+// =============================
+$(document).on("click", "#save_signature", function () {
+    myshowLoader();
+    let sigName = $("#sig_name").val().trim();
+    let sigDegrees = $("#sig_degrees").val().trim();
+    let sigTitle = $("#sig_title").val().trim();
+
+    // Validation
+    if (!sigName || !sigTitle) {
+        myhideLoader();
+        showToastMessage("error", "Name and Title are required for the signature!");
+        return;
+    }
+
+    // Because your backend uses request.form.get(), we must send FormData
+    // Axios defaults to JSON, so we explicitly create FormData
+    let formData = new FormData();
+    formData.append('sig_name', sigName);
+    formData.append('sig_degrees', sigDegrees);
+    formData.append('sig_title', sigTitle);
+
+    axios.post(`${baseUrl}/users/update_signature`, formData)
+        .then(res => {
+            myhideLoader();
+            showToastMessage("success", res.data.message || "Signature updated successfully!");
+            window.location.reload();
+        })
+        .catch(err => {
+            myhideLoader();
+            console.error("Error updating signature:", err);
+            let errMsg = err.response?.data?.error || "Failed to update signature!";
+            showToastMessage("error", errMsg);
+        });
+});
 
 // =============================
 // Delete (Deactivate) Account
@@ -227,21 +243,17 @@ $(document).on("click", "#delete_account", function () {
         if (result.isConfirmed) {
             axios.patch(`${baseUrl}/users/user/${userId}/status`, { is_active: false })
                 .then(res => {
-                    let response = res.data;
-                    showToastMessage("success", response.message || "Account deactivated!");
-
-                    // Redirect after short delay
+                    showToastMessage("success", res.data.message || "Account deactivated!");
                     setTimeout(() => {
                         window.location.href = baseUrl + "/logout";
                     }, 1500);
                 })
                 .catch(err => {
-                    console.error("Error deactivating account:", err);
+                    console.error("Error:", err);
                     showToastMessage("error", "Failed to deactivate account!");
                 });
         }
     });
 });
-
 </script>
 {% endblock %}

@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>MRI Brain Report - Mrs. Farzana</title>
+    <style>
+        /* RESET & BASIC SETUP */
+        * {
+            box-sizing: border-box;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #f0f0f0;
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 9.6pt;
+            color: #000;
+        }
+
+        /* PRINT CONFIGURATION */
+        @page {
+            size: A4 portrait;
+            margin: 0; 
+        }
+
+        @media print {
+            html, body {
+                height: 100%;
+                overflow: hidden; /* Prevents scrollbars triggering pages */
+            }
+            body { 
+                background-color: white; 
+            }
+            .page-container {
+                box-shadow: none;
+                margin: 0;
+                width: 100%;
+                /* CHANGED: 'auto' prevents forcing a 2nd page */
+                height: auto; 
+                overflow: hidden;
+            }
+            .no-print { display: none !important; }
+        }
+
+        /* PAGE CONTAINER */
+        .page-container {
+            width: 210mm;
+            height: 297mm; /* Keep fixed height for SCREEN view only */
+            background: white;
+            margin: 20px auto;
+            position: relative;
+            
+            /* YOUR EXACT PADDING PREFERENCES */
+            padding-top: 62mm;
+            padding-bottom: 26mm;
+            padding-left: 14mm;
+            padding-right: 14mm;
+            
+            display: block;
+        }
+
+        /* PATIENT INFO GRID */
+        .patient-header {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4px 35px;
+            margin-bottom: 15px; 
+            border-bottom: 2px solid #000;
+            padding-bottom: 10px;
+        }
+
+        .info-row { display: flex; }
+
+        .label {
+            font-weight: bold;
+            width: 140px; 
+            flex-shrink: 0;
+        }
+
+        .value {
+            font-weight: normal;
+            text-transform: uppercase;
+        }
+
+        /* REPORT CONTENT */
+        .report-body {
+            line-height: 1.3; 
+        }
+
+        .report-title {
+            text-align: left;
+            font-size: 10pt;
+            text-decoration: underline;
+            margin-top: 0;
+            margin-bottom: 10px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .section {
+            margin-bottom: 10px; 
+        }
+
+        .section-title {
+            font-weight: bold;
+            text-decoration: underline;
+            display: block;
+            margin-bottom: 2px;
+        }
+
+        .content-block {
+            text-align: justify;
+            margin-bottom: 5px; 
+        }
+
+        /* SIGNATURE BLOCK */
+        .signature-section {
+            margin-top: 20px;
+            display: flex;
+            justify-content: flex-start;
+            page-break-inside: avoid;
+        }
+
+        .signature-box {
+            width: 250px;
+            text-align: left;
+        }
+
+        .sig-image {
+            height: 35px; 
+            margin-bottom: 5px;
+            font-style: italic;
+            color: #555;
+            display: flex;
+            align-items: end;
+        }
+
+        .doctor-name {
+            font-weight: bold;
+            border-top: 1px solid #000;
+            padding-top: 5px;
+            display: inline-block;
+            width: 100%;
+        }
+
+        .doctor-credentials {
+            font-size: 9pt;
+            line-height: 1.3;
+        }
+
+        /* UI CONTROLS */
+        .ui-controls {
+            position: fixed; top: 20px; right: 20px;
+            background: white; padding: 10px; border-radius: 5px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2); z-index: 1000;
+        }
+        button {
+            background: #007bff; color: white; border: none;
+            padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="ui-controls no-print">
+        <button onclick="window.print()">🖨️ Print Report</button>
+    </div>
+
+    <div class="page-container">
+        
+        <div class="patient-header">
+            <div class="info-row">
+                <span class="label">I.D #:</span>
+                <span class="value">651</span>
+            </div>
+            <div class="info-row">
+                <span class="label">Reporting Date:</span>
+                <span class="value">25-11-2025</span>
+            </div>
+
+            <div class="info-row">
+                <span class="label">Patient Name:</span>
+                <span class="value">MRS FARZANA</span>
+            </div>
+            <div class="info-row">
+                <span class="label">Examination Date:</span>
+                <span class="value">24-11-2025</span>
+            </div>
+
+            <div class="info-row">
+                <span class="label">Age / Sex:</span>
+                <span class="value">40 Y / FEMALE</span>
+            </div>
+            <div class="info-row">
+                <span class="label">Referred By:</span>
+                <span class="value">DR UMAIR</span>
+            </div>
+        </div>
+
+        <div class="report-body">
+            
+            <h1 class="report-title">
+                MRI of the Brain
+                <span style="font-size: 11pt; font-weight: normal; text-decoration: none;">(with and without Gadolinium Enhancement)</span>
+            </h1>
+
+            <div class="section">
+                <span class="section-title">Clinical Information:</span>
+                <span>Post surgery</span>
+            </div>
+
+            <div class="section">
+                <span class="section-title">Scanning Protocol:</span>
+                <span>Multiplanar multi-sequential pre & post contrast images were obtained according to departmental protocol.</span>
+            </div>
+
+            <div class="section">
+                <span class="section-title">Findings:</span>
+                
+                <div class="content-block">
+                    There is evidence of signals in the left side of the cerebellopontine region. The signals are heterogenous intermediate on T2 and hypointense on T1. There is associated heterogenous post contrast enhancement.
+                </div>
+                
+                <div class="content-block">
+                    Medially involving the mid brain and pons. Anteriorly and medially extending to the left middle carinal foss involving the medial left temporal lobe.
+                </div>
+
+                <div class="content-block">
+                    The mass measures approximately 3.6 cm in transverse and 2.5 cm in anterior posterior and 3.3 cm in craniocaudal dimension and it anterior abutting and displacing the basilar artery.
+                </div>
+
+                <div class="content-block">
+                    Anteriorly the mass is partially interring the left cavernous sinus. Posteriorly it is abutted the left intracavernosal left ICA.
+                </div>
+
+                <div class="content-block">
+                    Prominence of sulci in region of the right parietal lobe. Another lesion in the right cerebellum measures approximately 1.6 x 1.3 cm.
+                </div>
+
+                <div class="content-block">
+                    There is no fluid restriction in the DWI.
+                </div>
+
+                <div class="content-block">
+                    There is evidence of abnormal signals are seen in the right parietal region and in the right scalp of the parietal lobe. The lesion in the sclp measures approximately 2.5 x 0.5 cm. The scalp region on hyperintense on T1 and T2 likely suggestive of subgaleal lipoma.
+                </div>
+
+                <div class="content-block">
+                    There is no midline shift. The sella, pituitary gland and cavernous sinuses are normal. The vestibulo-cochlear nerve complexes are normal.
+                </div>
+            </div>
+
+            <div class="section">
+                <span class="section-title">Conclusion:</span>
+                <div class="content-block" style="font-weight: bold;">
+                    Above described Findings are suggestive of neoplastic mass another lesion in the right cerebellum appears suspicious for metastasis from primary of the left cerebellopontine angle mass or unknown primary.
+                </div>
+                <div class="content-block">
+                    Need clinical correlation and further workup.
+                </div>
+            </div>
+            
+            <div class="signature-section">
+                <div class="signature-box">
+                    <div class="sig-image">Electronically signed by</div>
+                    <div class="doctor-name">DR GULZAR AHMED</div>
+                    <div class="doctor-credentials">
+                        MBBS, MCPS, FCPS, EDIR<br>
+                        CONSULTANT RADIOLOGIST
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+</body>
+</html>

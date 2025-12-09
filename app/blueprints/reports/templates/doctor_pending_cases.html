@@ -6,37 +6,14 @@
 <link rel="stylesheet" href="https://cdn.datatables.net/buttons/1.6.5/css/buttons.dataTables.min.css">
 <style>
     /* Timeline Styles */
-    .timeline {
-        position: relative;
-        margin-left: 20px;
-        padding-left: 20px;
-        border-left: 2px solid #dee2e6;
-    }
-
-    .timeline-item {
-        position: relative;
-        margin-bottom: 20px;
-    }
-
-    .timeline-icon {
-        position: absolute;
-        left: -34px;
-        top: 0;
-    }
-
-    .timeline-icon span {
-        width: 28px;
-        height: 28px;
-    }
+    .timeline { position: relative; margin-left: 20px; padding-left: 20px; border-left: 2px solid #dee2e6; }
+    .timeline-item { position: relative; margin-bottom: 20px; }
+    .timeline-icon { position: absolute; left: -34px; top: 0; }
+    .timeline-icon span { width: 28px; height: 28px; }
+    .badge-test { background-color: #e9ecef; color: #495057; margin-right: 4px; font-weight: 500; border: 1px solid #ced4da; }
     
-    /* Custom badge style for tests */
-    .badge-test {
-        background-color: #e9ecef;
-        color: #495057;
-        margin-right: 4px;
-        font-weight: 500;
-        border: 1px solid #ced4da;
-    }
+    /* Readonly Field Styling */
+    .form-control[readonly] { background-color: #f8f9fa; opacity: 1; color: #6c757d; }
 </style>
 {% endblock stylesheets %}
 
@@ -45,6 +22,8 @@
 
 {% block user_page %} 
 <div class="main-div">
+    <input type="hidden" id="currentDoctorId" value="{{ session.get('user_id') }}">
+
     <div class="jumbotron jumbotron-fluid rounded bg-white border-0 shadow-sm border-left py-3 px-4">
         <div class="justify-content-between mb-3 row align-items-center">  
             <div class="col-6 col-md-6">  
@@ -62,8 +41,9 @@
                 <table id="doctorPendingTable" class="table table-bordered table-hover" style="width:100%">
                     <thead>
                       <tr>
+                        <th>ID</th>
                         <th>Booking ID</th>
-                        <th>Test List</th>
+                        <th>Test Name</th>
                         <th>Status</th>
                         <th>Technician Comment</th>
                         <th>Assigned By</th>
@@ -90,6 +70,74 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="reportModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="bi bi-file-earmark-medical"></i> Create Report</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="reportForm">
+                    <div class="row g-3 mb-3 border-bottom pb-3">
+                        <div class="col-md-1">
+                            <label class="form-label small fw-bold">Booking ID</label>
+                            <input type="text" class="form-control" id="rep_bookingId" readonly>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small fw-bold">Patient Name</label>
+                            <input type="text" class="form-control" id="rep_patientName" readonly>
+                        </div>
+                        <div class="col-md-1">
+                            <label class="form-label small fw-bold">Age</label>
+                            <input type="text" class="form-control" id="rep_age" readonly>
+                        </div>
+                        <div class="col-md-1">
+                            <label class="form-label small fw-bold">Gender</label>
+                            <input type="text" class="form-control" id="rep_gender" readonly>
+                        </div>
+                        <div class="col-md-3">
+                           <label class="form-label">Test Name</label>
+                           <input type="text" class="form-control" id="rep_testName" readonly>
+                           <input type="hidden" id="rep_testId" name="test_id">
+                       </div>
+                        <div class="col-md-3">
+                            <label class="form-label small fw-bold">Referred By</label>
+                            <input type="text" class="form-control" id="rep_refDr" readonly>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Clinical Info</label>
+                        <textarea class="form-control" id="rep_clinical" rows="2" placeholder="Enter clinical history..."></textarea>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Scanning Protocols</label>
+                        <textarea class="form-control" id="rep_protocols" rows="2"></textarea>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Findings (Detailed Report) *</label>
+                        <textarea class="form-control" id="rep_findings" rows="10" placeholder="Type findings here..."></textarea>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Conclusion / Impression</label>
+                        <textarea class="form-control" id="rep_conclusion" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary px-4" id="btnSaveReport">
+                    <i class="bi bi-save"></i> Save Report
+                </button>
             </div>
         </div>
     </div>

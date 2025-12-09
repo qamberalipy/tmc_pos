@@ -36,6 +36,7 @@ def create_app():
             'session_user_role': session.get('user_role'),
             'session_role_id': session.get('role_id'),
             'session_user_name': session.get('user_name'),
+            'session_doctor_signature': session.get('doctor_signature'),
             'menu': menu
         }
 

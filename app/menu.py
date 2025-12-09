@@ -34,6 +34,7 @@ MENU = {
         {"label": "Booking", "icon": "bi-book", "endpoint": None, "children": [
             {"label": "Test Booking", "icon": "bi-bag-plus-fill", "endpoint": "booking.view_test_booking"},
             {"label": "View Booking", "icon": "bi bi-eye-fill", "endpoint": "booking.view_view_booking"},
+            {"label": "Book Results", "icon": "bi-file-earmark-medical-fill", "endpoint": "booking.view_booking_result"},
         ]},
         {"label": "Films", "icon": "bi bi-file-medical", "endpoint": None, "children": [
             {"label": "Inventory Audit", "icon": "bi-file-earmark-post", "endpoint": "booking.view_films_inventory_audit"},
@@ -54,7 +55,7 @@ MENU = {
     
     "doctor": [
         {"label": "Pending Cases", "icon": "bi-bag-plus-fill", "endpoint": "reports.view_pending_cases"},
-        {"label": "View Cases Report", "icon": "bi bi-eye-fill", "endpoint": "registrations.view_test_registration"},
+        {"label": "Report Cases", "icon": "bi bi-eye-fill", "endpoint": "reports.view_reported_cases"},
         ],
     "default": [
         {"label": "Amazon", "icon": "bi-amazon", "endpoint": "#"},

@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block stylesheets %}
+<link rel="stylesheet" href="https://cdn.datatables.net/1.10.22/css/jquery.dataTables.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/responsive/2.2.6/css/responsive.dataTables.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/select/1.3.1/css/select.dataTables.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/buttons/1.6.5/css/buttons.dataTables.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/buttons/1.6.5/css/buttons.dataTables.min.css">
+<link rel="stylesheet" href="{{ url_for('registrations.static', filename='css/style.css') }}">
+<style>
+    .timeline {
+        position: relative;
+        margin-left: 20px;
+        padding-left: 20px;
+        border-left: 2px solid #dee2e6;
+        /* vertical line */
+    }
+
+    .timeline-item {
+        position: relative;
+        margin-bottom: 20px;
+    }
+
+    .timeline-icon {
+        position: absolute;
+        left: -34px;
+        /* position circle on line */
+        top: 0;
+    }
+
+    .timeline-icon span {
+        width: 28px;
+        height: 28px;
+    }
+</style>
+{% endblock stylesheets %}
+
+{% block content %}
+{% endblock %}
+{% block user_page %}
+<div class="main-div">
+    <div class="jumbotron jumbotron-fluid rounded bg-white border-0 shadow-sm border-left py-3 px-4">
+        
+        <div class="justify-content-between mb-3 row align-items-center">
+            <div class="col-6 col-md-6">
+                <h5 class="text-pos">Booking Result</h5>
+            </div>
+            <div class="col-6 col-md-6 text-end">
+            </div>
+        </div>
+
+        <div class="row g-3 mb-4">
+            <div class="col-md-6">
+                <label class="form-label fw-semibold">From Date</label>
+                <input type="date" class="form-control shadow-sm" id="from_date">
+            </div>
+
+            <div class="col-md-6">
+                <label class="form-label fw-semibold">To Date</label>
+                <div class="d-flex">
+                    <input type="date" class="form-control shadow-sm" id="to_date">
+                    <button class="btn btn-dark ms-2" id="searchBtn">
+                        <i class="bi bi-search"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="text-dark">
+            <div class="table-responsive">
+                <table id="testReg_table"
+                    class="table-responsive-sm table-responsive border-0 dataTable no-footer table table-bordered table-hover"
+                    style="width:100%">
+                    <thead>
+                        <tr>
+                            <th>Booking ID</th>
+                            <th>Patient Name</th>
+                            <th>Test Name</th>
+                            <th>Status</th>
+                            <th>Assign To</th>
+                            <th>Assign By</th>
+                            <th>Assigned At</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="table_body" class=""></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block javascript %}
+<script src="https://cdn.datatables.net/1.10.22/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/responsive/2.2.6/js/dataTables.responsive.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/1.6.5/js/dataTables.buttons.min.js"></script>
+<script src="https://cdn.datatables.net/select/1.3.1/js/dataTables.select.min.js"></script>
+<script src="{{ url_for('booking.static', filename='js/view_booking.js') }}"></script>
+
+
+
+{% endblock %}

@@ -91,40 +91,103 @@ def view_pending_cases():
         print(f"Error in pending_cases: {str(e)}")
         return render_template("error.html", message="An error occurred while loading pending cases.")
 
+@reports_bp.route("/reported_cases", methods=["POST", "GET"])
+@login_required
+def view_reported_cases():
+    try:
+        return render_template("doctor_reported_cases.html")
+    except Exception as e:
+        print(f"Error in reported_cases: {str(e)}")
+        return render_template("error.html", message="An error occurred while loading pending cases.")
+    
 @reports_bp.route("/assign-bookings", methods=["POST"])
 def assign_bookings():
     data = request.get_json()
-    booking_ids = data.get("bookingids")
+    
+    # Matches the new frontend payload key: "bookings"
+    bookings_payload = data.get("bookings") 
     doctor_id = data.get("doctor_id")
+    
     user_id = session.get("user_id")
     branch_id = session.get("branch_id")
 
-    if not booking_ids or not doctor_id:
-        return jsonify({"error": "bookingids and doctor_id are required"}), 400
+    print("Assign Bookings Data:", data)
+
+    if not bookings_payload or not doctor_id:
+        return jsonify({"error": "bookings data and doctor_id are required"}), 400
 
     try:
-        result = report_services.assign_bookings_to_doctor(
-            booking_ids=booking_ids,
+        # Pass the list of objects to the service
+        result_count = report_services.assign_bookings_to_doctor(
+            bookings_payload=bookings_payload,
             doctor_id=doctor_id,
             assigned_by=user_id,
             branch_id=branch_id
         )
-        return jsonify({"message": "Bookings assigned successfully", "assigned_count": result}), 200
+        
+        msg = f"{result_count} tests assigned successfully"
+        if result_count == 0:
+            msg = "No new tests were assigned (all selected tests were already assigned)."
+
+        return jsonify({
+            "message": msg, 
+            "assigned_count": result_count
+        }), 200
+
     except Exception as e:
         print(f"Error in assign_bookings: {str(e)}")
+        # In production, avoid sending str(e) directly to client for security, use generic message
         return jsonify({"error": "Internal server error", "detail": str(e)}), 500
 
+@reports_bp.route("/decline-assignment", methods=["POST"])
+def decline_assignment_route():
+    data = request.get_json()
+    reporting_id = data.get("reporting_id")
+    doctor_id = session.get("user_id") 
 
+    if not reporting_id:
+        return jsonify({"error": "Reporting ID is required"}), 400
+
+    try:
+        success = report_services.decline_doctor_assignment(reporting_id, doctor_id)
+        
+        if success:
+            return jsonify({"message": "Assignment declined"}), 200
+        else:
+            return jsonify({"error": "Record not found or access denied"}), 404
+
+    except Exception as e:
+        print(f"Error declining assignment: {e}")
+        return jsonify({"error": str(e)}), 500
 
 @reports_bp.route("/bookings/pendingcase", methods=["GET"])
-def get_doctor_bookings():
+def get_doctor_pending_bookings():
     try:
         doctor_id = session.get("user_id")
         print("Doctor ID",doctor_id)
-        result = report_services.get_doctor_bookings(doctor_id=doctor_id)
+        result = report_services.get_doctor_pending_bookings(doctor_id=doctor_id)
         return jsonify(result), 200
     except Exception as e:
-        print(f"Error in get_doctor_bookings: {str(e)}")
+        print(f"Error in get_doctor_pending_bookings: {str(e)}")
+        return jsonify({"error": "Internal server error", "detail": str(e)}), 500
+
+@reports_bp.route("/bookings/reportedcase", methods=["GET"])
+def get_doctor_reported_bookings():
+    try:
+        doctor_id = session.get("user_id")
+        print("Doctor ID",doctor_id)
+        result = report_services.get_doctor_reported_bookings(doctor_id=doctor_id)
+        return jsonify(result), 200
+    except Exception as e:
+        print(f"Error in get_doctor_reported_bookings: {str(e)}")
+        return jsonify({"error": "Internal server error", "detail": str(e)}), 500
+    
+@reports_bp.route("/checking", methods=["GET"])
+def checking_route():
+    try:
+        return render_template("check_report.html")
+    except Exception as e:
+        print(f"Error in checking_route: {str(e)}")
         return jsonify({"error": "Internal server error", "detail": str(e)}), 500
 
 @reports_bp.route("/save-report", methods=["POST"])
@@ -135,6 +198,16 @@ def save_report():
         result=report_services.save_doctor_report(data, user_id)
         return jsonify(result), 200
     
+    except Exception as e:
+        print(e)
+        return jsonify({"error": str(e)}), 400
+    
+@reports_bp.route("/get-report-data/<int:report_id>", methods=["GET"])
+def get_report_data(report_id):
+    try:
+        result = report_services.get_doctor_report_by_id(report_id)
+        return jsonify(result), 200
+
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 
@@ -148,3 +221,13 @@ def update_report(report_id):
 
     except Exception as e:
         return jsonify({"error": str(e)}), 400
+    
+@reports_bp.route("/view-patient-report/<int:report_id>", methods=["GET"])
+def view_patient_report(report_id):
+    try:
+        result = report_services.get_doctor_report_by_id(report_id)
+        print("Patient Report Result:", result)
+        return render_template("view_patient_report.html", report=result)
+    except Exception as e:
+        print(f"Error in view_patient_report: {str(e)}")
+        return render_template("error.html", message="An error occurred while loading the report.")

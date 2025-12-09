@@ -558,13 +558,19 @@ def get_booking_details(booking_id: int):
 
 
 def _format_test_booking(row):
+    # Parse the ID string "1, 2, 3" into a list [1, 2, 3] for frontend use
+    test_ids_list = []
+    if row.test_ids:
+        test_ids_list = [int(id_str) for id_str in row.test_ids.split(', ')]
+
     return {
         "booking_id": row.id,
         "patient_name": row.patient_name,
         "date": row.create_at.strftime("%Y-%m-%d") if row.create_at else None,
         "referred_dr": row.referred_dr,
         "mr_no": row.mr_no,
-        "test_name": row.test_names,   # already aggregated string
+        "test_name": row.test_names,   # e.g., "CBC, Lipid Profile"
+        "test_ids": test_ids_list,     # e.g., [1, 4]
         "technician_comments": row.technician_comments,
         "total_amount": float(row.net_receivable),
         "total_films": row.total_no_of_films_used,
@@ -581,7 +587,6 @@ def _format_test_booking(row):
 
 def get_all_test_bookings(branch_id=None, from_date=None, to_date=None):
     try:
-
         start_dt = None
         end_dt = None
 
@@ -618,10 +623,16 @@ def get_all_test_bookings(branch_id=None, from_date=None, to_date=None):
                 TestBooking.update_at,
                 Branch.branch_name.label("branch_name"),
                 User.name.label("created_by_name"),
+                # --- Aggregating Test Names ---
                 func.string_agg(
                     func.distinct(cast(Test_registration.test_name, String)),
                     ', '
-                ).label("test_names")
+                ).label("test_names"),
+                # --- NEW: Aggregating Test IDs ---
+                func.string_agg(
+                    func.distinct(cast(Test_registration.id, String)),
+                    ', '
+                ).label("test_ids")
             )
             .join(TestBookingDetails, TestBookingDetails.booking_id == TestBooking.id)
             .join(Test_registration, Test_registration.id == TestBookingDetails.test_id)
@@ -653,8 +664,9 @@ def get_all_test_bookings(branch_id=None, from_date=None, to_date=None):
         return [_format_test_booking(r) for r in rows], 200
 
     except SQLAlchemyError as e:
+        # It is good practice to log 'e' here before returning
         return {"error": str(e.__dict__.get("orig", e))}, 500
-
+    
 def add_booking_comment(booking_id: int, data):
     try:
         comment_text = data.get("comment", "").strip()

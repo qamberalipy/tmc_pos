@@ -1,4 +1,4 @@
-from flask import session
+from flask import json, session
 from app.extensions import db
 from app.models import Role, Branch, User   
 from werkzeug.security import generate_password_hash
@@ -100,6 +100,37 @@ def get_all_users():
         return [_format_user(u, role_name, branch_name) for u, role_name, branch_name in results], 200
     except SQLAlchemyError as e:
         return {"error": str(e.__dict__.get('orig', e))}, 500
+
+def update_doctor_signature_service(user_id, sig_name, sig_degrees, sig_title):
+    try:
+        user = User.query.get(user_id)
+        
+        if not user:
+            return {"error": "User not found"}, 404
+
+        # Validation
+        if not sig_name or not sig_title:
+            return {"error": "Name and Title are required for signature"}, 400
+
+        # Create JSON structure
+        signature_data = {
+            "name": sig_name.upper(),
+            "degrees": sig_degrees.upper() if sig_degrees else "",
+            "title": sig_title.upper()
+        }
+
+        # Save to DB
+        user._signature_data = json.dumps(signature_data)
+        db.session.commit()
+        
+        return {"message": "Signature updated successfully"}, 200
+
+    except Exception as e:
+        db.session.rollback()
+        # Log the actual error in your server logs here
+        print(f"Error updating signature: {str(e)}")
+        return {"error": "Internal Server Error"}, 500
+
 
 
 def get_all_doctors(branch_id=None):

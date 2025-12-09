@@ -38,6 +38,14 @@ def view_films_inventory_audit():
     except Exception as e:
         print(f"Error in view_films_inventory_audit: {str(e)}")
         return redirect(url_for('main.error_page'))
+@booking_bp.route('/view/booking-result')
+@login_required
+def view_booking_result():
+    try:
+        return render_template('view_booking_result.html')
+    except Exception as e:
+        print(f"Error in view_booking_result: {str(e)}")
+        return redirect(url_for('main.error_page'))
 
 @booking_bp.route("/receipts")
 @login_required
@@ -95,6 +103,8 @@ def get_test_booking(booking_id):
     except Exception as e:
         print(f"Error in get_test_booking: {str(e)}")
         return jsonify({"error": "Failed to fetch booking details"}), 400
+    
+
 
 @booking_bp.route("/comments/<int:booking_id>", methods=["GET"])
 def get_booking_comments(booking_id):

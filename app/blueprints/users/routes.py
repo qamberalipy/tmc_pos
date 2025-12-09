@@ -24,6 +24,30 @@ def profile():
         print(f"Error in profile: {str(e)}")
         return redirect(url_for('main.error_page'))
 
+@users_bp.route('/update_signature', methods=['POST'])
+@login_required
+def update_signature():
+    user_id = session.get('user_id')
+    sig_name = request.form.get('sig_name')
+    sig_degrees = request.form.get('sig_degrees')
+    sig_title = request.form.get('sig_title')
+
+    # 3. Call Service
+    response_data, status_code = users_services.update_doctor_signature_service(
+        user_id, 
+        sig_name, 
+        sig_degrees, 
+        sig_title
+    )
+
+    # 4. Return JSON Response
+    session['doctor_signature'] = {
+            "name": sig_name.upper(),
+            "degrees": sig_degrees.upper() if sig_degrees else "",
+            "title": sig_title.upper()
+        }
+    session.modified = True
+    return jsonify(response_data), status_code
 
 @users_bp.route("/user", methods=["POST"])
 def create_user():
@@ -89,7 +113,8 @@ def update_user_password():
     result, status = users_services.update_user_password(session.get("user_id"), data["password"])
     return jsonify(result), status
 
-@users_bp.route("/get_all_doctors/<branch_id>", methods=["GET"])
-def get_all_doctors(branch_id):
+@users_bp.route("/get_all_doctors", methods=["GET"])
+def get_all_doctors():
+    branch_id=session.get("branch_id")
     result, status = users_services.get_all_doctors(branch_id)
     return jsonify(result), status

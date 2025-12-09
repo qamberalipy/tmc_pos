@@ -116,7 +116,7 @@ $(document).ready(function () {
 
         // Fetch Doctors API
         // NOTE: Ensure the branch ID (1) is correct or dynamic based on your logic
-        axios.get(baseUrl + "/users/get_all_doctors/1")
+        axios.get(baseUrl + "/users/get_all_doctors")
             .then(res => {
                 let doctors = res.data;
                 let options = `<option value="" selected disabled>-- Select Doctor --</option>`;
@@ -135,35 +135,76 @@ $(document).ready(function () {
 
     // D. Confirm Assignment (Submit to Backend)
     $("#btnConfirmAssignment").on("click", function() {
-        const doctorId = $("#doctorSelectDropdown").val();
-        const bookingIds = Array.from(window.selectedBookingIds); // Convert Set to Array
+    const doctorId = $("#doctorSelectDropdown").val();
+    
+    // 1. Validation
+    if (!doctorId) {
+        showToastMessage("error", "Please select a doctor.");
+        return;
+    }
 
-        if (!doctorId) {
-            showToastMessage("error", "Please select a doctor.");
-            return;
+    if (window.selectedBookingIds.size === 0) {
+        showToastMessage("error", "No bookings selected.");
+        return;
+    }
+
+    // 2. Build the detailed payload
+    let bookingDetails = [];
+
+    // Iterate through the Set of selected IDs
+    window.selectedBookingIds.forEach(function(bId) {
+        // Find the checkbox in the DOM with this value
+        let $checkbox = $(`.chk-booking[value="${bId}"]`);
+        
+        // If found (Note: If using pagination, this only finds rows on the current page)
+        if ($checkbox.length > 0) {
+            // Traverse up to the row (tr), then find the hidden span (.test-info-cell)
+            let $row = $checkbox.closest('tr');
+            let $infoSpan = $row.find('.test-info-cell');
+            
+            // Retrieve the data-ids attribute (e.g., "2,5,6")
+            let idsString = $infoSpan.data('ids');
+            
+            // Convert string "2,5,6" -> Array [2, 5, 6]
+            let idsArray = [];
+            if (idsString !== undefined && idsString !== null && idsString !== "") {
+                idsArray = idsString.toString().split(',').map(Number);
+            }
+
+            // Add to our list
+            bookingDetails.push({
+                booking_id: bId,
+                test_ids: idsArray
+            });
         }
-
-        const payload = {
-            bookingids: bookingIds,
-            doctor_id: doctorId
-        };
-
-        myshowLoader();
-        // NOTE: Adjust the endpoint prefix if your reports_bp has a prefix (e.g. /reports)
-        axios.post(baseUrl + "/reports/assign-bookings", payload) 
-            .then(res => {
-                showToastMessage("success", res.data.message || "Bookings assigned successfully!");
-                $("#assignDoctorModal").modal("hide");
-                
-                // Clear selections and refresh
-                window.selectedBookingIds.clear();
-                updateBulkButtonState();
-                $("#selectAllBookings").prop("checked", false);
-                getAllTestBookings();
-            })
-            .catch(err => handleAxiosError(err))
-            .finally(() => myhideLoader());
     });
+
+    const payload = {
+        doctor_id: doctorId,
+        bookings: bookingDetails // This now contains the list of objects
+    };
+
+    // 3. Send to Backend
+    myshowLoader();
+    axios.post(baseUrl + "/reports/assign-bookings", payload) 
+        .then(res => {
+            showToastMessage("success", res.data.message || "Bookings assigned successfully!");
+            $("#assignDoctorModal").modal("hide");
+            
+            // Clear selections and refresh
+            window.selectedBookingIds.clear();
+            updateBulkButtonState();
+            $("#selectAllBookings").prop("checked", false);
+            getAllTestBookings();
+        })
+        .catch(err => {
+            console.error(err);
+            // Handle Axios error (assuming you have a helper or manual check)
+            let msg = err.response && err.response.data ? err.response.data.error : "An error occurred";
+            showToastMessage("error", msg);
+        })
+        .finally(() => myhideLoader());
+});
 
 });
 
@@ -183,6 +224,8 @@ function getAllTestBookings() {
     axios.get(url)
         .then(res => {
             let data = res.data;
+            console.log("Fetched Bookings:", data);
+            
             let dtable = $("#testReg_table").DataTable({
                 destroy: true,
                 responsive: true,
@@ -191,20 +234,30 @@ function getAllTestBookings() {
                 ordering: false
             });
 
-            dtable.clear(); // Clear internal data
-            window.selectedBookingIds.clear(); // Reset selection on new fetch
+            dtable.clear(); 
+            window.selectedBookingIds.clear(); 
             updateBulkButtonState();
 
             let rowsToAdd = [];
 
             $.each(data, function (i, t) {
-                // Actions
+                
+                let hiddenTestIds = (t.test_ids || []).join(',');
+
+        
                 let printBtn = `<a href="${baseUrl}/booking/receipt/${t.booking_id}" target="_blank" class="border btn print-booking"><i class="bi-printer-fill text-success"></i></a>`;
                 let commentBtn = `<button class="border btn comment-booking" data-id="${t.booking_id}"><i class="bi-chat-left-dots-fill text-primary"></i></button>`;
-                let filmsBtn = `<button class="border btn edit-films" data-id="${t.booking_id}" data-films="${t.total_films || 0}"><i class="bi-pencil-square text-dark"></i></button>`;
+                
+                // 2. I added data-test-ids to this button too, in case you need them here
+                let filmsBtn = `<button class="border btn edit-films" data-id="${t.booking_id}" data-test-ids="${hiddenTestIds}" data-films="${t.total_films || 0}"><i class="bi-pencil-square text-dark"></i></button>`;
 
                 // Checkbox Column
                 let checkbox = `<div class=""><input type="checkbox" class="chk-booking" value="${t.booking_id}" style="cursor: pointer;"></div>`;
+
+                // 3. Prepare the Test Name Cell with Hidden Data
+                let testNameHtml = `<span class="test-info-cell"  data-booking-id="${t.booking_id}" data-ids="${hiddenTestIds}">
+                                        ${t.test_name || "-"}
+                                    </span>`;
 
                 rowsToAdd.push([
                     checkbox,
@@ -213,7 +266,7 @@ function getAllTestBookings() {
                     t.date || "-",
                     t.referred_dr || "-",
                     t.mr_no || "-",
-                    t.test_name || "-",
+                    testNameHtml, // <--- Using the HTML with hidden data here
                     t.total_amount || "0",
                     t.discount || "0",
                     t.net_amount || "0",
@@ -223,7 +276,6 @@ function getAllTestBookings() {
                 ]);
             });
 
-            // Batch Add for Performance
             if(rowsToAdd.length > 0) {
                 dtable.rows.add(rowsToAdd);
             }
