@@ -1,4 +1,5 @@
 from app.extensions import db
+from datetime import datetime
 
 class Expenses(db.Model):
     __tablename__ = "expenses"
@@ -17,7 +18,7 @@ class Expenses(db.Model):
     )
     paid_to = db.Column(db.String(225))
 
-    created_at = db.Column(db.DateTime, default=db.func.now())
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
     created_by = db.Column(db.Integer)
-    updated_at = db.Column(db.DateTime, default=db.func.now(), onupdate=db.func.now())
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     updated_by = db.Column(db.Integer)

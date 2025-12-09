@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block stylesheets %}
+<link rel="stylesheet" href="https://cdn.datatables.net/1.10.22/css/jquery.dataTables.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/responsive/2.2.6/css/responsive.dataTables.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/buttons/1.6.5/css/buttons.dataTables.min.css">
+
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+
+<style>
+    /* Fix Select2 height and border to match Bootstrap inputs */
+    .select2-container .select2-selection--multiple {
+        min-height: 38px;
+        border: 1px solid #ced4da;
+        border-radius: 0.25rem;
+    }
+    .select2-container--default.select2-container--focus .select2-selection--multiple {
+        border-color: #80bdff;
+        box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+    }
+</style>
+{% endblock stylesheets %}
+
+{% block content %}
+{% endblock %}
+
+{% block user_page %}
+<div class="main-div">
+    <div class="jumbotron jumbotron-fluid rounded bg-white border-0 shadow-sm border-left py-3 px-4">
+        
+        <div class="justify-content-between mb-3 row align-items-center">
+            <div class="col-6 col-md-6">
+                <h5 class="text-pos">Assigned Reports</h5>
+            </div>
+        </div>
+
+        <div class="row g-3 mb-4 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label fw-semibold">From Date</label>
+                <input type="date" class="form-control shadow-sm" id="from_date">
+            </div>
+
+            <div class="col-md-3">
+                <label class="form-label fw-semibold">To Date</label>
+                <input type="date" class="form-control shadow-sm" id="to_date">
+            </div>
+
+            <div class="col-md-4">
+                <label class="form-label fw-semibold">Status</label>
+                <select class="select2-filter shadow-sm w-100" id="status_filter" multiple="multiple">
+                    <option value="Pending" selected>Pending</option>
+                    <option value="Reported">Reported</option>
+                    <option value="Declined">Declined</option>
+                </select>
+            </div>
+
+            <div class="col-md-2">
+                <button class="btn btn-dark w-100 shadow-sm" id="searchBtn">
+                    <i class="bi bi-search"></i> Search
+                </button>
+            </div>
+        </div>
+
+        <div class="text-dark">
+            <div class="table-responsive">
+                <table id="assignedReportsTable" class="table table-bordered table-hover dataTable no-footer" style="width:100%">
+                    <thead>
+                        <tr>
+                            <th>Booking ID</th>
+                            <th>Test Name</th>
+                            <th>Status</th>
+                            <th>Assign To</th>
+                            <th>Assign By</th>
+                            <th>Assigned At</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="table_body"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block javascript %}
+<script src="https://cdn.datatables.net/1.10.22/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/responsive/2.2.6/js/dataTables.responsive.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+<script src="{{ url_for('booking.static', filename='js/view_booking_result.js') }}"></script>
+
+<script>
+    $(document).ready(function() {
+        $('.select2-filter').select2({
+            placeholder: "Select Status",
+            allowClear: true,
+            width: '100%' // Ensures it fills the column
+        });
+    });
+</script>
+{% endblock %}

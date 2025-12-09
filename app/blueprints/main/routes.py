@@ -50,9 +50,7 @@ def login():
                 flash('Email and password are required.', 'error')
                 return redirect(url_for('main.login'))
 
-            print("Hello")
             user = get_user_by_email(email=email)
-            print("MyDATA", user)
 
             if not user:
                 flash('Invalid email or password.', 'error')
@@ -65,12 +63,22 @@ def login():
 
             # Check password
             if check_password_hash(user.get('password'), password):
+                # Set Session
                 session['user_id'] = user.get('id')
                 session['user_name'] = user.get('name')
                 session['user_email'] = user.get('email')
                 session['user_role'] = user.get('role')
                 session['role_id'] = user.get('role_id')
                 session['branch_id'] = user.get('branch_id')
+                session['doctor_signature'] = user.get('doctor_signature')
+                print("User Signature:", session['doctor_signature'])
+                # --- NEW LOGIC: Check Doctor Signature ---
+                if user.get('role') == 'doctor' and not user.get('has_signature'):
+                    flash('Please complete your profile by adding your digital signature.', 'warning')
+                    session
+                    return redirect(url_for('users.profile'))
+                # -----------------------------------------
+
                 flash('Login successful!', 'success')
                 return redirect(url_for('admin.view_admin_dashboard'))
             else:
@@ -80,7 +88,9 @@ def login():
         return render_template('login.html')
     except Exception as e:
         print(f"Error in login: {str(e)}")
-        return e
+        # In production, log this properly
+        flash('An error occurred during login.', 'error')
+        return redirect(url_for('main.login'))
 
 @main_bp.route('/logout')
 def logout():

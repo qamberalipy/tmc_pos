@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block stylesheets %}
+<link rel="stylesheet" href="{{ url_for('registrations.static', filename='css/style.css') }}">
+
+<style>
+    .report-table td, .report-table th {
+        padding: 6px 10px !important;
+        font-size: 14px;
+    }
+    .report-title {
+        font-size: 20px;
+        font-weight: 700;
+    }
+    .section-header {
+        background: #e3f2fd;
+        padding: 6px 10px;
+        font-weight: 700;
+        border: 1px solid #ccc;
+        margin-top: 20px;
+        margin-bottom: 5px;
+    }
+</style>
+{% endblock %}
+
+{% block user_page %}
+
+<div class="container-fluid py-3 rounded bg-white shadow-sm">
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 class="fw-bold">Daily Closing Report</h4>
+    </div>
+
+    <div class="row">
+        <div class="col-md-4">
+            <label class="form-label fw-semibold">Select Date *</label>
+            <div class="d-flex">
+                <input type="date" class="form-control shadow-sm" id="report_date">
+                <button class="btn btn-dark ms-2" id="searchBtn">
+                    <i class="bi bi-search"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<div class="container-fluid py-3 rounded bg-white shadow-sm mt-2">
+
+    <div class="d-flex justify-content-end mb-2 gap-2">
+        <button class="btn btn-success" id="exportExcel">
+            <i class="bi bi-file-earmark-excel"></i> Excel
+        </button>
+
+        <button class="btn btn-danger" id="exportPDF">
+            <i class="bi bi-file-earmark-pdf"></i> PDF
+        </button>
+    </div>
+
+    <div id="daily-report-area"></div>
+</div>
+
+{% endblock %}
+
+{% block javascript %}
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+<script src="{{ url_for('reports.static', filename='js/daily_reports.js') }}"></script>
+{% endblock %}

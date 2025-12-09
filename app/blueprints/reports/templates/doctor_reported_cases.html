@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+
+{% block stylesheets %}
+<link rel="stylesheet" href="https://cdn.datatables.net/1.10.22/css/jquery.dataTables.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/responsive/2.2.6/css/responsive.dataTables.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/buttons/1.6.5/css/buttons.dataTables.min.css">
+<style>
+    /* Custom badge style */
+    .badge-test { background-color: #e9ecef; color: #495057; border: 1px solid #ced4da; }
+    /* Readonly styling */
+    .form-control[readonly], .form-control:disabled { background-color: #f8f9fa; opacity: 1; color: #6c757d; }
+</style>
+{% endblock stylesheets %}
+
+{% block content %}
+{% endblock %}
+
+{% block user_page %} 
+<div class="main-div">
+    <input type="hidden" id="currentDoctorId" value="{{ session.get('user_id') }}">
+
+    <div class="jumbotron jumbotron-fluid rounded bg-white border-0 shadow-sm border-left py-3 px-4">
+        <div class="justify-content-between mb-3 row align-items-center">  
+            <div class="col-6 col-md-6">  
+              <h5 class="text-pos">View Reported Cases</h5>
+            </div>
+            <div class="col-6 col-md-6 text-end">
+                <button class="btn btn-sm btn-outline-secondary" onclick="getReportedBookings()">
+                    <i class="bi bi-arrow-clockwise"></i> Refresh
+                </button>
+            </div>
+        </div>
+        
+        <div class="text-dark">
+            <div class="table-responsive">
+                <table id="doctorReportedTable" class="table table-bordered table-hover" style="width:100%">
+                    <thead>
+                      <tr>
+                        <th>Booking ID</th>
+                        <th>Patient Name</th>
+                        <th>Test Name</th>
+                        <th>Status</th>
+                        <th>Reported at</th>
+                        <th class="text-center">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody id="table_body"></tbody>
+                  </table>
+            </div>        
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="editReportModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title"><i class="bi bi-pencil-square"></i> Edit Report</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editReportForm">
+                    <input type="hidden" id="edit_report_id">
+                    
+                    <div class="row g-3 mb-3 border-bottom pb-3">
+                        <div class="col-md-4">
+                            <label class="fw-bold">Patient Name</label>
+                            <input type="text" class="form-control" id="edit_patientName" readonly>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="fw-bold">Test Name</label>
+                            <input type="text" class="form-control" id="edit_testName" readonly>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="fw-bold">Referred Dr</label>
+                            <input type="text" class="form-control" id="edit_referredDr" readonly>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Clinical Info</label>
+                        <textarea class="form-control" id="edit_clinical" rows="2"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Scanning Protocols</label>
+                        <textarea class="form-control" id="edit_protocols" rows="2"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Findings (Detailed Report) *</label>
+                        <textarea class="form-control" id="edit_findings" rows="10"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Conclusion / Impression</label>
+                        <textarea class="form-control" id="edit_conclusion" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-warning" id="btnUpdateReport">
+                    <i class="bi bi-save"></i> Update Report
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block javascript %}
+<script src="https://cdn.datatables.net/1.10.22/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/responsive/2.2.6/js/dataTables.responsive.min.js"></script>
+<script src="{{ url_for('reports.static', filename='js/doctor_reported_cases.js') }}"></script>
+{% endblock %}

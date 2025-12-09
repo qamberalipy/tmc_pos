@@ -9,6 +9,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from decimal import Decimal, InvalidOperation
 from datetime import datetime, date, time
 from werkzeug.exceptions import BadRequest
+from app.helper import convert_to_utc
 from sqlalchemy.ext.mutable import MutableDict, MutableList
 from app.models.test_booking import TestFilmUsage, TestBooking,FilmInventoryTransaction
 from app.models.test_registration import Test_registration
@@ -75,13 +76,15 @@ def create_test_booking(data):
                 reporting_date = None
                 if test.get("reporting_date"):
                     try:
+                        test["reporting_date"] = convert_to_utc(test["reporting_date"])
                         reporting_date = (
-                            datetime.strptime(test["reporting_date"], "%Y-%m-%d").date()
-                            if isinstance(test["reporting_date"], str)
-                            else test["reporting_date"]
+                            test["reporting_date"].date()
+                            if isinstance(test["reporting_date"], datetime)
+                            else datetime.strptime(test["reporting_date"], "%Y-%m-%d").date()
                         )
                     except ValueError:
                         raise ValueError(f"tests[{idx}].reporting_date must be YYYY-MM-DD")
+
 
                 details.append(TestBookingDetails(
                     booking_id=booking.id,
@@ -500,6 +503,9 @@ def get_booking_details(booking_id: int):
                     t.reporting_date.strftime("%d-%b-%Y %I:%M %p")
                     if t.reporting_date else None
                 ),
+                "test_name": db.session.query(Test_registration.test_name)
+                                .filter(Test_registration.id == t.test_id)
+                                .scalar(),  
                 "sample_to_follow": t.sample_to_follow,
             }
             for t in tests
@@ -539,7 +545,7 @@ def get_booking_details(booking_id: int):
                 "balance": float(booking.due_amount or 0),
             },
             "tests": test_list,
-            "printed_at": datetime.now().strftime("%d-%b-%Y %I:%M %p"),
+            "printed_at": datetime.utcnow().strftime("%d-%b-%Y %I:%M %p"),
             "current_user": session.get("user_name"),
         }, 200
 
@@ -552,13 +558,19 @@ def get_booking_details(booking_id: int):
 
 
 def _format_test_booking(row):
+    # Parse the ID string "1, 2, 3" into a list [1, 2, 3] for frontend use
+    test_ids_list = []
+    if row.test_ids:
+        test_ids_list = [int(id_str) for id_str in row.test_ids.split(', ')]
+
     return {
         "booking_id": row.id,
         "patient_name": row.patient_name,
         "date": row.create_at.strftime("%Y-%m-%d") if row.create_at else None,
         "referred_dr": row.referred_dr,
         "mr_no": row.mr_no,
-        "test_name": row.test_names,   # already aggregated string
+        "test_name": row.test_names,   # e.g., "CBC, Lipid Profile"
+        "test_ids": test_ids_list,     # e.g., [1, 4]
         "technician_comments": row.technician_comments,
         "total_amount": float(row.net_receivable),
         "total_films": row.total_no_of_films_used,
@@ -573,10 +585,28 @@ def _format_test_booking(row):
     }
 
 
-# 🔹 Get All Bookings (optimized with join + aggregation)
-def get_all_test_bookings(branch_id=None):
+def get_all_test_bookings(branch_id=None, from_date=None, to_date=None):
     try:
-        # PostgreSQL-compatible aggregation of test names
+        start_dt = None
+        end_dt = None
+
+        if from_date and to_date:
+            try:
+                from_date_obj = datetime.strptime(from_date, "%Y-%m-%d").date()
+                to_date_obj   = datetime.strptime(to_date, "%Y-%m-%d").date()
+            except ValueError:
+                raise BadRequest("Date format must be YYYY-MM-DD.")
+
+            if from_date_obj > to_date_obj:
+                raise BadRequest("from_date cannot be greater than to_date.")
+
+            start_dt = datetime.combine(from_date_obj, time.min)
+            end_dt   = datetime.combine(to_date_obj, time.max)
+
+        elif from_date or to_date:
+            raise BadRequest("Both from_date and to_date are required for date filtering.")
+
+
         query = (
             db.session.query(
                 TestBooking.id,
@@ -593,10 +623,16 @@ def get_all_test_bookings(branch_id=None):
                 TestBooking.update_at,
                 Branch.branch_name.label("branch_name"),
                 User.name.label("created_by_name"),
+                # --- Aggregating Test Names ---
                 func.string_agg(
                     func.distinct(cast(Test_registration.test_name, String)),
                     ', '
-                ).label("test_names")
+                ).label("test_names"),
+                # --- NEW: Aggregating Test IDs ---
+                func.string_agg(
+                    func.distinct(cast(Test_registration.id, String)),
+                    ', '
+                ).label("test_ids")
             )
             .join(TestBookingDetails, TestBookingDetails.booking_id == TestBooking.id)
             .join(Test_registration, Test_registration.id == TestBookingDetails.test_id)
@@ -609,18 +645,28 @@ def get_all_test_bookings(branch_id=None):
                 User.name,
                 Referred.name
             )
-            .order_by(TestBooking.create_at.desc())
         )
-
         if branch_id:
             query = query.filter(TestBooking.branch_id == branch_id)
+
+
+        if start_dt and end_dt:
+            query = query.filter(
+                and_(
+                    TestBooking.create_at >= start_dt,
+                    TestBooking.create_at <= end_dt
+                )
+            )
+
+        query = query.order_by(TestBooking.create_at.desc())
 
         rows = query.all()
         return [_format_test_booking(r) for r in rows], 200
 
     except SQLAlchemyError as e:
+        # It is good practice to log 'e' here before returning
         return {"error": str(e.__dict__.get("orig", e))}, 500
-
+    
 def add_booking_comment(booking_id: int, data):
     try:
         comment_text = data.get("comment", "").strip()

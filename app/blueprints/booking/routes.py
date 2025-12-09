@@ -38,6 +38,14 @@ def view_films_inventory_audit():
     except Exception as e:
         print(f"Error in view_films_inventory_audit: {str(e)}")
         return redirect(url_for('main.error_page'))
+@booking_bp.route('/view/booking-result')
+@login_required
+def view_booking_result():
+    try:
+        return render_template('view_booking_result.html')
+    except Exception as e:
+        print(f"Error in view_booking_result: {str(e)}")
+        return redirect(url_for('main.error_page'))
 
 @booking_bp.route("/receipts")
 @login_required
@@ -79,9 +87,24 @@ def view_receipt(booking_id):
 def get_all_test_bookings():
     role = session.get("role", "").lower()
     branch_id = None if role == "admin" else session.get("branch_id")
-    result, status = booking_services.get_all_test_bookings(branch_id)
+    from_date = request.args.get("from_date")
+    to_date = request.args.get("to_date")
+    result, status = booking_services.get_all_test_bookings(branch_id, from_date, to_date)
     print("All Bookings Data:", result)
     return jsonify(result), status
+
+@booking_bp.route("/test-booking/<int:booking_id>", methods=["GET"])
+def get_test_booking(booking_id):
+    try:
+        print("Fetching booking details for ID:", booking_id)
+        result, status = booking_services.get_booking_details(booking_id)
+        print("Single Booking Data:", result)
+        return jsonify(result), status
+    except Exception as e:
+        print(f"Error in get_test_booking: {str(e)}")
+        return jsonify({"error": "Failed to fetch booking details"}), 400
+    
+
 
 @booking_bp.route("/comments/<int:booking_id>", methods=["GET"])
 def get_booking_comments(booking_id):

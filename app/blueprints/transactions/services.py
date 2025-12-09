@@ -1,3 +1,4 @@
+import datetime
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import cast, String
 from app.extensions import db
@@ -28,6 +29,7 @@ def _format_expense(exp, branch_name=None, created_by_name=None, expense_head_na
 def create_expense(data):
     try:
         # Required fields
+        print(datetime.datetime.utcnow())
         if not data.get("Branch_id"):
             return {"error": "Branch_id is required"}, 400
         if not data.get("created_by"):

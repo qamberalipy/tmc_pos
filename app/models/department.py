@@ -1,4 +1,5 @@
 from app.extensions import db
+from datetime import datetime
 
 class Department(db.Model):
     __tablename__ = "department"
@@ -8,7 +9,7 @@ class Department(db.Model):
     description = db.Column(db.String(225))
     is_active = db.Column(db.Boolean, default=True)
 
-    created_at = db.Column(db.DateTime, default=db.func.now())
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
     created_by = db.Column(db.String(225))
-    updated_at = db.Column(db.DateTime, default=db.func.now(), onupdate=db.func.now())
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     updated_by = db.Column(db.String(225))
