@@ -231,3 +231,34 @@ def view_patient_report(report_id):
     except Exception as e:
         print(f"Error in view_patient_report: {str(e)}")
         return render_template("error.html", message="An error occurred while loading the report.")
+    
+
+@reports_bp.route("/assigned-reports", methods=["GET"])
+def get_doctor_assigned_reports():
+    try:
+        # 1. Extract Query Parameters
+        # Use .get() for single values
+        branch_id = session.get("branch_id")
+        from_date = request.args.get("from_date")
+        to_date = request.args.get("to_date")
+        status = request.args.getlist("status")
+        print("Status Params:", status,from_date,to_date,branch_id)
+        if not status:
+            status = None
+
+       
+        result = report_services.get_doctor_assigned_reports_service(
+            branch_id=branch_id,
+            status=status,
+            from_date=from_date,
+            to_date=to_date
+        )
+
+        if isinstance(result, tuple):
+            return jsonify(result[0]), result[1]
+        
+        # If it's just a dict (the error case from service exception)
+        return jsonify(result), 400
+
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500

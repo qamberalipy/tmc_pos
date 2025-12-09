@@ -3,8 +3,9 @@ from sqlalchemy import func, cast, Date, desc, Integer, and_
 from app.extensions import db
 from app.models import TestBookingDetails
 from decimal import Decimal
-from datetime import datetime, date
+from datetime import datetime, date,time
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import aliased
 from app.models.test_booking import TestFilmUsage, TestBooking, FilmInventoryTransaction
 from app.models.test_registration import Test_registration
 from app.models.doctor_reporting_details import DoctorReportingdetails, DoctorReportData
@@ -230,7 +231,89 @@ def assign_bookings_to_doctor(bookings_payload, doctor_id, assigned_by, branch_i
 
     return assigned_count
 
-from sqlalchemy import cast, Integer
+def get_doctor_assigned_reports_service(branch_id=None, status=None, from_date=None, to_date=None):
+    try:
+        # --- 1. Date Filtering Logic ---
+        start_dt = None
+        end_dt = None
+
+        if from_date and to_date:
+            try:
+                from_date_obj = datetime.strptime(from_date, "%Y-%m-%d").date()
+                to_date_obj   = datetime.strptime(to_date, "%Y-%m-%d").date()
+            except ValueError:
+                return {"status": "error", "message": "Date format must be YYYY-MM-DD."}
+
+            if from_date_obj > to_date_obj:
+                return {"status": "error", "message": "from_date cannot be greater than to_date."}
+
+            start_dt = datetime.combine(from_date_obj, time.min)
+            end_dt   = datetime.combine(to_date_obj, time.max)
+
+        # --- 2. Setup Aliases ---
+        DoctorUser = aliased(User)   # Alias for "Assign To"
+        AssignerUser = aliased(User) # Alias for "Assign By"
+
+        # --- 3. Build Base Query ---
+        query = db.session.query(
+            DoctorReportingdetails.booking_id,
+            DoctorReportingdetails.test_id,
+            Test_registration.test_name.label("test_name"),
+            DoctorReportingdetails.status,
+            DoctorUser.name.label("doctor_name"),    
+            AssignerUser.name.label("assign_by"),    
+            DoctorReportingdetails.report_at.label("assigned_at"),
+            DoctorReportingdetails.report_details_id,
+            DoctorReportingdetails.id.label("reported_id")
+        ).join(
+            Test_registration, DoctorReportingdetails.test_id == Test_registration.id
+        ).join(
+            # 🔥 FIX: Cast String(doctor_id) to Integer so Postgres can compare it to User.id
+            DoctorUser, cast(DoctorReportingdetails.doctor_id, Integer) == DoctorUser.id
+        ).outerjoin(
+            # Assigner is already Integer, so no cast needed here
+            AssignerUser, DoctorReportingdetails.assign_by == AssignerUser.id
+        )
+
+        # --- 4. Filters ---
+        if branch_id:
+            query = query.filter(DoctorReportingdetails.branch_id == branch_id)
+
+        if status:
+            if isinstance(status, (list, tuple)):
+                query = query.filter(DoctorReportingdetails.status.in_(status))
+            else:
+                query = query.filter(DoctorReportingdetails.status == status)
+
+        if start_dt and end_dt:
+            query = query.filter(DoctorReportingdetails.report_at.between(start_dt, end_dt))
+
+        # --- 5. Execute ---
+        results = query.order_by(DoctorReportingdetails.report_at.desc()).all()
+
+        response_data = []
+        for row in results:
+            response_data.append({
+                "booking_id": row.booking_id,
+                "test_id": row.test_id,
+                "test_name": row.test_name,
+                "status": row.status,
+                "assign_to": row.doctor_name,
+                "assign_by": row.assign_by if row.assign_by else "System",
+                "assigned_at": row.assigned_at.strftime('%Y-%m-%d %H:%M:%S') if row.assigned_at else None,
+                "report_details_id": row.report_details_id,
+                "id": row.reported_id
+            })
+
+        return response_data, 200
+
+    except Exception as e:
+        print(f"Error fetching assigned reports: {str(e)}")
+        # Return a simple dict for the route to handle, NOT a tuple here
+        return {
+            "status": "error",
+            "message": str(e)
+        }
 
 def get_doctor_pending_bookings(doctor_id):
     doctor_id_str = str(doctor_id)
