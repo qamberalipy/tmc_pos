@@ -50,41 +50,74 @@ $(document).ready(function () {
             .finally(() => myhideLoader());
     });
 
-    // 3. Films Logic
-    $("#SaveEditfilms").on("click", function () {
-        const payload = {
-            booking_id: parseInt($("#bookingIdInput").val()),
-            new_films_used: Number($("#changedFilmsInput").val()),
-            usage_type: $("#causeSelect").val(),
-            reason: $("#reasonInput").val().trim()
-        };
+// 3. Save Films Logic
+$("#SaveEditfilms").off("click").on("click", function () {
+    // Collect values from the UI
+    const bookingId = parseInt($("#bookingIdInput").val());
+    const testId = $("#testIdSelect").val(); // Get selected test ID
+    
+    // Individual Test Films: Current + what was added/changed in the input
+    const currentTestFilms = Number($("#currentFilmsInput").val()) || 0;
+    const addedFilms = Number($("#changedFilmsInput").val()) || 0;
+    const filmsUnderTest = currentTestFilms + addedFilms; 
 
-        if (!payload.new_films_used || payload.new_films_used <= 0) return showToastMessage("error", "Invalid films count.");
-        if (!payload.reason) return showToastMessage("error", "Reason is required.");
+    // Booking Grand Total: Calculated automatically in our 'input' event listener
+    const totalNewFilmsUsed = Number($("#totalFilmsUsedInput").val());
 
-        myshowLoader();
-        axios.post(baseUrl + "/booking/films/", payload)
-            .then(res => {
-                showToastMessage("success", "Film usage updated!");
-                $("#filmsModal").modal("hide");
-                getAllTestBookings(); // Refresh table to show new values
-            })
-            .catch(err => handleAxiosError(err))
-            .finally(() => myhideLoader());
-    });
+    const payload = {
+        booking_id: bookingId,
+        test_id: parseInt(testId),
+        films_under_test: filmsUnderTest, // Updates TestBookingDetails
+        total_new_films_used: totalNewFilmsUsed, // Updates TestFilmUsage & TestBooking
+        usage_type: $("#causeSelect").val(),
+        reason: $("#reasonInput").val().trim()
+    };
+
+    // --- Validations ---
+    if (!payload.test_id) {
+        return showToastMessage("error", "Please select a test.");
+    }
+    if (addedFilms <= 0) {
+        return showToastMessage("error", "Please enter a valid number of films to add.");
+    }
+    if (!payload.reason) {
+        return showToastMessage("error", "Reason is required.");
+    }
+
+    myshowLoader();
+    axios.post(baseUrl + "/booking/films/", payload)
+        .then(res => {
+            showToastMessage("success", "Film usage updated!");
+            $("#filmsModal").modal("hide");
+            
+            // Refresh table to show new values
+            if (typeof getAllTestBookings === "function") {
+                getAllTestBookings();
+            }
+        })
+        .catch(err => {
+            if (typeof handleAxiosError === "function") {
+                handleAxiosError(err);
+            } else {
+                console.error(err);
+                showToastMessage("error", "Something went wrong.");
+            }
+        })
+        .finally(() => myhideLoader());
+});
 
     // =======================================================
     // 🔥 BULK ASSIGN LOGIC
     // =======================================================
 
     // A. Handle "Select All" Checkbox
-    $("#selectAllBookings").on("change", function() {
+    $("#selectAllBookings").on("change", function () {
         const isChecked = $(this).is(":checked");
-        
+
         $(".chk-booking").prop("checked", isChecked);
-        
+
         if (isChecked) {
-            $(".chk-booking").each(function() {
+            $(".chk-booking").each(function () {
                 window.selectedBookingIds.add($(this).val());
             });
         } else {
@@ -94,7 +127,7 @@ $(document).ready(function () {
     });
 
     // B. Handle Individual Row Checkbox (Delegated Event)
-    $("#testReg_table").on("change", ".chk-booking", function() {
+    $("#testReg_table").on("change", ".chk-booking", function () {
         const id = $(this).val();
         if ($(this).is(":checked")) {
             window.selectedBookingIds.add(id);
@@ -106,7 +139,7 @@ $(document).ready(function () {
     });
 
     // C. Open Assign Modal (Fetch Doctors)
-    $("#btnBulkAssign").on("click", function() {
+    $("#btnBulkAssign").on("click", function () {
         if (window.selectedBookingIds.size === 0) return;
 
         // Reset Modal State
@@ -120,11 +153,11 @@ $(document).ready(function () {
             .then(res => {
                 let doctors = res.data;
                 let options = `<option value="" selected disabled>-- Select Doctor --</option>`;
-                
+
                 doctors.forEach(dr => {
                     options += `<option value="${dr.id}">${dr.name}</option>`;
                 });
-                
+
                 $("#doctorSelectDropdown").html(options);
             })
             .catch(err => {
@@ -134,77 +167,77 @@ $(document).ready(function () {
     });
 
     // D. Confirm Assignment (Submit to Backend)
-    $("#btnConfirmAssignment").on("click", function() {
-    const doctorId = $("#doctorSelectDropdown").val();
-    
-    // 1. Validation
-    if (!doctorId) {
-        showToastMessage("error", "Please select a doctor.");
-        return;
-    }
+    $("#btnConfirmAssignment").on("click", function () {
+        const doctorId = $("#doctorSelectDropdown").val();
 
-    if (window.selectedBookingIds.size === 0) {
-        showToastMessage("error", "No bookings selected.");
-        return;
-    }
-
-    // 2. Build the detailed payload
-    let bookingDetails = [];
-
-    // Iterate through the Set of selected IDs
-    window.selectedBookingIds.forEach(function(bId) {
-        // Find the checkbox in the DOM with this value
-        let $checkbox = $(`.chk-booking[value="${bId}"]`);
-        
-        // If found (Note: If using pagination, this only finds rows on the current page)
-        if ($checkbox.length > 0) {
-            // Traverse up to the row (tr), then find the hidden span (.test-info-cell)
-            let $row = $checkbox.closest('tr');
-            let $infoSpan = $row.find('.test-info-cell');
-            
-            // Retrieve the data-ids attribute (e.g., "2,5,6")
-            let idsString = $infoSpan.data('ids');
-            
-            // Convert string "2,5,6" -> Array [2, 5, 6]
-            let idsArray = [];
-            if (idsString !== undefined && idsString !== null && idsString !== "") {
-                idsArray = idsString.toString().split(',').map(Number);
-            }
-
-            // Add to our list
-            bookingDetails.push({
-                booking_id: bId,
-                test_ids: idsArray
-            });
+        // 1. Validation
+        if (!doctorId) {
+            showToastMessage("error", "Please select a doctor.");
+            return;
         }
+
+        if (window.selectedBookingIds.size === 0) {
+            showToastMessage("error", "No bookings selected.");
+            return;
+        }
+
+        // 2. Build the detailed payload
+        let bookingDetails = [];
+
+        // Iterate through the Set of selected IDs
+        window.selectedBookingIds.forEach(function (bId) {
+            // Find the checkbox in the DOM with this value
+            let $checkbox = $(`.chk-booking[value="${bId}"]`);
+
+            // If found (Note: If using pagination, this only finds rows on the current page)
+            if ($checkbox.length > 0) {
+                // Traverse up to the row (tr), then find the hidden span (.test-info-cell)
+                let $row = $checkbox.closest('tr');
+                let $infoSpan = $row.find('.test-info-cell');
+
+                // Retrieve the data-ids attribute (e.g., "2,5,6")
+                let idsString = $infoSpan.data('ids');
+
+                // Convert string "2,5,6" -> Array [2, 5, 6]
+                let idsArray = [];
+                if (idsString !== undefined && idsString !== null && idsString !== "") {
+                    idsArray = idsString.toString().split(',').map(Number);
+                }
+
+                // Add to our list
+                bookingDetails.push({
+                    booking_id: bId,
+                    test_ids: idsArray
+                });
+            }
+        });
+
+        const payload = {
+            doctor_id: doctorId,
+            bookings: bookingDetails // This now contains the list of objects
+        };
+
+        // 3. Send to Backend
+        myshowLoader();
+        axios.post(baseUrl + "/reports/assign-bookings", payload)
+            .then(res => {
+                showToastMessage("success", res.data.message || "Bookings assigned successfully!");
+                $("#assignDoctorModal").modal("hide");
+
+                // Clear selections and refresh
+                window.selectedBookingIds.clear();
+                updateBulkButtonState();
+                $("#selectAllBookings").prop("checked", false);
+                getAllTestBookings();
+            })
+            .catch(err => {
+                console.error(err);
+                // Handle Axios error (assuming you have a helper or manual check)
+                let msg = err.response && err.response.data ? err.response.data.error : "An error occurred";
+                showToastMessage("error", msg);
+            })
+            .finally(() => myhideLoader());
     });
-
-    const payload = {
-        doctor_id: doctorId,
-        bookings: bookingDetails // This now contains the list of objects
-    };
-
-    // 3. Send to Backend
-    myshowLoader();
-    axios.post(baseUrl + "/reports/assign-bookings", payload) 
-        .then(res => {
-            showToastMessage("success", res.data.message || "Bookings assigned successfully!");
-            $("#assignDoctorModal").modal("hide");
-            
-            // Clear selections and refresh
-            window.selectedBookingIds.clear();
-            updateBulkButtonState();
-            $("#selectAllBookings").prop("checked", false);
-            getAllTestBookings();
-        })
-        .catch(err => {
-            console.error(err);
-            // Handle Axios error (assuming you have a helper or manual check)
-            let msg = err.response && err.response.data ? err.response.data.error : "An error occurred";
-            showToastMessage("error", msg);
-        })
-        .finally(() => myhideLoader());
-});
 
 });
 
@@ -225,7 +258,7 @@ function getAllTestBookings() {
         .then(res => {
             let data = res.data;
             console.log("Fetched Bookings:", data);
-            
+
             let dtable = $("#testReg_table").DataTable({
                 destroy: true,
                 responsive: true,
@@ -276,11 +309,11 @@ function getAllTestBookings() {
                 ]);
             });
 
-            if(rowsToAdd.length > 0) {
+            if (rowsToAdd.length > 0) {
                 dtable.rows.add(rowsToAdd);
             }
             dtable.draw(false);
-            
+
             rebindTableEvents();
             myhideLoader();
         })
@@ -290,8 +323,12 @@ function getAllTestBookings() {
         });
 }
 
-// Helper to rebind specific click events inside table
+// Global variable to track the booking's baseline total
+let grandTotalFilms = 0;
+
 function rebindTableEvents() {
+    
+    // --- Comment Booking Logic ---
     $("#testReg_table").off("click", ".comment-booking").on("click", ".comment-booking", function () {
         let bookingId = $(this).data("id");
         $("#saveCommentBtn").data("booking-id", bookingId);
@@ -299,21 +336,87 @@ function rebindTableEvents() {
         $("#commentsModal").modal("show");
     });
 
+    // --- Edit Films Logic ---
     $("#testReg_table").off("click", ".edit-films").on("click", ".edit-films", function () {
-        let bookingId = $(this).data("id");
-        let currentFilms = $(this).data("films");
-        $("#currentFilmsInput").val(currentFilms);
+        const bookingId = $(this).data("id");
+        const $testSelect = $("#testIdSelect");
+
+        // 1. Reset Modal Fields
+        $("#bookingIdInput").val(bookingId);
         $("#changedFilmsInput").val("");
         $("#reasonInput").val("");
-        $("#bookingIdInput").val(bookingId);
-        $("#filmsModal").modal("show");
+        $("#currentFilmsInput").val("");
+        $("#totalFilmsUsedInput").val(""); 
+        $testSelect.html('<option value="">Loading tests...</option>');
+
+        // 2. Fetch Data using Axios
+        myshowLoader();
+        axios.get(`${baseUrl}/booking/get-films-by-booking/${bookingId}`)
+            .then(res => {
+                const details = res.data.details || [];
+                // Store the current grand total from DB
+                grandTotalFilms = Number(res.data.grand_total_films) || 0;
+                
+                // Show the current total immediately
+                $("#totalFilmsUsedInput").val(grandTotalFilms);
+
+                $testSelect.empty().append('<option value="">-- Select Test --</option>');
+
+                if (details.length > 0) {
+                    details.forEach(item => {
+                        let option = $('<option>', {
+                            value: item.test_id,
+                            text: item.test_name
+                        }).data('films', item.films_used);
+
+                        $testSelect.append(option);
+                    });
+                } else {
+                    $testSelect.html('<option value="">No tests found</option>');
+                }
+
+                $("#filmsModal").modal("show");
+            })
+            .catch(err => {
+                console.error("Error fetching films:", err);
+                alert("Failed to load test details.");
+            })
+            .finally(() => {
+                myhideLoader();
+            });
     });
 }
+
+/** * Event: Calculate New Grand Total
+ * Use 'input' instead of 'change' for real-time calculation as user types
+ */
+$(document).on("input", "#changedFilmsInput", function () {
+    const additionalFilms = Number($(this).val()) || 0;
+    const newTotal = grandTotalFilms + additionalFilms;
+    $("#totalFilmsUsedInput").val(newTotal);
+});
+
+/**
+ * Event: Update Selected Test Current Films
+ */
+$(document).on("change", "#testIdSelect", function () {
+    const selectedFilms = $(this).find(':selected').data('films');
+    if (selectedFilms !== undefined) {
+        $("#currentFilmsInput").val(selectedFilms);
+    } else {
+        $("#currentFilmsInput").val("");
+    }
+});
+
+/**
+ * Event: Save Changes Axios Post
+ */
+
 
 function updateBulkButtonState() {
     const count = window.selectedBookingIds.size;
     $("#selectedCountBadge").text(count);
-    
+
     if (count > 0) {
         $("#btnBulkAssign").fadeIn();
     } else {

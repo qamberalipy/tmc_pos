@@ -132,7 +132,9 @@ def edit_film_usage():
 
     result, status = booking_services.edit_film_usage_by_booking(
         data.get("booking_id"),
-        data.get("new_films_used"),
+        data.get("test_id"),
+        data.get("films_under_test"),
+        data.get("total_new_films_used"),
         data.get("usage_type"),
         edited_by,
         data.get("reason")
@@ -205,4 +207,9 @@ def get_inventory_report():
         from_date=from_date,
         to_date=to_date
     )
+    return jsonify(result), status
+
+@booking_bp.route("/get-films-by-booking/<int:booking_id>", methods=["GET"])
+def get_films_by_booking(booking_id):
+    result, status = booking_services.get_test_details_booking(booking_id=booking_id)
     return jsonify(result), status

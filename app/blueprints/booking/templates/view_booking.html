@@ -156,11 +156,30 @@
             </div>
             <div class="modal-body">
                 <input type="hidden" id="bookingIdInput">
-                <label class="mb-1">Current Films:</label>
-                <input type="number" class="form-control mb-2" id="currentFilmsInput" disabled>
                 
-                <label class="mb-1">Changed To *</label>
-                <input type="number" class="form-control mb-2" id="changedFilmsInput">
+                <div class="row">
+                    <div class="col-md-6">
+                        <label class="mb-1">Select Test *</label>
+                        <select id="testIdSelect" class="form-control mb-2"></select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="mb-1">Current Films (This Test):</label>
+                        <input type="number" class="form-control mb-2" id="currentFilmsInput" disabled>
+                    </div>
+                </div>
+
+                <hr>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <label class="mb-1 text-primary">Add/Change Films By: *</label>
+                        <input type="number" class="form-control mb-2" id="changedFilmsInput" placeholder="e.g. 2" min="0">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="mb-1">New Booking Grand Total:</label>
+                        <input type="number" class="form-control mb-2" id="totalFilmsUsedInput" disabled style="background-color: #e9ecef; font-weight: bold;">
+                    </div>
+                </div>
                 
                 <label class="mb-1">Cause *</label>
                 <select id="causeSelect" class="form-control mb-2">
@@ -170,7 +189,7 @@
                 </select>
                 
                 <label class="mb-1">Reason *</label>
-                <textarea id="reasonInput" rows="3" class="form-control"></textarea>
+                <textarea id="reasonInput" rows="3" class="form-control" placeholder="Enter reason for change..."></textarea>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>

@@ -356,45 +356,51 @@ def get_films_audit(branch_id=None, from_date=None, to_date=None):
         return {"error": str(e)}, 500
 
 
-def edit_film_usage_by_booking(booking_id, new_films_used, usage_type, edited_by, reason="Edited film usage"):
-    print("Editing film usage:", booking_id, new_films_used, usage_type, edited_by, reason)
+def edit_film_usage_by_booking(booking_id, test_id, films_under_test,total_new_films_used, usage_type, edited_by, reason="Edited film usage"):
+    print(f"Editing film usage: Booking {booking_id}, Test {test_id}, New Total {total_new_films_used}")
 
     # ---- Basic Validations ----
     if not booking_id:
         return {"error": "booking_id is required"}, 400
-        
-    if new_films_used is None or new_films_used < 0:
-        return {"error": "Invalid new_films_used value"}, 400
-
+    if not test_id:
+        return {"error": "test_id is required"}, 400
+    if total_new_films_used is None or total_new_films_used < 0:
+        return {"error": "Invalid Films value"}, 400
     if usage_type not in ['Normal', 'Extra', 'Repeat', 'Error']:
         return {"error": "Invalid usage_type value"}, 400
 
+    # 1. Fetch the usage record
     usage = TestFilmUsage.query.filter_by(booking_id=booking_id).first()
     if not usage:
-        return {"error": "Film usage not found for this booking"}, 404
+        return {"error": "Film usage record not found for this booking"}, 404
+
+    # 2. Fetch the specific test detail record to update individual film count
+    # This is the specific line you requested to update no_of_films in TestBookingDetails
+    test_detail = TestBookingDetails.query.filter_by(booking_id=booking_id, test_id=test_id).first()
+    if not test_detail:
+        return {"error": "Test details not found for this specific test/booking"}, 404
 
     old_value = usage.films_used
-    difference = new_films_used - old_value
+    difference = total_new_films_used - old_value
 
     try:
-        # ❗ NO db.session.begin() HERE ❗
+        # ---- UPDATE INDIVIDUAL TEST DETAIL ----
+        # This updates the specific test's film count
+        test_detail.no_of_films = films_under_test 
+        db.session.add(test_detail)
 
-        # STORE LAST EDIT
+        # ---- UPDATE GLOBAL FILM USAGE RECORD ----
         usage.last_edited_old_value = old_value
         usage.last_edited_at = datetime.utcnow()
         usage.last_edited_by = edited_by
         usage.usage_type = usage_type
-
-        # UPDATE REQUIRED FIELDS
         usage.used_by = edited_by
         usage.used_at = datetime.utcnow()
-
-        # UPDATE FILMS USED
-        usage.films_used = new_films_used
+        usage.films_used = total_new_films_used
         usage.reason = reason
         db.session.add(usage)
 
-        # INVENTORY IMPACT
+        # ---- INVENTORY IMPACT ----
         if difference > 0:
             inventory_transaction(
                 quantity=difference,
@@ -402,9 +408,8 @@ def edit_film_usage_by_booking(booking_id, new_films_used, usage_type, edited_by
                 handled_by=edited_by,
                 branch_id=usage.branch_id,
                 booking_id=booking_id,
-                reason="Film usage increased"
+                reason=f"Film usage increased for Test ID: {test_id}"
             )
-
         elif difference < 0:
             inventory_transaction(
                 quantity=abs(difference),
@@ -412,28 +417,27 @@ def edit_film_usage_by_booking(booking_id, new_films_used, usage_type, edited_by
                 handled_by=edited_by,
                 branch_id=usage.branch_id,
                 booking_id=booking_id,
-                reason="Film usage reduced"
+                reason=f"Film usage reduced for Test ID: {test_id}"
             )
 
-        # UPDATE BOOKING TOTAL FILMS
+        # ---- UPDATE BOOKING TOTAL FILMS ----
+        # This calls your existing function to sync the TestBooking table
         update_booking_total_films(booking_id)
 
         # FINAL COMMIT
         db.session.commit()
 
         return {
-            "message": "Film usage updated",
+            "message": "Film usage updated successfully",
             "old_value": old_value,
-            "new_value": new_films_used,
-            "difference": difference,
-            "previous_edit_stored": old_value
-        },201
+            "new_value": total_new_films_used,
+            "difference": difference
+        }, 201
 
     except Exception as e:
         db.session.rollback()
         print("Film usage update error:", str(e))
         return {"error": str(e)}, 500
-
 
 def get_booking_details(booking_id: int):
     """
@@ -710,3 +714,41 @@ def add_booking_comment(booking_id: int, data):
         db.session.rollback()
         return {"error": str(e)}, 500
 
+
+def get_test_details_booking(booking_id):
+    try:
+        results = (
+            db.session.query(
+                TestBookingDetails.test_id,
+            Test_registration.test_name,
+                # IF no_of_films is Null, DB returns 0 automatically
+                func.coalesce(TestBookingDetails.no_of_films, 0).label('films_used')
+            )
+            .join(Test_registration, TestBookingDetails.test_id == Test_registration.id)
+            .filter(TestBookingDetails.booking_id == booking_id)
+            .all()
+        )
+
+        data = []
+        total_booking_films = 0
+
+        for row in results:
+            # No need for "if/else" check here anymore
+            films_used = row.films_used 
+            
+            data.append({
+                "test_id": row.test_id,
+                "test_name": row.test_name,
+                "films_used": films_used
+            })
+            
+            total_booking_films += films_used
+
+        return {
+            "details": data, 
+            "grand_total_films": total_booking_films
+        }, 200
+
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        return {"details": [], "grand_total_films": 0}, 500
