@@ -213,3 +213,25 @@ def get_inventory_report():
 def get_films_by_booking(booking_id):
     result, status = booking_services.get_test_details_booking(booking_id=booking_id)
     return jsonify(result), status
+
+@booking_bp.route("/update-film-status", methods=["POST"])
+def update_film_status():
+    data = request.get_json()
+    
+    # Extract data from request
+    booking_id = data.get("booking_id")
+    test_id = data.get("test_id")
+    film_issued = data.get("film_issued")
+
+    # Simple validation
+    if booking_id is None or test_id is None:
+        return jsonify({"error": "Missing required fields"}), 400
+
+    # Call the service function
+    result, status = booking_services.update_test_film_status(
+        booking_id=booking_id, 
+        test_id=test_id, 
+        film_issued=film_issued
+    )
+    
+    return jsonify(result), status

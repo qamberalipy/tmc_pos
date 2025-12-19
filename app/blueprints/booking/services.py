@@ -562,30 +562,27 @@ def get_booking_details(booking_id: int):
 
 
 def _format_test_booking(row):
-    # Parse the ID string "1, 2, 3" into a list [1, 2, 3] for frontend use
-    test_ids_list = []
-    if row.test_ids:
-        test_ids_list = [int(id_str) for id_str in row.test_ids.split(', ')]
-
     return {
         "booking_id": row.id,
         "patient_name": row.patient_name,
+        "mr_no": row.mr_no,
         "date": row.create_at.strftime("%Y-%m-%d") if row.create_at else None,
         "referred_dr": row.referred_dr,
-        "mr_no": row.mr_no,
-        "test_name": row.test_names,   # e.g., "CBC, Lipid Profile"
-        "test_ids": test_ids_list,     # e.g., [1, 4]
+        
+        # This contains: [{"id": 12, "test_name": "xyz", "film_issued": False}, ...]
+        "test_booking_details": row.test_booking_details, 
+        
         "technician_comments": row.technician_comments,
-        "total_amount": float(row.net_receivable),
+        "total_amount": float(row.net_receivable or 0),
         "total_films": row.total_no_of_films_used,
-        "discount": float(row.discount_value) if row.discount_value else 0,
-        "net_amount": float(row.net_receivable - row.discount_value) if row.discount_value else float(row.net_receivable),
-        "received": float(row.paid_amount),
-        "balance": float(row.due_amount),
+        "discount": float(row.discount_value or 0),
+        "net_amount": float((row.net_receivable or 0) - (row.discount_value or 0)),
+        "received": float(row.paid_amount or 0),
+        "balance": float(row.due_amount or 0),
         "branch": row.branch_name,
         "created_by": row.created_by_name,
-        "created_at": row.create_at,
-        "updated_at": row.update_at
+        "created_at": row.create_at.isoformat() if row.create_at else None,
+        "updated_at": row.update_at.isoformat() if row.update_at else None
     }
 
 
@@ -627,16 +624,14 @@ def get_all_test_bookings(branch_id=None, from_date=None, to_date=None):
                 TestBooking.update_at,
                 Branch.branch_name.label("branch_name"),
                 User.name.label("created_by_name"),
-                # --- Aggregating Test Names ---
-                func.string_agg(
-                    func.distinct(cast(Test_registration.test_name, String)),
-                    ', '
-                ).label("test_names"),
-                # --- NEW: Aggregating Test IDs ---
-                func.string_agg(
-                    func.distinct(cast(Test_registration.id, String)),
-                    ', '
-                ).label("test_ids")
+                # --- Aggregating Test Details into a JSON List ---
+                func.json_agg(
+                    func.json_build_object(
+                        'id', Test_registration.id,
+                        'test_name', Test_registration.test_name,
+                        'film_issued', TestBookingDetails.film_issued
+                    )
+                ).label("test_booking_details")
             )
             .join(TestBookingDetails, TestBookingDetails.booking_id == TestBooking.id)
             .join(Test_registration, Test_registration.id == TestBookingDetails.test_id)
@@ -752,3 +747,25 @@ def get_test_details_booking(booking_id):
     except Exception as e:
         print(f"Error: {str(e)}")
         return {"details": [], "grand_total_films": 0}, 500
+
+def update_test_film_status(booking_id, test_id, film_issued):
+    try:
+        # Find the specific test record under that booking
+        test_detail = TestBookingDetails.query.filter_by(
+            booking_id=booking_id, 
+            test_id=test_id
+        ).first()
+
+        if not test_detail:
+            return {"error": "Test record not found for this booking"}, 404
+
+        # Update the status
+        test_detail.film_issued = film_issued
+        db.session.commit()
+
+        return {"message": "Status updated successfully", "status": film_issued}, 200
+
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error updating film status: {str(e)}")
+        return {"error": "Internal Server Error"}, 500
