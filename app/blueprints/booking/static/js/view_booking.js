@@ -10,14 +10,10 @@ $(document).ready(function () {
     $("#to_date").val(toDate);
 
     window.selectedBookingIds = new Set();
-
     getAllTestBookings();
 
     // --- EVENT LISTENERS ---
-
-    $("#searchBtn").on("click", function () {
-        getAllTestBookings();
-    });
+    $("#searchBtn").on("click", function () { getAllTestBookings(); });
 
     $("#saveCommentBtn").on("click", function () {
         let bookingId = $(this).data("booking-id");
@@ -132,99 +128,72 @@ $(document).ready(function () {
     });
 });
 
-// --- MAIN TABLE FUNCTION ---
+let grandTotalFilms = 0;
+
 function getAllTestBookings() {
     myshowLoader();
     const from_date = $("#from_date").val();
     const to_date = $("#to_date").val();
     let url = baseUrl + "/booking/test-booking";
-    
     if (from_date && to_date) url += `?from_date=${from_date}&to_date=${to_date}`;
 
-    axios.get(url)
-        .then(res => {
-            let dtable = $("#testReg_table").DataTable({
-                destroy: true, 
-                responsive: true, 
-                pageLength: 14, 
-                lengthChange: false, 
-                ordering: false
-            });
-
-            dtable.clear();
-            window.selectedBookingIds.clear();
-            updateBulkButtonState();
-
-            let rowsToAdd = [];
-
-            $.each(res.data, function (i, t) {
-                let tests = t.test_booking_details || [];
-                let testNamesStr = tests.map(obj => obj.test_name).join(", ");
-                let testIdsStr = tests.map(obj => obj.id).join(",");
-
-                // --- MODERN CHIP-BASED UI ---
-                let testAndFilmHtml = `<div class="d-flex flex-column gap-2 py-1" style="min-width: 240px;">`;
-                
-                if (tests.length > 0) {
-                    testAndFilmHtml += tests.map(obj => {
-                        const isChecked = obj.film_issued ? 'checked' : '';
-                        const statusLabel = obj.film_issued ? 'ISSUED' : 'PENDING';
-                        const themeClass = obj.film_issued ? 'status-issued' : 'status-pending';
-                        const toggleId = `toggle_${t.booking_id}_${obj.id}`;
-                        
-                        return `
-                        <div class="test-status-card ${themeClass} d-flex align-items-center justify-content-between px-3 py-2 rounded-3 border">
-                            <div class="d-flex flex-column">
-                                <span class="test-title fw-bold text-uppercase">${obj.test_name}</span>
-                                <span class="status-indicator small fw-semibold">${statusLabel}</span>
-                            </div>
-                            <div class="form-check form-switch m-0">
-                                <input class="form-check-input film-issue-toggle modern-switch" type="checkbox" 
-                                    role="switch" id="${toggleId}" ${isChecked}
-                                    data-booking-id="${t.booking_id}" 
-                                    data-test-id="${obj.id}">
-                            </div>
-                        </div>`;
-                    }).join("");
-                } else {
-                    testAndFilmHtml += `<span class="text-muted small ps-2">No Tests Linked</span>`;
-                }
-                
-                // Keep the hidden info for your other logic
-                testAndFilmHtml += `<div style="display:none;" class="test-info-cell" data-ids="${testIdsStr}">${testNamesStr || "-"}</div></div>`;
-
-                // --- ACTION BUTTONS (Simplified) ---
-                let printBtn = `<a href="${baseUrl}/booking/receipt/${t.booking_id}" target="_blank" class="btn btn-action shadow-sm px-2"><i class="bi-printer text-success"></i></a>`;
-                let commentBtn = `<button class="btn btn-action shadow-sm comment-booking px-2" data-id="${t.booking_id}"><i class="bi-chat-dots text-primary"></i></button>`;
-                let filmsBtn = `<button class="btn btn-action shadow-sm edit-films px-2" data-id="${t.booking_id}" data-test-ids="${testIdsStr}"><i class="bi-plus-circle text-dark"></i></button>`;
-
-                rowsToAdd.push([
-                    `<input type="checkbox" class="chk-booking custom-chk" value="${t.booking_id}">`,
-                    `<span class="fw-bold text-dark">#${t.booking_id}</span>`,
-                    `<span class="fw-semibold text-secondary">${t.patient_name || "-"}</span>`,
-                    `<span class="text-muted" style="font-size:12px;">${t.date || "-"}</span>`,
-                    t.referred_dr || "-",
-                    t.mr_no || "-",
-                    testAndFilmHtml, 
-                    `<span class="fw-bold">${t.total_amount || "0"}</span>`,
-                    t.discount || "0",
-                    `<span class="text-success fw-bold">${t.net_amount || "0"}</span>`,
-                    t.received || "0",
-                    `<span class="${t.balance > 0 ? 'text-danger' : 'text-muted'} fw-bold">${t.balance || "0"}</span>`,
-                    `<div class="d-flex gap-2">${printBtn} ${commentBtn} ${filmsBtn}</div>`
-                ]);
-            });
-
-            dtable.rows.add(rowsToAdd).draw(false);
-            rebindTableEvents();
-            myhideLoader();
-        })
-        .catch(err => { 
-            console.error(err); 
-            myhideLoader(); 
+    axios.get(url).then(res => {
+        let dtable = $("#testReg_table").DataTable({
+            destroy: true, responsive: true, pageLength: 15, ordering: false, lengthChange: false
         });
+        dtable.clear();
+        window.selectedBookingIds.clear();
+        updateBulkButtonState();
+
+        let rowsToAdd = [];
+        $.each(res.data, function (i, t) {
+            let tests = t.test_booking_details || [];
+            let testIdsStr = tests.map(obj => obj.id).join(",");
+
+            // 1. Tests & Status Rendering
+            let testHtml = `<div class="d-flex flex-column gap-2 py-1">`;
+            tests.forEach(obj => {
+                const isChecked = obj.film_issued ? 'checked' : '';
+                const theme = obj.film_issued ? 'status-issued' : 'status-pending';
+                testHtml += `
+                <div class="test-status-card ${theme} d-flex align-items-center justify-content-between px-2 py-1 rounded-2">
+                    <div class="d-flex flex-column">
+                        <span class="test-title fw-bold text-uppercase">${obj.test_name}</span>
+                        <span class="status-indicator small fw-bold">${obj.film_issued ? 'ISSUED' : 'PENDING'}</span>
+                    </div>
+                    <div class="form-check form-switch m-0">
+                        <input class="form-check-input film-issue-toggle modern-switch" type="checkbox" 
+                            ${isChecked} data-booking-id="${t.booking_id}" data-test-id="${obj.id}">
+                    </div>
+                </div>`;
+            });
+            testHtml += `<div style="display:none;" class="test-info-cell" data-ids="${testIdsStr}"></div></div>`;
+
+            // 2. Action Buttons
+            let actions = `
+            <div class="d-flex gap-1 justify-content-center">
+                <a href="${baseUrl}/booking/receipt/${t.booking_id}" target="_blank" class="btn btn-action text-success shadow-sm"><i class="bi bi-printer"></i></a>
+                <button class="btn btn-action text-primary shadow-sm comment-booking" data-id="${t.booking_id}"><i class="bi bi-chat-left-text"></i></button>
+                <button class="btn btn-action text-dark shadow-sm edit-films" data-id="${t.booking_id}" data-test-ids="${testIdsStr}"><i class="bi bi-plus-square"></i></button>
+            </div>`;
+
+            rowsToAdd.push([
+                `<input type="checkbox" class="chk-booking custom-chk" value="${t.booking_id}">`,
+                `<div><div class="fw-bold">#${t.booking_id}</div><div class="text-muted text-xs">${t.date}</div></div>`,
+                `<div><div class="fw-bold text-primary">${t.patient_name}</div><div class="text-muted text-xs">MR: ${t.mr_no || 'N/A'}</div></div>`,
+                testHtml,
+                `<div class="text-xs fw-medium">${t.referred_dr || 'Self'}</div>`,
+                `<div class="text-end text-muted text-xs">${t.total_amount}</div>`,
+                `<div class="text-end fw-bold">${t.received}</div>`,
+                `<div class="text-end fw-bold ${t.balance > 0 ? 'text-danger' : 'text-success'}">${t.balance}</div>`,
+                actions
+            ]);
+        });
+
+        dtable.rows.add(rowsToAdd).draw(false);
+        rebindTableEvents();
+    }).catch(err => console.error(err)).finally(() => myhideLoader());
 }
-let grandTotalFilms = 0;
 
 function rebindTableEvents() {
     $("#testReg_table").off("click", ".comment-booking").on("click", ".comment-booking", function () {
@@ -237,7 +206,6 @@ function rebindTableEvents() {
     $("#testReg_table").off("click", ".edit-films").on("click", ".edit-films", function () {
         const bookingId = $(this).data("id");
         const $testSelect = $("#testIdSelect");
-
         $("#bookingIdInput").val(bookingId);
         $("#changedFilmsInput, #reasonInput, #currentFilmsInput").val("");
         $testSelect.html('<option value="">Loading tests...</option>');
@@ -248,7 +216,6 @@ function rebindTableEvents() {
                 grandTotalFilms = Number(res.data.grand_total_films) || 0;
                 $("#totalFilmsUsedInput").val(grandTotalFilms);
                 $testSelect.empty().append('<option value="">-- Select Test --</option>');
-
                 (res.data.details || []).forEach(item => {
                     let opt = $('<option>', { value: item.test_id, text: item.test_name }).data('films', item.films_used);
                     $testSelect.append(opt);
@@ -259,17 +226,15 @@ function rebindTableEvents() {
     });
 }
 
-// --- Modern Event Listener for Film Status Toggles ---
+// Film Toggle Logic
 $(document).on("change", ".film-issue-toggle", function() {
     const $toggle = $(this);
-    const $card = $toggle.closest('.test-status-card'); // Find the card container
-    const $statusLabel = $card.find('.status-indicator'); // Find the PENDING/ISSUED text
-    
+    const $card = $toggle.closest('.test-status-card');
+    const $statusLabel = $card.find('.status-indicator');
     const bookingId = $toggle.data("booking-id");
     const testId = $toggle.data("test-id");
     const isIssued = $toggle.is(":checked");
 
-    // 1. Instant Visual Feedback (Optimistic UI)
     if (isIssued) {
         $card.removeClass('status-pending').addClass('status-issued');
         $statusLabel.text('ISSUED');
@@ -278,34 +243,18 @@ $(document).on("change", ".film-issue-toggle", function() {
         $statusLabel.text('PENDING');
     }
     
-    // Add a slight fade to show "Saving..." state
-    $card.css('opacity', '0.7');
-
-    // 2. API Call
+    $card.css('opacity', '0.6');
     axios.post(baseUrl + "/booking/update-film-status", {
-        booking_id: bookingId,
-        test_id: testId,
-        film_issued: isIssued
+        booking_id: bookingId, test_id: testId, film_issued: isIssued
     })
-    .then(res => {
-        showToastMessage("success", "Film status updated");
-    })
+    .then(() => showToastMessage("success", "Film status updated"))
     .catch(err => {
-        // 3. Revert if API Fails
         $toggle.prop('checked', !isIssued);
-        if (!isIssued) {
-            $card.removeClass('status-pending').addClass('status-issued');
-            $statusLabel.text('ISSUED');
-        } else {
-            $card.removeClass('status-issued').addClass('status-pending');
-            $statusLabel.text('PENDING');
-        }
         handleAxiosError(err);
     })
-    .finally(() => {
-        $card.css('opacity', '1');
-    });
+    .finally(() => $card.css('opacity', '1'));
 });
+
 $(document).on("input", "#changedFilmsInput", function () {
     $("#totalFilmsUsedInput").val(grandTotalFilms + (Number($(this).val()) || 0));
 });

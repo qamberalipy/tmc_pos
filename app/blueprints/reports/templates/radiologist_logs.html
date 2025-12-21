@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+
+{% block stylesheets %}
+<link rel="stylesheet" href="https://cdn.datatables.net/1.10.22/css/jquery.dataTables.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/responsive/2.2.6/css/responsive.dataTables.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/buttons/1.6.5/css/buttons.dataTables.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+
+<style>
+  /* --- Shared UI Consistency --- */
+  .range-btn {
+      border: 1px solid #198754;
+      background: white;
+      color: #198754;
+      padding: 6px 15px;
+      border-radius: 30px;
+      font-size: 14px;
+      transition: 0.15s ease;
+  }
+  .range-btn:hover, .range-btn:focus {
+      background: #198754;
+      color: #fff;
+      outline: none;
+  }
+
+  /* Layout */
+  #exportButtons {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+  }
+
+  .top-controls {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      align-items: center;
+      margin-bottom: 0.75rem;
+      flex-wrap: wrap;
+  }
+
+  input[type="date"], select.form-select {
+      min-height: 45px;
+  }
+
+  /* DataTable Button Colors */
+  .dt-buttons .buttons-excel {
+      background-color: #198754 !important;
+      border-color: #198754 !important;
+      color: #fff !important;
+  }
+  .dt-buttons .buttons-pdf {
+      background-color: #dc3545 !important;
+      border-color: #dc3545 !important;
+      color: #fff !important;
+  }
+  .dt-buttons .dt-button {
+      display: inline-flex !important;
+      align-items: center !important;
+      gap: 5px !important;
+      padding: 6px 12px !important;
+      border-radius: 6px !important;
+      font-size: 14px !important;
+      margin-left: 5px !important;
+  }
+
+  .report-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+  }
+  
+  /* Table styling to match Excel Image */
+  #report_table th {
+      background-color: #f8f9fa;
+      vertical-align: middle;
+      text-align: center;
+      font-weight: 700;
+  }
+  #report_table td {
+      text-align: center;
+      vertical-align: middle;
+  }
+</style>
+{% endblock stylesheets %}
+
+{% block content %}{% endblock %}
+
+{% block user_page %}
+<div class="container-fluid py-3 rounded bg-white shadow-sm border-0">
+
+    <div class="report-header">
+        <h4 class="fw-bold text-dark m-0">Radiologist Performance Report</h4>
+        <div id="exportButtons"></div>
+    </div>
+
+    <div class="top-controls">
+        <div class="d-flex gap-2">
+            <button class="range-btn" data-range="today">Today</button>
+            <button class="range-btn" data-range="7">Last 7 Days</button>
+            <button class="range-btn" data-range="30">Last 30 Days</button>
+        </div>
+
+        <div class="d-flex align-items-end gap-2">
+            <div class="me-2" style="min-width: 200px;">
+                <label class="form-label small mb-1">Radiologist</label>
+                <select id="doctor_select" class="form-select">
+                    {% for doc in doctors %}
+                        <option value="{{ doc.id }}">{{ doc.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="me-2">
+                <label class="form-label small mb-1">From</label>
+                <input type="date" id="from_date" class="form-control">
+            </div>
+
+            <div class="me-2">
+                <label class="form-label small mb-1">To</label>
+                <input type="date" id="to_date" class="form-control">
+            </div>
+
+            <div class="d-flex align-items-end gap-2">
+                <button class="btn btn-dark" id="searchBtn" title="Search">
+                    <i class="bi bi-search"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table id="report_table" class="table table-bordered table-hover w-100" cellspacing="0" width="100%">
+            <thead></thead> 
+            <tbody></tbody>
+            <tfoot></tfoot>
+        </table>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block javascript %}
+<script src="https://cdn.datatables.net/1.10.22/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/responsive/2.2.6/js/dataTables.responsive.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/1.6.5/js/dataTables.buttons.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.3/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdfmake@0.1.36/build/pdfmake.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdfmake@0.1.36/build/vfs_fonts.js"></script>
+<script src="https://cdn.datatables.net/buttons/1.6.5/js/buttons.html5.min.js"></script>
+
+<script src="{{ url_for('reports.static', filename='js/radiologist_logs.js') }}"></script>
+{% endblock %}

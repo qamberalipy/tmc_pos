@@ -262,3 +262,34 @@ def get_doctor_assigned_reports():
 
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+    
+@reports_bp.route('/radiologist-logs', methods=['GET'])
+def view_radiologist_logs():
+    try:
+        return render_template('radiologist_logs.html')
+    except Exception as e:
+        print(f"Error in view_radiologist_logs: {str(e)}")
+        return render_template("error.html", message="An error occurred while loading the radiologist logs page.")
+
+@reports_bp.route('/radiologist-logs/<int:doctor_id>', methods=['GET'])
+def radiologist_report(doctor_id):
+    try:
+        start_date_str = request.args.get('start_date')
+        end_date_str = request.args.get('end_date')
+        report_data = report_services.get_radiologist_performance_data(doctor_id, start_date_str, end_date_str)
+       
+        print("Radiologist Report Data:", report_data)
+        return jsonify({
+            "status": "success",
+            "meta": {
+                "start_date": start_date_str,
+                "end_date": end_date_str,
+                "count": len(report_data)
+            },
+            "data": report_data
+        }), 200
+
+    except Exception as e:
+        # Log the actual error in your server logs
+        print(f"Error generating report: {str(e)}")
+        return jsonify({"error": "Internal Server Error", "message": str(e)}), 500

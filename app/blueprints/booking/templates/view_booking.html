@@ -3,159 +3,100 @@
 <link rel="stylesheet" href="https://cdn.datatables.net/1.10.22/css/jquery.dataTables.min.css">
 <link rel="stylesheet" href="https://cdn.datatables.net/responsive/2.2.6/css/responsive.dataTables.min.css">
 <link rel="stylesheet" href="https://cdn.datatables.net/select/1.3.1/css/select.dataTables.min.css">
-<link rel="stylesheet" href="https://cdn.datatables.net/buttons/1.6.5/css/buttons.dataTables.min.css">
-<link rel="stylesheet" href="https://cdn.datatables.net/buttons/1.6.5/css/buttons.dataTables.min.css">
 <link rel="stylesheet" href="{{ url_for('registrations.static', filename='css/style.css') }}">
 <style>
-/* Modern Test Card Styling */
-.test-status-card {
-    transition: all 0.3s ease;
-    border: 1px solid #edf2f7 !important;
-    background: #ffffff;
-}
-
-.test-title {
-    font-size: 10px;
-    letter-spacing: 0.5px;
-    color: #4a5568;
-}
-
-.status-indicator {
-    font-size: 9px;
-    letter-spacing: 1px;
-}
-
-/* Status: Pending State */
-.status-pending {
-    background-color: #fffaf0 !important;
-    border-left: 4px solid #ed8936 !important;
-}
-.status-pending .status-indicator { color: #dd6b20; }
-
-/* Status: Issued State */
-.status-issued {
-    background-color: #f0fff4 !important;
-    border-left: 4px solid #48bb78 !important;
-}
-.status-issued .status-indicator { color: #2f855a; }
-
-/* Modern Switch Styling */
-.modern-switch {
-    width: 2.4em !important;
-    height: 1.2em !important;
-    cursor: pointer;
-    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='rgba%280, 0, 0, 0.25%29'/%3e%3c/svg%3e") !important;
-}
-
-.modern-switch:checked {
-    background-color: #48bb78 !important;
-    border-color: #48bb78 !important;
-}
-
-/* Action Buttons Customization */
-.btn-action {
-    background: white;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    transition: transform 0.2s;
-}
-.btn-action:hover {
-    transform: translateY(-2px);
-    background: #f8fafc;
-}
-
-.badge {
-    border-radius: 4px;
-    font-weight: 500;
-}
-    .timeline {
-        position: relative;
-        margin-left: 20px;
-        padding-left: 20px;
-        border-left: 2px solid #dee2e6;
-        /* vertical line */
+    /* Modern Card Layout */
+    .test-status-card {
+        transition: all 0.2s ease;
+        border: 1px solid #edf2f7 !important;
+        background: #ffffff;
     }
 
-    .timeline-item {
-        position: relative;
-        margin-bottom: 20px;
+    .test-title { font-size: 10px; letter-spacing: 0.5px; color: #4a5568; }
+    .status-indicator { font-size: 9px; letter-spacing: 1px; }
+
+    /* Pending State */
+    .status-pending { background-color: #fffaf0 !important; border-left: 4px solid #ed8936 !important; }
+    .status-pending .status-indicator { color: #dd6b20; }
+
+    /* Issued State */
+    .status-issued { background-color: #f0fff4 !important; border-left: 4px solid #48bb78 !important; }
+    .status-issued .status-indicator { color: #2f855a; }
+
+    /* Financial Highlight */
+    .col-finance { background-color: #f8fafc; border-left: 1px solid #e2e8f0; }
+    .text-xs { font-size: 0.75rem; }
+    
+    .modern-switch {
+        width: 2.2em !important;
+        height: 1.1em !important;
+        cursor: pointer;
     }
 
-    .timeline-icon {
-        position: absolute;
-        left: -34px;
-        /* position circle on line */
-        top: 0;
+    .btn-action {
+        background: white;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 5px 10px;
+        transition: all 0.2s;
+    }
+    .btn-action:hover { 
+        transform: translateY(-2px); 
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); 
     }
 
-    .timeline-icon span {
-        width: 28px;
-        height: 28px;
-    }
+    .timeline { position: relative; margin-left: 20px; padding-left: 20px; border-left: 2px solid #dee2e6; }
+    .timeline-item { position: relative; margin-bottom: 20px; }
+    .timeline-icon { position: absolute; left: -34px; top: 0; }
 </style>
 {% endblock stylesheets %}
 
-{% block content %}
-{% endblock %}
 {% block user_page %}
 <div class="main-div">
-    <div class="jumbotron jumbotron-fluid rounded bg-white border-0 shadow-sm border-left py-3 px-4">
+    <div class="jumbotron jumbotron-fluid rounded bg-white border-0 shadow-sm py-3 px-4">
+        
+        <div class="d-flex justify-content-between mb-3 align-items-center">
+            <h5 class="text-pos mb-0">Test Booking Management</h5>
+            <button id="btnBulkAssign" class="btn btn-primary shadow-sm" style="display: none;">
+                Assign to Doctor <span class="badge bg-white text-primary ms-1" id="selectedCountBadge">0</span>
+            </button>
+        </div>
 
-        <div class="justify-content-between mb-3 row align-items-center">
-            <div class="col-6 col-md-6">
-                <h5 class="text-pos">Test Booking Management</h5>
+        <div class="row g-3 mb-4">
+            <div class="col-md-5">
+                <label class="form-label small fw-bold">From Date</label>
+                <input type="date" class="form-control" id="from_date">
             </div>
-            <div class="col-6 col-md-6 text-end">
-                <button id="btnBulkAssign" class="btn btn-primary shadow-sm" style="display: none;">
-                    Send to Doctor <span class="badge bg-white text-primary ms-1" id="selectedCountBadge">0</span>
+            <div class="col-md-5">
+                <label class="form-label small fw-bold">To Date</label>
+                <input type="date" class="form-control" id="to_date">
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button class="btn btn-dark w-100" id="searchBtn">
+                    <i class="bi bi-search me-2"></i>Filter
                 </button>
             </div>
         </div>
 
-        <div class="row g-3 mb-4">
-            <div class="col-md-6">
-                <label class="form-label fw-semibold">From Date</label>
-                <input type="date" class="form-control shadow-sm" id="from_date">
-            </div>
-
-            <div class="col-md-6">
-                <label class="form-label fw-semibold">To Date</label>
-                <div class="d-flex">
-                    <input type="date" class="form-control shadow-sm" id="to_date">
-                    <button class="btn btn-dark ms-2" id="searchBtn">
-                        <i class="bi bi-search"></i>
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <div class="text-dark">
-            <div class="table-responsive">
-                <table id="testReg_table"
-                    class="table-responsive-sm table-responsive border-0 dataTable no-footer table table-bordered table-hover"
-                    style="width:100%">
-                   <thead>
-    <tr>
-        <th class="text-center" style="width: 40px;">
-            <input type="checkbox" id="selectAllBookings" style="cursor: pointer;">
-        </th>
-        <th>Booking ID</th>
-        <th>Patient Name</th>
-        <th>Date</th>
-        <th>Referred Dr</th>
-        <th>MR/Ref No</th>
-        <th style="min-width: 220px;">Tests & Film Status</th> 
-        <th>Total Amount</th>
-        <th>Discount</th>
-        <th>Net Amount</th>
-        <th>Recieved</th>
-        <th>Balance</th>
-        <th>Action</th>
-    </tr>
-</thead>
-                    <tbody id="table_body" class=""></tbody>
-                </table>
-            </div>
+        <div class="table-responsive">
+            <table id="testReg_table" class="table table-hover align-middle" style="width:100%">
+                <thead class="table-light">
+                    <tr>
+                        <th class="text-center" style="width: 40px;">
+                            <input type="checkbox" id="selectAllBookings">
+                        </th>
+                        <th>ID / Date</th>
+                        <th>Patient Details</th>
+                        <th style="min-width: 250px;">Tests & Status</th>
+                        <th>Referral</th>
+                        <th class="text-end col-finance">Total</th>
+                        <th class="text-end col-finance">Paid</th>
+                        <th class="text-end col-finance" style="border-right: 1px solid #e2e8f0;">Balance</th>
+                        <th class="text-center">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="table_body"></tbody>
+            </table>
         </div>
     </div>
 </div>
@@ -165,14 +106,10 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">Assign to Doctor</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
-                    aria-label="Close"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <p class="text-muted mb-3">
-                    You are assigning <strong id="modalSelectedCount">0</strong> booking(s) to a doctor.
-                </p>
-
+                <p class="text-muted mb-3">You are assigning <strong id="modalSelectedCount">0</strong> booking(s) to a doctor.</p>
                 <div class="form-group">
                     <label class="fw-bold mb-2">Select Doctor *</label>
                     <select id="doctorSelectDropdown" class="form-control form-select">
@@ -182,9 +119,7 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" id="btnConfirmAssignment">
-                    Assign Now
-                </button>
+                <button type="button" class="btn btn-primary" id="btnConfirmAssignment">Assign Now</button>
             </div>
         </div>
     </div>
@@ -218,43 +153,35 @@
             </div>
             <div class="modal-body">
                 <input type="hidden" id="bookingIdInput">
-
                 <div class="row">
                     <div class="col-md-6">
-                        <label class="mb-1">Select Test *</label>
+                        <label class="mb-1 small fw-bold">Select Test *</label>
                         <select id="testIdSelect" class="form-control mb-2"></select>
                     </div>
                     <div class="col-md-6">
-                        <label class="mb-1">Current Films (This Test):</label>
+                        <label class="mb-1 small fw-bold">Current Films (This Test):</label>
                         <input type="number" class="form-control mb-2" id="currentFilmsInput" disabled>
                     </div>
                 </div>
-
                 <hr>
-
                 <div class="row">
                     <div class="col-md-6">
-                        <label class="mb-1 text-primary">Add/Change Films By: *</label>
-                        <input type="number" class="form-control mb-2" id="changedFilmsInput" placeholder="e.g. 2"
-                            min="0">
+                        <label class="mb-1 text-primary small fw-bold">Add/Change Films By: *</label>
+                        <input type="number" class="form-control mb-2" id="changedFilmsInput" placeholder="e.g. 2" min="0">
                     </div>
                     <div class="col-md-6">
-                        <label class="mb-1">New Booking Grand Total:</label>
-                        <input type="number" class="form-control mb-2" id="totalFilmsUsedInput" disabled
-                            style="background-color: #e9ecef; font-weight: bold;">
+                        <label class="mb-1 small fw-bold">New Booking Grand Total:</label>
+                        <input type="number" class="form-control mb-2 fw-bold" id="totalFilmsUsedInput" disabled style="background-color: #f8f9fa;">
                     </div>
                 </div>
-
-                <label class="mb-1">Cause *</label>
+                <label class="mb-1 small fw-bold">Cause *</label>
                 <select id="causeSelect" class="form-control mb-2">
                     <option value="Extra">Extra</option>
                     <option value="Repeat">Repeat</option>
                     <option value="Error">Error</option>
                 </select>
-
-                <label class="mb-1">Reason *</label>
-                <textarea id="reasonInput" rows="3" class="form-control"
-                    placeholder="Enter reason for change..."></textarea>
+                <label class="mb-1 small fw-bold">Reason *</label>
+                <textarea id="reasonInput" rows="3" class="form-control" placeholder="Enter reason for change..."></textarea>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
@@ -268,10 +195,5 @@
 {% block javascript %}
 <script src="https://cdn.datatables.net/1.10.22/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/responsive/2.2.6/js/dataTables.responsive.min.js"></script>
-<script src="https://cdn.datatables.net/buttons/1.6.5/js/dataTables.buttons.min.js"></script>
-<script src="https://cdn.datatables.net/select/1.3.1/js/dataTables.select.min.js"></script>
 <script src="{{ url_for('booking.static', filename='js/view_booking.js') }}"></script>
-
-
-
 {% endblock %}

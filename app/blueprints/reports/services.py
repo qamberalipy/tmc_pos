@@ -1,5 +1,5 @@
 from flask import session
-from sqlalchemy import func, cast, Date, desc, Integer, and_
+from sqlalchemy import func, cast, Date, desc, Integer, and_,String
 from app.extensions import db
 from app.models import TestBookingDetails
 from decimal import Decimal
@@ -12,6 +12,7 @@ from app.models.doctor_reporting_details import DoctorReportingdetails, DoctorRe
 from app.models.user import User
 from app.models.expenses import Expenses
 from app.models.branch import Branch
+from collections import defaultdict
 from app.models.expense_head import Expense_head
 from app.helper import convert_to_utc
 from werkzeug.exceptions import BadRequest, NotFound
@@ -578,3 +579,75 @@ def update_doctor_report(report_id, data, user_id):
         "message": "Report updated successfully.",
         "report_id": report_id
     }
+
+def get_radiologist_performance_data(doctor_id, start_date_str=None, end_date_str=None):
+    
+    from_date = datetime.strptime(start_date_str, "%Y-%m-%d")
+    to_date = datetime.strptime(end_date_str, "%Y-%m-%d").replace(hour=23, minute=59, second=59)
+
+    query = db.session.query(
+        func.date(DoctorReportingdetails.report_at).label('report_date'),
+        User.name.label('radiologist_name'),
+        Test_registration.test_name,
+        DoctorReportingdetails.status,
+        TestBookingDetails.no_of_films
+    ).select_from(DoctorReportingdetails)\
+    .join(User, cast(User.id, String) == DoctorReportingdetails.doctor_id)\
+    .join(Test_registration, Test_registration.id == DoctorReportingdetails.test_id)\
+    .outerjoin(TestBookingDetails, 
+        (cast(TestBookingDetails.booking_id, String) == DoctorReportingdetails.booking_id) & 
+        (TestBookingDetails.test_id == DoctorReportingdetails.test_id)
+    ).filter(
+       
+        DoctorReportingdetails.doctor_id == str(doctor_id), 
+        DoctorReportingdetails.report_at >= from_date,
+        DoctorReportingdetails.report_at <= to_date
+    )
+
+    results = query.all()
+
+    # --- Python Data Aggregation (Pivot Logic) ---
+    grouped_data = {}
+
+    for row in results:
+        date_str = str(row.report_date)
+        doctor = row.radiologist_name
+        test_name = row.test_name
+        
+        key = (date_str, doctor)
+
+        if key not in grouped_data:
+            grouped_data[key] = {
+                "date": date_str,
+                "radiologist_name": doctor,
+                "tests_counts": defaultdict(int),
+                "total_tests": 0,
+                "reports_made": 0,
+                "films_issued": 0
+            }
+
+        grouped_data[key]["tests_counts"][test_name] += 1
+        grouped_data[key]["total_tests"] += 1
+
+        if row.status == "Reported":
+            grouped_data[key]["reports_made"] += 1
+
+        if row.no_of_films:
+            grouped_data[key]["films_issued"] += row.no_of_films
+
+    final_report = []
+    sorted_keys = sorted(grouped_data.keys(), key=lambda x: x[0])
+
+    for index, key in enumerate(sorted_keys, 1):
+        data = grouped_data[key]
+        final_report.append({
+            "s_no": index,
+            "date": data["date"],
+            "radiologist_name": data["radiologist_name"],
+            "test_breakdown": dict(data["tests_counts"]),
+            "total_tests": data["total_tests"],
+            "reports_made": data["reports_made"],
+            "films_issued": data["films_issued"]
+        })
+
+    return final_report

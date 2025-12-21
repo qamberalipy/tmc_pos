@@ -49,6 +49,7 @@ MENU = {
             {"label": "Test Wise Report", "icon": "bi-file-earmark-bar-graph", "endpoint": "#"},
             {"label": "Doctor Wise Report", "icon": "bi-file-earmark-bar-graph", "endpoint": "#"},
             {"label": "Expense Report", "icon": "bi-file-earmark-bar-graph", "endpoint": "#"},
+            {"label": "Radiologist Logs", "icon": "bi-file-earmark-bar-graph", "endpoint": "reports.view_radiologist_logs"}
         ]},
         
     ],
