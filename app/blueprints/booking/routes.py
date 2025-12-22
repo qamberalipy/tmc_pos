@@ -103,8 +103,55 @@ def get_test_booking(booking_id):
     except Exception as e:
         print(f"Error in get_test_booking: {str(e)}")
         return jsonify({"error": "Failed to fetch booking details"}), 400
-    
 
+@booking_bp.route("/view_dues", methods=["GET"])
+@login_required
+def view_dues():
+    try:
+        return render_template('view_dues.html')
+    except Exception as e:
+        print(f"Error in view_dues: {str(e)}")
+        return redirect(url_for('main.error_page'))
+
+@booking_bp.route("/dues", methods=["GET"])
+def get_branch_dues():
+    branch_id = session.get("branch_id")
+    to_date = request.args.get("to_date")
+    from_date = request.args.get("from_date")
+    result, status = booking_services.get_dues_list(branch_id, from_date, to_date)
+    return jsonify(result), status 
+
+@booking_bp.route("/clear-due/<int:booking_id>", methods=["POST"])
+def clear_booking_due_api(booking_id):
+ 
+    
+    user_id = session.get("user_id")
+    if not user_id:
+        return jsonify({"error": "Unauthorized access. Please login."}), 401
+
+    # 2. Get Payload
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Request body is missing"}), 400
+
+    amount_to_pay = data.get("amount")
+    payment_type = data.get("payment_type")
+
+    # 3. Basic Validation
+    if amount_to_pay is None:
+        return jsonify({"error": "Amount is required"}), 400
+    
+    if not payment_type:
+        return jsonify({"error": "Payment type is required"}), 400
+    
+    result, status = booking_services.clear_booking_due(
+        booking_id=booking_id,
+        amount_to_pay=amount_to_pay,
+        payment_type=payment_type,
+        user_id=user_id
+    )
+
+    return jsonify(result), status
 
 @booking_bp.route("/comments/<int:booking_id>", methods=["GET"])
 def get_booking_comments(booking_id):

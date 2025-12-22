@@ -16,7 +16,7 @@ from collections import defaultdict
 from app.models.expense_head import Expense_head
 from app.helper import convert_to_utc
 from werkzeug.exceptions import BadRequest, NotFound
-
+from app.models.expenses import PaymentTransaction
 
 def _to_float(value):
     if value is None:
@@ -32,20 +32,22 @@ def _to_float(value):
 def get_expenses_report(branch_id: int, date):
     if not branch_id or not date:
         raise ValueError("branch_id and date are required")
-    # date = convert_to_utc(date.strftime("%Y-%m-%d"))
-    print("Converted date to UTC:", date)
+
     try:
         q = (
             db.session.query(
                 Expenses.expense_head_id.label("head_id"),
                 Expense_head.name.label("head_name"),
-                func.coalesce(func.sum(Expenses.amount), 0).label("amount")
+                func.coalesce(func.sum(PaymentTransaction.amount), 0).label("amount")
             )
+            .join(Expenses, Expenses.id == PaymentTransaction.expense_id)
             .join(Expense_head, Expense_head.id == Expenses.expense_head_id)
             .filter(
-                Expenses.is_deleted.isnot(True),
-                Expenses.branch_id == branch_id,
-                cast(Expenses.created_at, Date) == date
+                PaymentTransaction.branch_id == branch_id,
+                PaymentTransaction.direction == "OUT",
+                cast(PaymentTransaction.payment_date, Date) == date,
+                # Double check to ignore soft-deleted items if not handled by transaction delete
+                Expenses.is_deleted.isnot(True) 
             )
             .group_by(Expenses.expense_head_id, Expense_head.name)
             .order_by(Expense_head.name)
@@ -63,7 +65,9 @@ def get_expenses_report(branch_id: int, date):
                 "amount": amt
             })
             total += amt
-        user_branch=db.session.query(Branch).filter(Branch.id == branch_id).first()
+        
+        user_branch = db.session.query(Branch).filter(Branch.id == branch_id).first()
+        
         return {
             "branch_id": branch_id,
             "branch_name": user_branch.branch_name if user_branch else None,
@@ -72,11 +76,10 @@ def get_expenses_report(branch_id: int, date):
             "items": items
         }
 
-    except SQLAlchemyError as e:
+    except Exception as e:
         print(f"Error in get_expenses_report: {str(e)}")
         db.session.rollback()
         raise
-
 
 def get_films_report(branch_id: int, date):
     """date is a datetime.date object."""
@@ -128,23 +131,21 @@ def get_films_report(branch_id: int, date):
 def get_test_report(branch_id: int, date):
     if not branch_id or not date:
         raise ValueError("branch_id and date are required")
-    # date = convert_to_utc(date.strftime("%Y-%m-%d"))
+
     try:
-        # 1) Total income
-        income_row = (
+        income_val = (
             db.session.query(
-                func.coalesce(func.sum(TestBooking.net_receivable), 0).label("total")
+                func.coalesce(func.sum(PaymentTransaction.amount), 0)
             )
             .filter(
-                TestBooking.branch_id == branch_id,
-                cast(TestBooking.create_at, Date) == date
+                PaymentTransaction.branch_id == branch_id,
+                PaymentTransaction.direction == "IN",
+                cast(PaymentTransaction.payment_date, Date) == date
             )
-            .one()
+            .scalar()
         )
 
-        total_income = _to_float(income_row.total)
-
-        # 2) Test frequency
+        total_income = _to_float(income_val)
         t_q = (
             db.session.query(
                 TestBookingDetails.test_id.label("test_id"),
@@ -172,7 +173,7 @@ def get_test_report(branch_id: int, date):
             "tests": tests
         }
 
-    except SQLAlchemyError:
+    except Exception as e:
         db.session.rollback()
         raise
 

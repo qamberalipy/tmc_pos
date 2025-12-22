@@ -31,10 +31,11 @@ MENU = {
             {"label": "Referred Dr Reg", "icon": "bi-person-fill-add", "endpoint": "registrations.referred_registration"},
             {"label": "Expense Head Reg", "icon": "bi-house-add-fill", "endpoint": "registrations.expense_registration"},
         ]},
-        {"label": "Booking", "icon": "bi-book", "endpoint": None, "children": [
-            {"label": "Test Booking", "icon": "bi-bag-plus-fill", "endpoint": "booking.view_test_booking"},
-            {"label": "View Booking", "icon": "bi bi-eye-fill", "endpoint": "booking.view_view_booking"},
-            {"label": "Book Results", "icon": "bi-file-earmark-medical-fill", "endpoint": "booking.view_booking_result"},
+       {"label": "Booking", "icon": "bi-calendar2-check", "endpoint": None, "children": [
+            {"label": "Test Booking", "icon": "bi-clipboard-plus", "endpoint": "booking.view_test_booking"},
+            {"label": "View Booking", "icon": "bi-list-check", "endpoint": "booking.view_view_booking"},
+            {"label": "Book Results","icon": "bi-file-earmark-medical","endpoint": "booking.view_booking_result"},
+            {"label": "View Dues", "icon": "bi-cash-stack", "endpoint": "booking.view_dues"}
         ]},
         {"label": "Films", "icon": "bi bi-file-medical", "endpoint": None, "children": [
             {"label": "Inventory Audit", "icon": "bi-file-earmark-post", "endpoint": "booking.view_films_inventory_audit"},

@@ -13,7 +13,7 @@ from app.helper import convert_to_utc
 from sqlalchemy.ext.mutable import MutableDict, MutableList
 from app.models.test_booking import TestFilmUsage, TestBooking,FilmInventoryTransaction
 from app.models.test_registration import Test_registration
-
+from app.models.expenses import PaymentTransaction
 
 def create_test_booking(data):
     try:
@@ -39,7 +39,7 @@ def create_test_booking(data):
 
         # --- Start transaction ---
         with db.session.begin():
-            # Create booking
+            # 1. Create booking
             booking = TestBooking(
                 mr_no=data.get("mr_no"),
                 patient_name=data["patient_name"],
@@ -61,30 +61,42 @@ def create_test_booking(data):
             db.session.add(booking)
             db.session.flush()  # ensures booking.id is available
 
-            # Prepare test details
+            # 2. Record Financial Transaction (NEW IMPLEMENTATION)
+            # This ensures the money 'IN' is recorded for the Daily Cash Report
+            if paid_amount > 0:
+                transaction = PaymentTransaction(
+                    branch_id=booking.branch_id,
+                    booking_id=booking.id,
+                    amount=paid_amount,
+                    direction="IN",
+                    payment_type=booking.payment_type,
+                    transaction_type="Initial",
+                    created_by=data["create_by"],
+                    payment_date=datetime.utcnow()
+                )
+                db.session.add(transaction)
+
+            # 3. Prepare test details
             test_details_list = data.get('tests', [])
             details = []
 
             for idx, test in enumerate(test_details_list, start=1):
                 if not test.get("test_id"):
                     raise ValueError(f"Test #{idx} missing test_id")
-                if not test.get("amount"):
-                    raise ValueError(f"Test #{idx} missing amount")
-
-                amount = to_decimal(test["amount"], f"tests[{idx}].amount")
-
+                
+                amount = to_decimal(test.get("amount"), f"tests[{idx}].amount")
+                
                 reporting_date = None
                 if test.get("reporting_date"):
                     try:
-                        test["reporting_date"] = convert_to_utc(test["reporting_date"])
-                        reporting_date = (
-                            test["reporting_date"].date()
-                            if isinstance(test["reporting_date"], datetime)
-                            else datetime.strptime(test["reporting_date"], "%Y-%m-%d").date()
-                        )
+                        # Ensure convert_to_utc returns a datetime object
+                        utc_dt = convert_to_utc(test["reporting_date"])
+                        if isinstance(utc_dt, datetime):
+                            reporting_date = utc_dt.date()
+                        else:
+                            reporting_date = datetime.strptime(utc_dt, "%Y-%m-%d").date()
                     except ValueError:
                         raise ValueError(f"tests[{idx}].reporting_date must be YYYY-MM-DD")
-
 
                 details.append(TestBookingDetails(
                     booking_id=booking.id,
@@ -100,6 +112,7 @@ def create_test_booking(data):
             if details:
                 db.session.add_all(details)
             
+            # 4. Handle initial film usage
             initial_films = int(data.get("total_no_of_films", 0))
             if initial_films > 0:
                 add_film_usage(
@@ -110,23 +123,132 @@ def create_test_booking(data):
                     branch_id=data["branch_id"]
                 )
 
-            # Recalculate anyway
-            #update_booking_total_films(booking.id)
-
-        # --- Commit happens automatically at the end of with block ---
         return {
             "message": "Booking created successfully",
             "booking_id": booking.id,
             "total_tests": len(test_details_list)
-        }
+        }, 201
+
     except SQLAlchemyError as e:
         db.session.rollback()
-        print("Database error creating booking:", str(e.__dict__.get("orig", e)))
         return {"error": str(e.__dict__.get("orig", e))}, 500
     except Exception as e:
-        print("Error creating booking:", str(e))
         return {"error": str(e)}, 400  
-    
+
+def clear_booking_due(booking_id, amount_to_pay, payment_type, user_id):
+    try:
+        booking = TestBooking.query.get(booking_id)
+        if not booking:
+            return {"error": "Booking not found"}, 404
+
+        pay_amt = Decimal(str(amount_to_pay))
+        
+        if pay_amt <= 0:
+            return {"error": "Payment amount must be greater than 0"}, 400
+            
+        if pay_amt > booking.due_amount:
+            return {"error": f"Payment {pay_amt} exceeds due amount {booking.due_amount}"}, 400
+
+        # --- 1. Update Booking Balance ---
+        booking.paid_amount += pay_amt
+        booking.due_amount -= pay_amt
+        booking.update_at = datetime.utcnow()
+        booking.update_by = user_id
+        
+        # Add to session (SQLAlchemy tracks changes automatically, but adding explicitly is safe)
+        db.session.add(booking)
+
+        # --- 2. Create Transaction Record (Cash IN) ---
+        transaction = PaymentTransaction(
+            branch_id=booking.branch_id,
+            booking_id=booking.id,
+            amount=pay_amt,
+            direction="IN",
+            payment_type=payment_type,
+            transaction_type="DueClearance",
+            created_by=user_id,
+            payment_date=datetime.utcnow()
+        )
+        db.session.add(transaction)
+
+        # --- 3. Commit Changes ---
+        # This saves both the booking update and the new transaction together
+        db.session.commit()
+
+        return {
+            "message": "Due cleared successfully", 
+            "remaining_due": float(booking.due_amount),
+            "paid_now": float(pay_amt)
+        }, 200
+
+    except Exception as e:
+        db.session.rollback() # Undo everything if error occurs
+        print("Error in clear_booking_due:", e)
+        return {"error": str(e)}, 500   
+     
+def get_dues_list(branch_id, from_date=None, to_date=None):
+    try:
+        # 1. Validation and Date Setup
+        if not from_date or not to_date:
+            raise BadRequest("Both from_date and to_date are required.")
+
+        try:
+            from_date_obj = datetime.strptime(from_date, "%Y-%m-%d").date()
+            to_date_obj   = datetime.strptime(to_date, "%Y-%m-%d").date()
+        except ValueError:
+            raise BadRequest("Date format must be YYYY-MM-DD.")
+
+        if from_date_obj > to_date_obj:
+            raise BadRequest("from_date cannot be greater than to_date.")
+
+        # Create full timestamps (Start of day to End of day)
+        start_dt = datetime.combine(from_date_obj, time.min)
+        end_dt   = datetime.combine(to_date_obj, time.max)
+
+        if not branch_id:
+            return {"error": "branch_id is required"}, 400
+
+        # 2. Query with Date Filter Added
+        bookings = (
+            db.session.query(TestBooking)
+            .filter(
+                TestBooking.branch_id == int(branch_id),
+                TestBooking.due_amount > 0,
+                TestBooking.create_at >= start_dt,  # <--- Filter start
+                TestBooking.create_at <= end_dt     # <--- Filter end
+            )
+            .order_by(TestBooking.create_at.desc())
+            .all()
+        )
+
+        # 3. Serialize Data
+        dues_list = []
+        total_due_amount = 0
+
+        for b in bookings:
+            dues_list.append({
+                "booking_id": b.id,
+                "mr_no": b.mr_no,
+                "patient_name": b.patient_name,
+                "contact_no": b.contact_no,
+                "date": b.create_at.strftime("%Y-%m-%d %I:%M %p") if b.create_at else None,
+                "total_amount": float(b.net_receivable or 0), # Added 'or 0' for safety
+                "paid_amount": float(b.paid_amount or 0),
+                "due_amount": float(b.due_amount or 0),
+                "created_by": b.create_by
+            })
+            total_due_amount += float(b.due_amount or 0)
+
+        return {
+            "dues": dues_list,
+            "total_outstanding_amount": total_due_amount,
+            "count": len(dues_list)
+        }, 200
+
+    except SQLAlchemyError as e:
+        return {"error": str(e.__dict__.get("orig", e))}, 500
+    except Exception as e:
+        return {"error": str(e)}, 500
 
 def update_booking_total_films(booking_id):
     total = db.session.query(
