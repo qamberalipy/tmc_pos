@@ -282,3 +282,36 @@ def update_film_status():
     )
     
     return jsonify(result), status
+
+@booking_bp.route('/referral-shares/list', methods=['GET'])
+def list_referral_shares():
+    
+    filters = {
+        "branch_id": session.get('branch_id'), # Enforce session branch
+        "referred_id": request.args.get('referred_id'),
+        "from_date": request.args.get('from_date'),
+        "to_date": request.args.get('to_date')
+    }
+    
+    response, status = booking_services.get_referral_shares_service(filters)
+    return jsonify(response), status
+
+@booking_bp.route('/referral-shares/<int:share_id>/toggle-payment', methods=['POST'])
+def toggle_payment_route(share_id):
+    user_id = session.get('user_id')
+    branch_id = session.get('branch_id')
+    
+    response, status = booking_services.toggle_share_payment_service(share_id, user_id, branch_id)
+    return jsonify(response), status
+
+@booking_bp.route('/referral-shares/<int:share_id>', methods=['PUT'])
+def update_share_route(share_id):
+    data = request.get_json()
+    new_amount = data.get('amount')
+    user_id = session.get('user_id')
+    
+    if new_amount is None:
+        return jsonify({"error": "Amount is required"}), 400
+
+    response, status = booking_services.update_share_amount_service(share_id, new_amount, user_id)
+    return jsonify(response), status
