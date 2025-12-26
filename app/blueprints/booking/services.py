@@ -125,7 +125,7 @@ def create_test_booking(data):
             
             # 4. Handle initial film usage (Mock function call as per previous context)
             # add_film_usage(...) 
-
+        
         return {
             "message": "Booking created successfully",
             "booking_id": booking.id,
@@ -897,6 +897,7 @@ def update_test_film_status(booking_id, test_id, film_issued):
     
 def get_referral_shares_service(filters):
     try:
+        # 1. Base Query with Joins
         query = db.session.query(
             ReferralShare, 
             TestBooking, 
@@ -907,32 +908,43 @@ def get_referral_shares_service(filters):
             Referred, ReferralShare.referred_id == Referred.id
         )
 
-        # Filters
+        # 2. Apply ID Filters
         if filters.get('branch_id'):
-            query = query.filter(TestBooking.branch_id == filters['branch_id'])
+            query = query.filter(TestBooking.branch_id == int(filters['branch_id']))
         
         if filters.get('referred_id'):
-            query = query.filter(ReferralShare.referred_id == filters['referred_id'])
+            query = query.filter(ReferralShare.referred_id == int(filters['referred_id']))
 
+        # 3. Apply Date Filters (Handling Time Boundaries)
         if filters.get('from_date'):
             query = query.filter(TestBooking.create_at >= filters['from_date'])
         
         if filters.get('to_date'):
-            query = query.filter(TestBooking.create_at <= filters['to_date'])
+            # Convert string to datetime and set to end-of-day (23:59:59)
+            try:
+                to_date_obj = datetime.strptime(str(filters['to_date']), '%Y-%m-%d')
+                end_of_day = to_date_obj.replace(hour=23, minute=59, second=59)
+                query = query.filter(TestBooking.create_at <= end_of_day)
+            except ValueError:
+                query = query.filter(TestBooking.create_at <= filters['to_date'])
 
-        results = query.all()
+        # 4. Execute Query
+        results = query.order_by(TestBooking.create_at.desc()).all()
         data = []
 
+        # 5. Process Results
         for share, booking, doc_name in results:
             # Fetch Test Names for this booking
-            # Joining Details -> Test to get names
-            test_details = db.session.query(Test_registration.test_name).join(
-                TestBookingDetails, Test_registration.id == TestBookingDetails.test_id
-            ).filter(
-                TestBookingDetails.booking_id == booking.id
-            ).all()
-            
-            test_names = [t[0] for t in test_details]
+            test_names = []
+            try:
+                test_details = db.session.query(Test_registration.test_name).join(
+                    TestBookingDetails, Test_registration.id == TestBookingDetails.test_id
+                ).filter(
+                    TestBookingDetails.booking_id == booking.id
+                ).all()
+                test_names = [t[0] for t in test_details]
+            except Exception:
+                test_names = []
 
             data.append({
                 "share_id": share.id,
@@ -941,7 +953,7 @@ def get_referral_shares_service(filters):
                 "doctor_name": doc_name,
                 "test_list": test_names,
                 "booking_date": booking.create_at.strftime('%Y-%m-%d'),
-                "created_by": booking.create_by, # Or join User table to get name
+                "created_by": booking.create_by,
                 "share_amount": float(share.share_amount),
                 "is_paid": share.is_paid,
                 "paid_at": share.paid_at.strftime('%Y-%m-%d') if share.paid_at else None
@@ -951,7 +963,7 @@ def get_referral_shares_service(filters):
 
     except Exception as e:
         return {"error": str(e)}, 500
-
+    
 def toggle_share_payment_service(share_id, user_id, branch_id):
     try:
         share = ReferralShare.query.get(share_id)

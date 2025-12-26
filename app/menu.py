@@ -42,8 +42,8 @@ MENU = {
             {"label": "Films Usage", "icon": "bi-file-earmark-text", "endpoint": "booking.view_films_usage"},
         ]},
         {"label": "Transactions", "icon": "bi-currency-exchange", "endpoint": None, "children": [
-            {"label": "Payment", "icon": "bi-cash-stack", "endpoint": "#"},
             {"label": "Expense", "icon": "bi-wallet2", "endpoint": "transactions.view_expenses"},
+            {"label": "Referral Share", "icon": "bi-cash-stack", "endpoint": "transactions.view_referral_share"}
         ]},
         {"label": "Reports", "icon": "bi-graph-up-arrow", "endpoint": None, "children": [
              {"label": "Daily Report", "icon": "bi-journal-text", "endpoint": "reports.view_daily_reports"},

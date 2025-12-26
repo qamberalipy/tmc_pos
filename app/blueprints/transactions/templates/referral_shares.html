@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+
+{% block stylesheets %}
+<link rel="stylesheet" href="https://cdn.datatables.net/1.10.22/css/jquery.dataTables.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/responsive/2.2.6/css/responsive.dataTables.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+
+<style>
+  
+  .range-btn {
+      border: 1px solid #198754;
+      background: white;
+      color: #198754;
+      padding: 6px 15px;
+      border-radius: 30px;
+      font-size: 14px;
+      transition: 0.15s ease;
+      white-space: nowrap;
+  }
+  .range-btn:hover, .range-btn:focus {
+      background: #198754;
+      color: #fff;
+      outline: none;
+  }
+
+  .top-controls {
+      background-color: #f8f9fa;
+      padding: 15px;
+      border-radius: 8px;
+      margin-bottom: 1rem;
+      border: 1px solid #e9ecef;
+  }
+
+  input[type="date"], select.form-select {
+      min-height: 38px;
+      font-size: 14px;
+  }
+
+  .report-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+  }
+
+  /* Status Badges */
+  .badge-paid { background-color: #d1e7dd; color: #0f5132; padding: 5px 10px; border-radius: 20px; font-weight: 600; font-size: 0.85em; }
+  .badge-unpaid { background-color: #f8d7da; color: #842029; padding: 5px 10px; border-radius: 20px; font-weight: 600; font-size: 0.85em; }
+</style>
+{% endblock stylesheets %}
+
+{% block content %}{% endblock %}
+
+{% block user_page %}
+<div class="container-fluid py-3 rounded bg-white shadow-sm border-0">
+
+    <div class="report-header">
+        <h4 class="fw-bold text-dark m-0">Referral Commission Management</h4>
+    </div>
+
+    <div class="top-controls">
+        <div class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label small mb-1 fw-bold">Quick Filters</label>
+                <div class="d-flex gap-2">
+                    <button class="range-btn" data-range="today">Today</button>
+                    <button class="range-btn" data-range="7">Last 7 Days</button>
+                    <button class="range-btn" data-range="30">Last 30 Days</button>
+                </div>
+            </div>
+
+            <div class="col-md-3">
+                <label class="form-label small mb-1 fw-bold">Referrer / Doctor</label>
+                <select id="referrer_select" class="form-select">
+                    <option value="">-- All Referrers --</option>
+                    </select>
+            </div>
+
+            <div class="col-md-2">
+                <label class="form-label small mb-1 fw-bold">From</label>
+                <input type="date" id="from_date" class="form-control">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small mb-1 fw-bold">To</label>
+                <input type="date" id="to_date" class="form-control">
+            </div>
+
+            <div class="col-md-2 d-flex">
+                <button class="btn btn-dark w-100" id="searchBtn" title="Search">
+                    <i class="bi bi-search"></i> Search Logs
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table id="referral_table" class="table table-bordered table-hover w-100 align-middle" cellspacing="0" width="100%">
+            <thead class="bg-light">
+                <tr>
+                    <th>Date</th>
+                    <th>Booking ID</th>
+                    <th>Referred By</th>
+                    <th>Patient & Tests</th>
+                    <th class="text-end">Amount</th>
+                    <th class="text-center">Status</th>
+                    <th class="text-center">Action</th>
+                </tr>
+            </thead>
+            <tbody id="table_body"></tbody>
+            <tfoot>
+                <tr>
+                    <th colspan="4" style="text-align:right">Total Payable:</th>
+                    <th id="total_amount_footer" class="text-end">0.00</th>
+                    <th colspan="2"></th>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+
+</div>
+
+<div class="modal fade" id="editAmountModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-sm modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title fs-6">Update Share Amount</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+          <input type="hidden" id="edit_share_id">
+          <div class="mb-3">
+              <label class="form-label small">New Amount</label>
+              <input type="number" id="edit_share_amount" class="form-control" step="0.01">
+          </div>
+          <button type="button" class="btn btn-primary w-100 btn-sm" id="saveAmountBtn">Save Changes</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block javascript %}
+<script src="https://cdn.datatables.net/1.10.22/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/responsive/2.2.6/js/dataTables.responsive.min.js"></script>
+<script src="{{ url_for('transactions.static', filename='js/referral_shares.js') }}"></script>
+{% endblock %}

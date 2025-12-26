@@ -62,7 +62,9 @@ def create_booking():
     print("Booking Data:", data)
     try:
         result = booking_services.create_test_booking(data)
+        print("Create Booking Response:", result)
         return jsonify(result), 201
+    
     except Exception as e:
         print(f"Error in create_booking: {str(e)}")
         return jsonify({"error": "Failed to create booking"}), 400
@@ -294,6 +296,7 @@ def list_referral_shares():
     }
     
     response, status = booking_services.get_referral_shares_service(filters)
+    print("Referral Shares List Response:", response)
     return jsonify(response), status
 
 @booking_bp.route('/referral-shares/<int:share_id>/toggle-payment', methods=['POST'])

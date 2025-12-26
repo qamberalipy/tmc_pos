@@ -4,7 +4,7 @@
 const bookingState = {
     tests: [],   // {id, name, rate, qty, days, sample}
     discount: { type: "None", value: 0 },
-    totals: { tests: 0, amount: 0, net: 0, reportingDate: "" ,films: 0 }  // 🔒 films
+    totals: { tests: 0, amount: 0, net: 0, reportingDate: "", films: 0 }  // 🔒 films
 
 };
 
@@ -245,22 +245,22 @@ function handleReceivableChange() {
 // -------------------------------
 // Submit Handler
 // -------------------------------
- $(document).on("click", "#close_receipt_btn", function () {
+$(document).on("click", "#close_receipt_btn", function () {
     $("#receipt_box").fadeOut(400); // 400ms fade out
-  });
+});
 $(document).on("click", "#submit_booking", async function () {
     try {
         myshowLoader();
 
         // Collect values from form
-        let give_share_to=null;
-        if ($("input[name='shareType']:checked").val()==="doctor"){
-            give_share_to=$("#referred_dr").val();
-            if(!give_share_to){ showToastMessage("error", "Please select a doctor to give share!"); return; }
+        let give_share_to = null;
+        if ($("input[name='shareType']:checked").val() === "doctor") {
+            give_share_to = $("#referred_dr").val();
+            if (!give_share_to) { showToastMessage("error", "Please select a doctor to give share!"); return; }
         }
-        else if ($("input[name='shareType']:checked").val()==="nonDoctor"){
-            give_share_to=$("#referred_non_dr").val();
-            if(!give_share_to){ showToastMessage("error", "Please select a Non-Doctor to give share!"); return; }
+        else if ($("input[name='shareType']:checked").val() === "nonDoctor") {
+            give_share_to = $("#referred_non_dr").val();
+            if (!give_share_to) { showToastMessage("error", "Please select a Non-Doctor to give share!"); return; }
         }
         const payload = {
             mr_no: $("#mr_ref_no").val().trim() || null,
@@ -303,12 +303,22 @@ $(document).on("click", "#submit_booking", async function () {
             headers: { "Content-Type": "application/json" }
         });
 
-        if (res.status === 201) {
-            showToastMessage("success", res.data.message || "Booking created!");
+        // 1. Extract the actual data and status from the array response
+        // Based on your log: res.data[0] is the object, res.data[1] is the status code (201)
+        var responseData = res.data[0];
+        var responseStatus = res.data[1];
+
+        // 2. Check the status extracted from the body
+        if (responseStatus === 201) {
+            showToastMessage("success", responseData.message || "Booking created!");
+
             $("#receipt_box").fadeIn(100);
-            console.log("Booking Response:", res.data);
-            $("#booking_id").text(res.data.booking_id);
-            $("#print_receipt_btn").attr("href", baseUrl + "/booking/receipt/" + res.data.booking_id);
+            console.log("Booking Response:", responseData);
+
+            // 3. Use responseData instead of res.data
+            $("#booking_id").text(responseData.booking_id);
+            $("#print_receipt_btn").attr("href", baseUrl + "/booking/receipt/" + responseData.booking_id);
+
             $("html, body").animate({ scrollTop: 0 }, 500);
             resetBookingForm();
 
