@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+
+{% block stylesheets %}
+<link rel="stylesheet" href="https://cdn.datatables.net/1.10.22/css/jquery.dataTables.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/responsive/2.2.6/css/responsive.dataTables.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+
+<style>
+  .top-controls {
+      background-color: #f8f9fa;
+      padding: 15px;
+      border-radius: 8px;
+      margin-bottom: 1rem;
+      border: 1px solid #e9ecef;
+  }
+
+  input[type="date"], select.form-select {
+      min-height: 38px;
+      font-size: 14px;
+  }
+
+  .report-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+  }
+
+  /* Status Badges */
+  .badge-paid { background-color: #d1e7dd; color: #0f5132; padding: 5px 10px; border-radius: 20px; font-weight: 600; font-size: 0.85em; }
+  .badge-unpaid { background-color: #f8d7da; color: #842029; padding: 5px 10px; border-radius: 20px; font-weight: 600; font-size: 0.85em; }
+
+  /* --- Select2 Bootstrap 5 Theme Fixes --- */
+  .select2-container .select2-selection--single {
+      height: 38px !important; /* Match form-control height */
+      border: 1px solid #ced4da;
+      border-radius: 0.375rem; /* Bootstrap rounded */
+  }
+  .select2-container .select2-selection--single .select2-selection__rendered {
+      line-height: 36px !important;
+      padding-left: 12px;
+      color: #212529;
+  }
+  .select2-container .select2-selection--single .select2-selection__arrow {
+      height: 36px !important;
+      right: 5px;
+  }
+  .select2-container--default .select2-selection--single .select2-selection__placeholder {
+      color: #6c757d;
+  }
+  /* Focus State */
+  .select2-container--default.select2-container--focus .select2-selection--single {
+      border-color: #86b7fe;
+      box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+  }
+</style>
+{% endblock stylesheets %}
+
+{% block content %}{% endblock %}
+
+{% block user_page %}
+<div class="container-fluid py-3 rounded bg-white shadow-sm border-0">
+
+    <div class="report-header">
+        <h4 class="fw-bold text-dark m-0">Referral Commission Management</h4>
+    </div>
+
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-body p-3 bg-light rounded">
+            <div class="row g-2 align-items-end">
+                
+                <div class="col-12 col-md-4 col-lg-3">
+                    <label class="form-label small text-uppercase fw-bold text-muted mb-1">Referrer / Doctor</label>
+                    <div class="w-100">
+                        <select id="referrer_select" class="form-select">
+                            <option value="">-- All Referrers --</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="col-12 col-md-3 col-lg-2">
+                    <label class="form-label small text-uppercase fw-bold text-muted mb-1">Status</label>
+                    <select id="status_filter" class="form-select">
+                        <option value="">All Status</option>
+                        <option value="0">Unpaid</option>
+                        <option value="1">Paid</option>
+                    </select>
+                </div>
+
+                <div class="col-6 col-md-3 col-lg-2">
+                    <label class="form-label small text-uppercase fw-bold text-muted mb-1">From</label>
+                    <input type="date" id="from_date" class="form-control">
+                </div>
+
+                <div class="col-6 col-md-3 col-lg-2">
+                    <label class="form-label small text-uppercase fw-bold text-muted mb-1">To</label>
+                    <input type="date" id="to_date" class="form-control">
+                </div>
+
+                <div class="col-12 col-lg-3">
+                    <button class="btn btn-dark w-100 fw-bold" id="searchBtn">
+                        <i class="bi bi-search me-1"></i> Search
+                    </button>
+                </div>
+
+            </div>
+        </div>
+    </div>
+    
+    <div class="table-responsive">
+        <table id="referral_table" class="table table-bordered table-hover w-100 align-middle" cellspacing="0" width="100%">
+            <thead class="bg-light">
+                <tr>
+                    <th>Date</th>
+                    <th>Booking ID</th>
+                    <th>Referred By</th>
+                    <th>Patient & Tests</th>
+                    <th class="text-end">Amount</th>
+                    <th class="text-center">Status</th>
+                    <th class="text-center">Action</th>
+                </tr>
+            </thead>
+            <tbody id="table_body"></tbody>
+        </table>
+    </div>
+
+</div>
+
+<div class="modal fade" id="editAmountModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-sm modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title fs-6">Update Share Amount</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+          <input type="hidden" id="edit_share_id">
+          <div class="mb-3">
+              <label class="form-label small">New Amount</label>
+              <input type="number" id="edit_share_amount" class="form-control" step="0.01">
+          </div>
+          <button type="button" class="btn btn-primary w-100 btn-sm" id="saveAmountBtn">Save Changes</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block javascript %}
+<script src="https://cdn.datatables.net/1.10.22/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/responsive/2.2.6/js/dataTables.responsive.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script src="{{ url_for('transactions.static', filename='js/referral_shares.js') }}"></script>
+{% endblock %}

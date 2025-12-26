@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+
+{% block stylesheets %}
+<link rel="stylesheet" href="https://cdn.datatables.net/1.10.22/css/jquery.dataTables.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/responsive/2.2.6/css/responsive.dataTables.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/buttons/1.6.5/css/buttons.dataTables.min.css">
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+
+<style>
+    .select2-container .select2-selection--single {
+        height: 38px;
+        border: 1px solid #ced4da;
+    }
+    .select2-container--default .select2-selection--single .select2-selection__rendered {
+        line-height: 36px;
+    }
+    .badge-due {
+        background-color: #ffebee;
+        color: #c62828;
+        font-weight: bold;
+        border: 1px solid #ffcdd2;
+    }
+</style>
+{% endblock stylesheets %}
+
+
+{% block user_page %}
+<div class="main-div">
+    <div class="jumbotron jumbotron-fluid rounded bg-white border-0 shadow-sm border-left py-3 px-4">
+        
+        <div class="justify-content-between mb-3 row align-items-center">
+            <div class="col-6 col-md-6">
+                <h5 class="text-pos">Outstanding Dues Management</h5>
+            </div>
+        </div>
+
+        <div class="row g-3 mb-4 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label fw-semibold">From Date</label>
+                <input type="date" class="form-control shadow-sm" id="from_date">
+            </div>
+
+            <div class="col-md-3">
+                <label class="form-label fw-semibold">To Date</label>
+                <input type="date" class="form-control shadow-sm" id="to_date">
+            </div>
+
+            <div class="col-md-2">
+                <button class="btn btn-dark w-100 shadow-sm" id="searchBtn">
+                    <i class="bi bi-search"></i> Search
+                </button>
+            </div>
+        </div>
+
+        <div class="text-dark">
+            <div class="table-responsive">
+                <table id="duesTable" class="table table-bordered table-hover dataTable no-footer" style="width:100%">
+                    <thead>
+                        <tr class="bg-light">
+                            <th>Booking ID</th>
+                            <th>Patient Details</th>
+                            <th>Date</th>
+                            <th>Total</th>
+                            <th>Paid</th>
+                            <th>Due Amount</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                    <tfoot>
+                        <tr>
+                            <th colspan="5" style="text-align:right">Total Outstanding:</th>
+                            <th id="footer_total_due">0.00</th>
+                            <th></th>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="clearDueModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-light">
+                <h5 class="modal-title">Clear Dues</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="pay_booking_id">
+                
+                <div class="mb-3">
+                    <label class="fw-bold">Outstanding Balance:</label>
+                    <input type="text" id="display_due_amount" class="form-control" disabled 
+                           style="background-color: #ffebee; color: #d32f2f; font-weight: bold;">
+                </div>
+
+                <div class="mb-3">
+                    <label class="fw-bold">Amount Paying Now: *</label>
+                    <input type="number" id="pay_amount" class="form-control" min="1" placeholder="Enter amount">
+                </div>
+
+                <div class="mb-3">
+                    <label class="fw-bold">Payment Type: *</label>
+                    <select id="pay_method" class="form-select">
+                        <option value="Cash" selected>Cash</option>
+                        <option value="Card">Card</option>
+                        <option value="Online">Online</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" id="btnConfirmPayment">
+                    <i class="bi bi-check-circle"></i> Confirm Payment
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block javascript %}
+<script src="https://cdn.datatables.net/1.10.22/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/responsive/2.2.6/js/dataTables.responsive.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+<script src="{{ url_for('booking.static', filename='js/manage_dues.js') }}"></script>
+{% endblock %}

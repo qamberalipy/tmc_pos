@@ -3,7 +3,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import cast, String
 from app.extensions import db
 from app.models import Expense_head, Branch, User 
-from app.models.expenses import Expenses
+from app.models.expenses import Expenses, PaymentTransaction
 
 ALLOWED_PAYMENT_METHODS = {"Cash", "Card", "Online", "Other"}
 
@@ -25,55 +25,143 @@ def _format_expense(exp, branch_name=None, created_by_name=None, expense_head_na
         "updated_at": exp.updated_at,
     }
 
-# Create
 def create_expense(data):
+    """Creates an expense and an associated 'OUT' payment transaction."""
     try:
-        # Required fields
-        print(datetime.datetime.utcnow())
-        if not data.get("Branch_id"):
-            return {"error": "Branch_id is required"}, 400
-        if not data.get("created_by"):
-            return {"error": "created_by is required"}, 400
-        if not data.get("expense_head_id"):
-            return {"error": "expense_head_id is required"}, 400
-        if data.get("amount") is None:
-            return {"error": "amount is required"}, 400
+        # Required fields validation
+        required_fields = ["Branch_id", "created_by", "expense_head_id", "amount"]
+        if not all(data.get(field) for field in required_fields):
+            return {"error": "Missing required fields: Branch_id, created_by, expense_head_id, amount"}, 400
 
-        # Validate/convert
+        # Validate amount
         try:
-            amount = int(data["amount"])
+            amount = float(data["amount"])
         except (TypeError, ValueError):
-            return {"error": "amount must be an integer"}, 400
-
-        try:
-            expense_head_id = int(data["expense_head_id"])
-        except (TypeError, ValueError):
-            return {"error": "expense_head_id must be an integer"}, 400
+            return {"error": "Amount must be a valid number"}, 400
 
         payment_method = data.get("payment_method", "Cash")
         if payment_method not in ALLOWED_PAYMENT_METHODS:
-            return {"error": f"payment_method must be one of {sorted(ALLOWED_PAYMENT_METHODS)}"}, 400
+            return {"error": f"Invalid payment method. Allowed: {ALLOWED_PAYMENT_METHODS}"}, 400
 
-        exp = Expenses(
-            branch_id=str(data["Branch_id"]),
-            expense_head_id=expense_head_id,
-            amount=amount,
-            description=data.get("description"),
-            is_deleted=False,  # soft-delete default
-            ref_no=data.get("ref_no"),
-            payment_method=payment_method,
-            paid_to=data.get("paid_to"),
-            created_by=str(data["created_by"]),
-            updated_by=str(data.get("created_by"))  # initial updated_by = creator
-        )
-        db.session.add(exp)
+        # Start Atomic Transaction
+        with db.session.begin():
+            # 1. Create the Expense record
+            exp = Expenses(
+                branch_id=int(data["Branch_id"]),
+                expense_head_id=int(data["expense_head_id"]),
+                amount=amount,
+                description=data.get("description"),
+                is_deleted=False,
+                ref_no=data.get("ref_no"),
+                payment_method=payment_method,
+                paid_to=data.get("paid_to"),
+                created_by=int(data["created_by"]),
+                updated_by=int(data.get("created_by"))
+            )
+            db.session.add(exp)
+            db.session.flush() # Generates exp.id for the next step
+
+            # 2. Create the PaymentTransaction record
+            transaction = PaymentTransaction(
+                branch_id=exp.branch_id,
+                expense_id=exp.id,
+                amount=exp.amount,
+                direction="OUT",
+                payment_type=payment_method,
+                transaction_type="Expense",
+                created_by=exp.created_by,
+                payment_date=datetime.datetime.utcnow()
+            )
+            db.session.add(transaction)
+
+        return {"message": "Expense created and transaction recorded successfully", "id": exp.id}, 201
+
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        return {"error": str(e.__dict__.get("orig", e))}, 500
+    except Exception as e:
+        return {"error": str(e)}, 500
+
+
+def update_expense(expense_id, data):
+    """Updates an expense and synchronizes the associated payment transaction."""
+    try:
+        exp = Expenses.query.get(expense_id)
+        if not exp:
+            return {"error": "Expense not found"}, 404
+
+        # Update Descriptive Fields
+        if "description" in data: exp.description = data.get("description")
+        if "ref_no" in data: exp.ref_no = data.get("ref_no")
+        if "paid_to" in data: exp.paid_to = data.get("paid_to")
+        if "updated_by" in data: exp.updated_by = int(data["updated_by"])
+
+        # Update Financial Fields and Sync
+        if "amount" in data:
+            try:
+                exp.amount = float(data["amount"])
+            except (TypeError, ValueError):
+                return {"error": "Amount must be a valid number"}, 400
+
+        if "payment_method" in data:
+            if data["payment_method"] not in ALLOWED_PAYMENT_METHODS:
+                return {"error": "Invalid payment method"}, 400
+            exp.payment_method = data["payment_method"]
+
+        # SYNC with PaymentTransaction
+        trans = PaymentTransaction.query.filter_by(expense_id=expense_id).first()
+        if trans:
+            if "amount" in data: trans.amount = exp.amount
+            if "payment_method" in data: trans.payment_type = exp.payment_method
+            # Sync branch if it was updated
+            if "Branch_id" in data: 
+                exp.branch_id = int(data["Branch_id"])
+                trans.branch_id = exp.branch_id
+
         db.session.commit()
-        return {"message": "Expense created successfully", "id": exp.id}, 201
+        return {"message": "Expense and transaction updated successfully"}, 200
+
     except SQLAlchemyError as e:
         db.session.rollback()
         return {"error": str(e.__dict__.get("orig", e))}, 500
 
-# Get All (joined: Branch name, User name, Expense_head name)
+
+def toggle_expense_deleted(expense_id, is_deleted):
+    """Soft deletes/restores an expense and removes/restores the transaction impact."""
+    try:
+        exp = Expenses.query.get(expense_id)
+        if not exp:
+            return {"error": "Expense not found"}, 404
+
+        exp.is_deleted = bool(is_deleted)
+        
+        # Financial Integrity Sync
+        if exp.is_deleted:
+            # Remove from transaction table so it doesn't affect financial reports
+            PaymentTransaction.query.filter_by(expense_id=expense_id).delete()
+        else:
+            # Re-create transaction if restored
+            restored_trans = PaymentTransaction(
+                branch_id=exp.branch_id,
+                expense_id=exp.id,
+                amount=exp.amount,
+                direction="OUT",
+                payment_type=exp.payment_method,
+                transaction_type="Expense",
+                created_by=exp.updated_by or exp.created_by,
+                payment_date=datetime.datetime.utcnow()
+            )
+            db.session.add(restored_trans)
+        
+        db.session.commit()
+        state = "deleted" if exp.is_deleted else "restored"
+        return {"message": f"Expense {state} successfully"}, 200
+
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        return {"error": str(e.__dict__.get("orig", e))}, 500
+
+
 def get_all_expenses(branch_id_str=None):
     try:
         query = (
@@ -127,68 +215,4 @@ def get_expense_by_id(expense_id):
         e, branch_name, created_by_name, expense_head_name = result
         return _format_expense(e, branch_name, created_by_name, expense_head_name), 200
     except SQLAlchemyError as e:
-        return {"error": str(e.__dict__.get("orig", e))}, 500
-
-# Update (allow updating any field)
-def update_expense(expense_id, data):
-    try:
-        exp = Expenses.query.get(expense_id)
-        if not exp:
-            return {"error": "Expense not found"}, 404
-
-        if "Branch_id" in data and data["Branch_id"] is not None:
-            exp.branch_id = str(data["Branch_id"])
-
-        if "expense_head_id" in data and data["expense_head_id"] is not None:
-            try:
-                exp.expense_head_id = int(data["expense_head_id"])
-            except (TypeError, ValueError):
-                return {"error": "expense_head_id must be an integer"}, 400
-
-        if "amount" in data and data["amount"] is not None:
-            try:
-                exp.amount = int(data["amount"])
-            except (TypeError, ValueError):
-                return {"error": "amount must be an integer"}, 400
-
-        if "description" in data:
-            exp.description = data.get("description")
-
-        if "ref_no" in data:
-            exp.ref_no = data.get("ref_no")
-
-        if "payment_method" in data and data["payment_method"] is not None:
-            if data["payment_method"] not in ALLOWED_PAYMENT_METHODS:
-                return {"error": f"payment_method must be one of {sorted(ALLOWED_PAYMENT_METHODS)}"}, 400
-            exp.payment_method = data["payment_method"]
-
-        if "paid_to" in data:
-            exp.paid_to = data.get("paid_to")
-
-        if "is_deleted" in data:
-            exp.is_deleted = bool(data["is_deleted"])
-
-        if "updated_by" in data and data["updated_by"] is not None:
-            exp.updated_by = str(data["updated_by"])
-
-        db.session.commit()
-        return {"message": "Expense updated successfully"}, 200
-    except SQLAlchemyError as e:
-        db.session.rollback()
-        print({"error": str(e.__dict__.get("orig", e))})
-        return {"error": str(e.__dict__.get("orig", e))}, 500
-
-# Toggle soft delete
-def toggle_expense_deleted(expense_id, is_deleted):
-    try:
-        exp = Expenses.query.get(expense_id)
-        if not exp:
-            return {"error": "Expense not found"}, 404
-
-        exp.is_deleted = bool(is_deleted)
-        db.session.commit()
-        state = "deleted" if exp.is_deleted else "restored"
-        return {"message": f"Expense {state} successfully"}, 200
-    except SQLAlchemyError as e:
-        db.session.rollback()
         return {"error": str(e.__dict__.get("orig", e))}, 500

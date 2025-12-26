@@ -1,5 +1,4 @@
 $(document).ready(function () {
-
     // --- INITIALIZATION ---
     const today = new Date();
     const toDate = today.toISOString().split("T")[0];
@@ -10,31 +9,15 @@ $(document).ready(function () {
     $("#from_date").val(fromDate);
     $("#to_date").val(toDate);
 
-    // Global variable to store selected IDs
     window.selectedBookingIds = new Set();
-
-    // Load Initial Data
     getAllTestBookings();
 
     // --- EVENT LISTENERS ---
+    $("#searchBtn").on("click", function () { getAllTestBookings(); });
 
-    // 1. Search Button
-    $("#searchBtn").on("click", function () {
-        let from_date = $("#from_date").val();
-        let to_date = $("#to_date").val();
-
-        if ((from_date && !to_date) || (!from_date && to_date)) {
-            showToastMessage("error", "Please select both From and To dates.");
-            return;
-        }
-        getAllTestBookings();
-    });
-
-    // 2. Comments Logic
     $("#saveCommentBtn").on("click", function () {
         let bookingId = $(this).data("booking-id");
         let commentText = $("#newComment").val().trim();
-
         if (!commentText) return showToastMessage("error", "Please enter a comment.");
 
         myshowLoader();
@@ -50,16 +33,25 @@ $(document).ready(function () {
             .finally(() => myhideLoader());
     });
 
-    // 3. Films Logic
-    $("#SaveEditfilms").on("click", function () {
+    $("#SaveEditfilms").off("click").on("click", function () {
+        const bookingId = parseInt($("#bookingIdInput").val());
+        const testId = $("#testIdSelect").val();
+        const currentTestFilms = Number($("#currentFilmsInput").val()) || 0;
+        const addedFilms = Number($("#changedFilmsInput").val()) || 0;
+        const filmsUnderTest = currentTestFilms + addedFilms;
+        const totalNewFilmsUsed = Number($("#totalFilmsUsedInput").val());
+
         const payload = {
-            booking_id: parseInt($("#bookingIdInput").val()),
-            new_films_used: Number($("#changedFilmsInput").val()),
+            booking_id: bookingId,
+            test_id: parseInt(testId),
+            films_under_test: filmsUnderTest,
+            total_new_films_used: totalNewFilmsUsed,
             usage_type: $("#causeSelect").val(),
             reason: $("#reasonInput").val().trim()
         };
 
-        if (!payload.new_films_used || payload.new_films_used <= 0) return showToastMessage("error", "Invalid films count.");
+        if (!payload.test_id) return showToastMessage("error", "Please select a test.");
+        if (addedFilms <= 0) return showToastMessage("error", "Please enter a valid number of films.");
         if (!payload.reason) return showToastMessage("error", "Reason is required.");
 
         myshowLoader();
@@ -67,230 +59,142 @@ $(document).ready(function () {
             .then(res => {
                 showToastMessage("success", "Film usage updated!");
                 $("#filmsModal").modal("hide");
-                getAllTestBookings(); // Refresh table to show new values
+                getAllTestBookings();
             })
             .catch(err => handleAxiosError(err))
             .finally(() => myhideLoader());
     });
 
-    // =======================================================
-    // 🔥 BULK ASSIGN LOGIC
-    // =======================================================
-
-    // A. Handle "Select All" Checkbox
-    $("#selectAllBookings").on("change", function() {
+    // --- BULK ASSIGN LOGIC ---
+    $("#selectAllBookings").on("change", function () {
         const isChecked = $(this).is(":checked");
-        
         $(".chk-booking").prop("checked", isChecked);
-        
         if (isChecked) {
-            $(".chk-booking").each(function() {
-                window.selectedBookingIds.add($(this).val());
-            });
+            $(".chk-booking").each(function () { window.selectedBookingIds.add($(this).val()); });
         } else {
             window.selectedBookingIds.clear();
         }
         updateBulkButtonState();
     });
 
-    // B. Handle Individual Row Checkbox (Delegated Event)
-    $("#testReg_table").on("change", ".chk-booking", function() {
+    $("#testReg_table").on("change", ".chk-booking", function () {
         const id = $(this).val();
-        if ($(this).is(":checked")) {
-            window.selectedBookingIds.add(id);
-        } else {
-            window.selectedBookingIds.delete(id);
-            $("#selectAllBookings").prop("checked", false); // Uncheck master if one is unchecked
-        }
+        if ($(this).is(":checked")) { window.selectedBookingIds.add(id); }
+        else { window.selectedBookingIds.delete(id); $("#selectAllBookings").prop("checked", false); }
         updateBulkButtonState();
     });
 
-    // C. Open Assign Modal (Fetch Doctors)
-    $("#btnBulkAssign").on("click", function() {
+    $("#btnBulkAssign").on("click", function () {
         if (window.selectedBookingIds.size === 0) return;
-
-        // Reset Modal State
         $("#modalSelectedCount").text(window.selectedBookingIds.size);
         $("#doctorSelectDropdown").html('<option value="" selected disabled>Loading Doctors...</option>');
         $("#assignDoctorModal").modal("show");
 
-        // Fetch Doctors API
-        // NOTE: Ensure the branch ID (1) is correct or dynamic based on your logic
         axios.get(baseUrl + "/users/get_all_doctors")
             .then(res => {
-                let doctors = res.data;
                 let options = `<option value="" selected disabled>-- Select Doctor --</option>`;
-                
-                doctors.forEach(dr => {
-                    options += `<option value="${dr.id}">${dr.name}</option>`;
-                });
-                
+                res.data.forEach(dr => { options += `<option value="${dr.id}">${dr.name}</option>`; });
                 $("#doctorSelectDropdown").html(options);
             })
-            .catch(err => {
-                $("#doctorSelectDropdown").html('<option disabled>Error loading doctors</option>');
-                handleAxiosError(err);
-            });
+            .catch(err => handleAxiosError(err));
     });
 
-    // D. Confirm Assignment (Submit to Backend)
-    $("#btnConfirmAssignment").on("click", function() {
-    const doctorId = $("#doctorSelectDropdown").val();
-    
-    // 1. Validation
-    if (!doctorId) {
-        showToastMessage("error", "Please select a doctor.");
-        return;
-    }
+    $("#btnConfirmAssignment").on("click", function () {
+        const doctorId = $("#doctorSelectDropdown").val();
+        if (!doctorId) return showToastMessage("error", "Please select a doctor.");
 
-    if (window.selectedBookingIds.size === 0) {
-        showToastMessage("error", "No bookings selected.");
-        return;
-    }
-
-    // 2. Build the detailed payload
-    let bookingDetails = [];
-
-    // Iterate through the Set of selected IDs
-    window.selectedBookingIds.forEach(function(bId) {
-        // Find the checkbox in the DOM with this value
-        let $checkbox = $(`.chk-booking[value="${bId}"]`);
-        
-        // If found (Note: If using pagination, this only finds rows on the current page)
-        if ($checkbox.length > 0) {
-            // Traverse up to the row (tr), then find the hidden span (.test-info-cell)
-            let $row = $checkbox.closest('tr');
-            let $infoSpan = $row.find('.test-info-cell');
-            
-            // Retrieve the data-ids attribute (e.g., "2,5,6")
-            let idsString = $infoSpan.data('ids');
-            
-            // Convert string "2,5,6" -> Array [2, 5, 6]
-            let idsArray = [];
-            if (idsString !== undefined && idsString !== null && idsString !== "") {
-                idsArray = idsString.toString().split(',').map(Number);
+        let bookingDetails = [];
+        window.selectedBookingIds.forEach(function (bId) {
+            let $checkbox = $(`.chk-booking[value="${bId}"]`);
+            if ($checkbox.length > 0) {
+                let idsString = $checkbox.closest('tr').find('.test-info-cell').data('ids');
+                let idsArray = idsString ? idsString.toString().split(',').map(Number) : [];
+                bookingDetails.push({ booking_id: bId, test_ids: idsArray });
             }
+        });
 
-            // Add to our list
-            bookingDetails.push({
-                booking_id: bId,
-                test_ids: idsArray
-            });
-        }
+        myshowLoader();
+        axios.post(baseUrl + "/reports/assign-bookings", { doctor_id: doctorId, bookings: bookingDetails })
+            .then(res => {
+                showToastMessage("success", "Bookings assigned successfully!");
+                $("#assignDoctorModal").modal("hide");
+                window.selectedBookingIds.clear();
+                updateBulkButtonState();
+                $("#selectAllBookings").prop("checked", false);
+                getAllTestBookings();
+            })
+            .catch(err => handleAxiosError(err))
+            .finally(() => myhideLoader());
     });
-
-    const payload = {
-        doctor_id: doctorId,
-        bookings: bookingDetails // This now contains the list of objects
-    };
-
-    // 3. Send to Backend
-    myshowLoader();
-    axios.post(baseUrl + "/reports/assign-bookings", payload) 
-        .then(res => {
-            showToastMessage("success", res.data.message || "Bookings assigned successfully!");
-            $("#assignDoctorModal").modal("hide");
-            
-            // Clear selections and refresh
-            window.selectedBookingIds.clear();
-            updateBulkButtonState();
-            $("#selectAllBookings").prop("checked", false);
-            getAllTestBookings();
-        })
-        .catch(err => {
-            console.error(err);
-            // Handle Axios error (assuming you have a helper or manual check)
-            let msg = err.response && err.response.data ? err.response.data.error : "An error occurred";
-            showToastMessage("error", msg);
-        })
-        .finally(() => myhideLoader());
 });
 
-});
+let grandTotalFilms = 0;
 
-// =======================================================================
-// 🔥 MAIN TABLE FUNCTION
-// =======================================================================
 function getAllTestBookings() {
     myshowLoader();
     const from_date = $("#from_date").val();
     const to_date = $("#to_date").val();
     let url = baseUrl + "/booking/test-booking";
+    if (from_date && to_date) url += `?from_date=${from_date}&to_date=${to_date}`;
 
-    if (from_date && to_date) {
-        url += `?from_date=${from_date}&to_date=${to_date}`;
-    }
-
-    axios.get(url)
-        .then(res => {
-            let data = res.data;
-            console.log("Fetched Bookings:", data);
-            
-            let dtable = $("#testReg_table").DataTable({
-                destroy: true,
-                responsive: true,
-                pageLength: 14,
-                lengthChange: false,
-                ordering: false
-            });
-
-            dtable.clear(); 
-            window.selectedBookingIds.clear(); 
-            updateBulkButtonState();
-
-            let rowsToAdd = [];
-
-            $.each(data, function (i, t) {
-                
-                let hiddenTestIds = (t.test_ids || []).join(',');
-
-        
-                let printBtn = `<a href="${baseUrl}/booking/receipt/${t.booking_id}" target="_blank" class="border btn print-booking"><i class="bi-printer-fill text-success"></i></a>`;
-                let commentBtn = `<button class="border btn comment-booking" data-id="${t.booking_id}"><i class="bi-chat-left-dots-fill text-primary"></i></button>`;
-                
-                // 2. I added data-test-ids to this button too, in case you need them here
-                let filmsBtn = `<button class="border btn edit-films" data-id="${t.booking_id}" data-test-ids="${hiddenTestIds}" data-films="${t.total_films || 0}"><i class="bi-pencil-square text-dark"></i></button>`;
-
-                // Checkbox Column
-                let checkbox = `<div class=""><input type="checkbox" class="chk-booking" value="${t.booking_id}" style="cursor: pointer;"></div>`;
-
-                // 3. Prepare the Test Name Cell with Hidden Data
-                let testNameHtml = `<span class="test-info-cell"  data-booking-id="${t.booking_id}" data-ids="${hiddenTestIds}">
-                                        ${t.test_name || "-"}
-                                    </span>`;
-
-                rowsToAdd.push([
-                    checkbox,
-                    `B#${t.booking_id}`,
-                    t.patient_name || "-",
-                    t.date || "-",
-                    t.referred_dr || "-",
-                    t.mr_no || "-",
-                    testNameHtml, // <--- Using the HTML with hidden data here
-                    t.total_amount || "0",
-                    t.discount || "0",
-                    t.net_amount || "0",
-                    t.received || "0",
-                    t.balance || "0",
-                    `${printBtn} ${commentBtn} ${filmsBtn}`
-                ]);
-            });
-
-            if(rowsToAdd.length > 0) {
-                dtable.rows.add(rowsToAdd);
-            }
-            dtable.draw(false);
-            
-            rebindTableEvents();
-            myhideLoader();
-        })
-        .catch(err => {
-            console.error("Error:", err);
-            myhideLoader();
+    axios.get(url).then(res => {
+        let dtable = $("#testReg_table").DataTable({
+            destroy: true, responsive: true, pageLength: 15, ordering: false, lengthChange: false
         });
+        dtable.clear();
+        window.selectedBookingIds.clear();
+        updateBulkButtonState();
+
+        let rowsToAdd = [];
+        $.each(res.data, function (i, t) {
+            let tests = t.test_booking_details || [];
+            let testIdsStr = tests.map(obj => obj.id).join(",");
+
+            // 1. Tests & Status Rendering
+            let testHtml = `<div class="d-flex flex-column gap-2 py-1">`;
+            tests.forEach(obj => {
+                const isChecked = obj.film_issued ? 'checked' : '';
+                const theme = obj.film_issued ? 'status-issued' : 'status-pending';
+                testHtml += `
+                <div class="test-status-card ${theme} d-flex align-items-center justify-content-between px-2 py-1 rounded-2">
+                    <div class="d-flex flex-column">
+                        <span class="test-title fw-bold text-uppercase">${obj.test_name}</span>
+                        <span class="status-indicator small fw-bold">${obj.film_issued ? 'ISSUED' : 'PENDING'}</span>
+                    </div>
+                    <div class="form-check form-switch m-0">
+                        <input class="form-check-input film-issue-toggle modern-switch" type="checkbox" 
+                            ${isChecked} data-booking-id="${t.booking_id}" data-test-id="${obj.id}">
+                    </div>
+                </div>`;
+            });
+            testHtml += `<div style="display:none;" class="test-info-cell" data-ids="${testIdsStr}"></div></div>`;
+
+            // 2. Action Buttons
+            let actions = `
+            <div class="d-flex gap-1 justify-content-center">
+                <a href="${baseUrl}/booking/receipt/${t.booking_id}" target="_blank" class="btn btn-action text-success shadow-sm"><i class="bi bi-printer"></i></a>
+                <button class="btn btn-action text-primary shadow-sm comment-booking" data-id="${t.booking_id}"><i class="bi bi-chat-left-text"></i></button>
+                <button class="btn btn-action text-dark shadow-sm edit-films" data-id="${t.booking_id}" data-test-ids="${testIdsStr}"><i class="bi bi-plus-square"></i></button>
+            </div>`;
+
+            rowsToAdd.push([
+                `<input type="checkbox" class="chk-booking custom-chk" value="${t.booking_id}">`,
+                `<div><div class="fw-bold">#${t.booking_id}</div><div class="text-muted text-xs">${t.date}</div></div>`,
+                `<div><div class="fw-bold text-primary">${t.patient_name}</div><div class="text-muted text-xs">MR: ${t.mr_no || 'N/A'}</div></div>`,
+                testHtml,
+                `<div class="text-xs fw-medium">${t.referred_dr || 'Self'}</div>`,
+                `<div class="text-end text-muted text-xs">${t.total_amount}</div>`,
+                `<div class="text-end fw-bold">${t.received}</div>`,
+                `<div class="text-end fw-bold ${t.balance > 0 ? 'text-danger' : 'text-success'}">${t.balance}</div>`,
+                actions
+            ]);
+        });
+
+        dtable.rows.add(rowsToAdd).draw(false);
+        rebindTableEvents();
+    }).catch(err => console.error(err)).finally(() => myhideLoader());
 }
 
-// Helper to rebind specific click events inside table
 function rebindTableEvents() {
     $("#testReg_table").off("click", ".comment-booking").on("click", ".comment-booking", function () {
         let bookingId = $(this).data("id");
@@ -300,34 +204,75 @@ function rebindTableEvents() {
     });
 
     $("#testReg_table").off("click", ".edit-films").on("click", ".edit-films", function () {
-        let bookingId = $(this).data("id");
-        let currentFilms = $(this).data("films");
-        $("#currentFilmsInput").val(currentFilms);
-        $("#changedFilmsInput").val("");
-        $("#reasonInput").val("");
+        const bookingId = $(this).data("id");
+        const $testSelect = $("#testIdSelect");
         $("#bookingIdInput").val(bookingId);
-        $("#filmsModal").modal("show");
+        $("#changedFilmsInput, #reasonInput, #currentFilmsInput").val("");
+        $testSelect.html('<option value="">Loading tests...</option>');
+
+        myshowLoader();
+        axios.get(`${baseUrl}/booking/get-films-by-booking/${bookingId}`)
+            .then(res => {
+                grandTotalFilms = Number(res.data.grand_total_films) || 0;
+                $("#totalFilmsUsedInput").val(grandTotalFilms);
+                $testSelect.empty().append('<option value="">-- Select Test --</option>');
+                (res.data.details || []).forEach(item => {
+                    let opt = $('<option>', { value: item.test_id, text: item.test_name }).data('films', item.films_used);
+                    $testSelect.append(opt);
+                });
+                $("#filmsModal").modal("show");
+            })
+            .finally(() => myhideLoader());
     });
 }
+
+// Film Toggle Logic
+$(document).on("change", ".film-issue-toggle", function() {
+    const $toggle = $(this);
+    const $card = $toggle.closest('.test-status-card');
+    const $statusLabel = $card.find('.status-indicator');
+    const bookingId = $toggle.data("booking-id");
+    const testId = $toggle.data("test-id");
+    const isIssued = $toggle.is(":checked");
+
+    if (isIssued) {
+        $card.removeClass('status-pending').addClass('status-issued');
+        $statusLabel.text('ISSUED');
+    } else {
+        $card.removeClass('status-issued').addClass('status-pending');
+        $statusLabel.text('PENDING');
+    }
+    
+    $card.css('opacity', '0.6');
+    axios.post(baseUrl + "/booking/update-film-status", {
+        booking_id: bookingId, test_id: testId, film_issued: isIssued
+    })
+    .then(() => showToastMessage("success", "Film status updated"))
+    .catch(err => {
+        $toggle.prop('checked', !isIssued);
+        handleAxiosError(err);
+    })
+    .finally(() => $card.css('opacity', '1'));
+});
+
+$(document).on("input", "#changedFilmsInput", function () {
+    $("#totalFilmsUsedInput").val(grandTotalFilms + (Number($(this).val()) || 0));
+});
+
+$(document).on("change", "#testIdSelect", function () {
+    $("#currentFilmsInput").val($(this).find(':selected').data('films') || 0);
+});
 
 function updateBulkButtonState() {
     const count = window.selectedBookingIds.size;
     $("#selectedCountBadge").text(count);
-    
-    if (count > 0) {
-        $("#btnBulkAssign").fadeIn();
-    } else {
-        $("#btnBulkAssign").fadeOut();
-    }
+    count > 0 ? $("#btnBulkAssign").fadeIn() : $("#btnBulkAssign").fadeOut();
 }
 
-// Standard Error Helper
 function handleAxiosError(err) {
-    const msg = err.response?.data?.error || err.response?.data?.message || err.message;
-    showToastMessage("error", "Error: " + msg);
+    showToastMessage("error", err.response?.data?.error || err.message);
 }
 
-// Comment Logic (Kept same as yours)
 function fetchComments(bookingId) {
     myshowLoader();
     axios.get(baseUrl + "/booking/comments/" + bookingId)
@@ -340,30 +285,21 @@ function fetchComments(bookingId) {
 }
 
 function loadComments(comments) {
-    let html = "";
-    if (!comments || comments.length === 0) {
-        html = `<div class="text-muted text-center py-2">No comments yet.</div>`;
-    } else {
-        comments.forEach(c => {
-            html += `
-                <div class="timeline-item d-flex">
-                    <div class="timeline-icon">
-                        <span class="rounded-circle bg-success d-inline-flex align-items-center justify-content-center" style="width:28px; height:28px;">
-                            <i class="bi bi-person-fill-check text-white" style="font-size: 14px;"></i>
-                        </span>
-                    </div>
-                    <div class="timeline-content ms-3 flex-grow-1">
-                        <div class="card pb-2 px-3 border-0 shadow-sm bg-light">
-                            <div class="d-flex justify-content-between mt-2">
-                                <strong>${c.user_name} <span class="badge bg-secondary" style="font-size:10px">${c.role}</span></strong>
-                                <small class="text-muted">${c.datetime}</small>
-                            </div>
-                            <div class="mt-1">${c.comment}</div>
+    let html = comments.length ? "" : `<div class="text-muted text-center py-2">No comments yet.</div>`;
+    comments.forEach(c => {
+        html += `
+            <div class="timeline-item d-flex">
+                <div class="timeline-icon"><span class="rounded-circle bg-success d-inline-flex align-items-center justify-content-center" style="width:28px; height:28px;"><i class="bi bi-person-fill-check text-white" style="font-size: 14px;"></i></span></div>
+                <div class="timeline-content ms-3 flex-grow-1">
+                    <div class="card pb-2 px-3 border-0 shadow-sm bg-light">
+                        <div class="d-flex justify-content-between mt-2">
+                            <strong>${c.user_name} <span class="badge bg-secondary" style="font-size:10px">${c.role}</span></strong>
+                            <small class="text-muted">${c.datetime}</small>
                         </div>
+                        <div class="mt-1">${c.comment}</div>
                     </div>
                 </div>
-            `;
-        });
-    }
+            </div>`;
+    });
     $("#commentsHistory").html(html);
 }

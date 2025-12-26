@@ -10,7 +10,10 @@ def view_expenses():
     # Logic to retrieve and display expenses
     return render_template('view_expenses.html')
 
-# EXPENSES CRUD
+@transaction_bp.route("/expenses/view_referral_share")
+@login_required
+def view_referral_share():
+    return render_template("referral_shares.html")
 
 @transaction_bp.route("/expenses", methods=["POST"])
 def create_expense():
@@ -62,3 +65,4 @@ def toggle_expense_deleted(expense_id):
         return jsonify({"error": "is_deleted is required"}), 400
     result, status = transactions_services.toggle_expense_deleted(expense_id, data.get("is_deleted"))
     return jsonify(result), status
+

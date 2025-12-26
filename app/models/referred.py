@@ -25,3 +25,16 @@ class Referred(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     created_by = db.Column(db.Integer)
     updated_by = db.Column(db.Integer)
+
+class ReferralShare(db.Model):
+    __tablename__ = "referral_share"
+
+    id = db.Column(db.Integer, primary_key=True)
+    booking_id = db.Column(db.Integer, nullable=False, index=True) 
+    referred_id = db.Column(db.Integer, nullable=False) 
+    share_amount = db.Column(db.Numeric(10, 2), nullable=False) 
+    is_paid = db.Column(db.Boolean, default=False)
+    paid_at = db.Column(db.DateTime, nullable=True)
+    expense_id = db.Column(db.Integer, nullable=True) 
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_by = db.Column(db.Integer)
