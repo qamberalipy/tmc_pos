@@ -292,7 +292,8 @@ def list_referral_shares():
         "branch_id": session.get('branch_id'), # Enforce session branch
         "referred_id": request.args.get('referred_id'),
         "from_date": request.args.get('from_date'),
-        "to_date": request.args.get('to_date')
+        "to_date": request.args.get('to_date'),
+        "is_paid": request.args.get('is_paid')
     }
     
     response, status = booking_services.get_referral_shares_service(filters)

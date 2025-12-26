@@ -4,40 +4,24 @@ $(document).ready(function () {
     if (typeof window.myhideLoader !== "function") window.myhideLoader = function () {};
     if (typeof window.showToastMessage !== "function") window.showToastMessage = function (t, m) { console.log(t, m); };
     
-    // Ensure baseUrl is defined
-    const baseUrl = window.baseUrl || ""; 
+    const baseUrl = (window.baseUrl || "").replace(/\/$/, ""); 
 
     let referralTable = null;
     let editModal = new bootstrap.Modal(document.getElementById('editAmountModal'));
 
     // --- 1. Initialization ---
     initDates();
-    loadReferrers();
-    loadReferralData(); // Load initial data
+    loadReferrers(); // Now includes Select2 init
+    loadReferralData(); 
 
     // --- 2. Event Listeners ---
     
-    // Quick Range Buttons
-    $(".range-btn").on("click", function () {
-        const range = $(this).data("range");
-        const today = new Date();
-        let fromDate, toDate = formatDate(today);
-        
-        if (range === "today") {
-            fromDate = toDate;
-        } else {
-            let d = new Date();
-            d.setDate(today.getDate() - parseInt(range));
-            fromDate = formatDate(d);
-        }
-        $("#from_date").val(fromDate);
-        $("#to_date").val(toDate);
-        loadReferralData();
-    });
-
-    // Search & Filter
+    // Search Button
     $("#searchBtn").on("click", loadReferralData);
-    $("#referrer_select").on("change", loadReferralData);
+    
+    // Dropdown Changes (Auto-reload optional, usually better to wait for search button in complex filters)
+    // Uncomment if you want auto-search on change:
+    // $("#referrer_select, #status_filter").on("change", loadReferralData);
 
     // Save Edit Amount
     $("#saveAmountBtn").on("click", submitAmountUpdate);
@@ -56,7 +40,7 @@ $(document).ready(function () {
         }
     }
 
-    // Load Dropdown for Doctors
+    // Load Dropdown for Doctors & Init Select2
     function loadReferrers() {
         axios.get(baseUrl + "/registrations/referred/list")
             .then(res => {
@@ -67,6 +51,14 @@ $(document).ready(function () {
                     options += `<option value="${item.id}">${item.name}</option>`;
                 });
                 $("#referrer_select").html(options);
+
+                // Initialize Select2 with Bootstrap styling
+                $("#referrer_select").select2({
+                    placeholder: "-- Search Referrer --",
+                    allowClear: true,
+                    width: '100%',
+                    dropdownParent: $('#referrer_select').parent() // Ensures it renders correctly
+                });
             })
             .catch(err => console.error("Error loading referrers:", err));
     }
@@ -74,15 +66,25 @@ $(document).ready(function () {
     // Main Data Loader
     function loadReferralData() {
         myshowLoader();
+        
+        // Prepare Filters
         const params = {
             from_date: $("#from_date").val(),
             to_date: $("#to_date").val(),
             referred_id: $("#referrer_select").val()
         };
 
+        // Add Status Filter (Paid/Unpaid)
+        const statusVal = $("#status_filter").val();
+        if (statusVal !== "") {
+            // Passing "1" (Paid) or "0" (Unpaid)
+            // Ensure your backend handles '0' string correctly as False/0
+            params.is_paid = statusVal; 
+        }
+
         axios.get(baseUrl + "/booking/referral-shares/list", { params })
             .then((res) => {
-                const rows = (res.data && Array.isArray(res.data)) ? res.data : [];
+                const rows = (res.data && Array.isArray(res.data)) ? res.data : (res.data.data || []); 
                 renderTable(rows);
             })
             .catch((err) => {
@@ -115,7 +117,7 @@ $(document).ready(function () {
                 { 
                     data: null, 
                     render: function(row) {
-                        let tests = row.test_list.join(", ");
+                        let tests = (row.test_list || []).join(", ");
                         return `<div>
                                   <strong>${row.patient_name}</strong><br>
                                   <small class="text-muted">${tests}</small>
@@ -131,8 +133,13 @@ $(document).ready(function () {
                     data: "is_paid",
                     className: "text-center",
                     render: function(data, type, row) {
-                        if(data) return `<span class="badge-paid"><i class="bi bi-check-circle-fill"></i> PAID</span><br><small class="text-muted" style="font-size:10px">${row.paid_at || ''}</small>`;
-                        return `<span class="badge-unpaid">UNPAID</span>`;
+                        if(data) {
+                            return `<div class="d-flex flex-column align-items-center">
+                                        <span class="badge bg-success mb-1 py-1"><i class="bi bi-check-circle-fill"></i> PAID</span>
+                                        <small class="text-muted" style="font-size:11px;">${row.paid_at || ''}</small>
+                                    </div>`;
+                        }
+                        return `<span class="badge bg-warning text-dark">UNPAID</span>`;
                     }
                 },
                 {
@@ -142,78 +149,86 @@ $(document).ready(function () {
                     render: function(data, type, row) {
                         if (row.is_paid) {
                             return `<button class="btn btn-sm btn-outline-danger" onclick="togglePayment(${row.share_id}, true)" title="Reverse Payment">
-                                        <i class="bi bi-arrow-counterclockwise"></i> Reverse
+                                      <i class="bi bi-arrow-counterclockwise"></i> Reverse
                                     </button>`;
                         } else {
                             return `<div class="btn-group btn-group-sm">
                                       <button class="btn btn-success" onclick="togglePayment(${row.share_id}, false)" title="Mark as Paid">
-                                          <i class="bi bi-cash-stack"></i> Pay
+                                        <i class="bi bi-cash-stack"></i> Pay
                                       </button>
                                       <button class="btn btn-outline-primary" onclick="openEditModal(${row.share_id}, ${row.share_amount})" title="Edit Amount">
-                                          <i class="bi bi-pencil"></i>
+                                        <i class="bi bi-pencil"></i>
                                       </button>
                                     </div>`;
                         }
                     }
                 }
             ],
-            // Removed 'B' from dom, removed buttons array
             dom: 'frtip', 
-            language: { emptyTable: "No commissions found for this period" },
-            
-            // Calculate Total in Footer
-            footerCallback: function (row, data, start, end, display) {
-                let api = this.api();
-                let intVal = function (i) {
-                    return typeof i === 'string' ? i.replace(/[\$,]/g, '') * 1 : typeof i === 'number' ? i : 0;
-                };
-
-                let total = api.column(4, { page: 'current' }).data().reduce(function (a, b) {
-                    return intVal(a) + intVal(b);
-                }, 0);
-
-                $(api.column(4).footer()).html(total.toFixed(2));
-            }
+            language: { emptyTable: "No commissions found for this period" }
         });
     }
 
     // --- 4. Action Handlers ---
 
-    // Toggle Payment (Pay or Reverse)
     window.togglePayment = function(shareId, isCurrentlyPaid) {
-        let confirmMsg = isCurrentlyPaid 
-            ? "Are you sure you want to REVERSE this payment? This will delete the expense record." 
-            : "Confirm payment for this referral share? An expense will be created.";
+        let swalOptions = {};
 
-        if(!confirm(confirmMsg)) return;
+        if(isCurrentlyPaid) {
+            swalOptions = {
+                title: "Reverse Payment?",
+                text: "This will mark the commission as UNPAID and remove the expense.",
+                icon: "warning",
+                showCancelButton: true,
+                confirmButtonColor: "#dc3545",
+                cancelButtonColor: "#6c757d",
+                confirmButtonText: "Yes, Reverse it!"
+            };
+        } else {
+            swalOptions = {
+                title: "Confirm Payment?",
+                text: "This will create an expense record and mark as PAID.",
+                icon: "info",
+                showCancelButton: true,
+                confirmButtonColor: "#198754",
+                cancelButtonColor: "#6c757d",
+                confirmButtonText: "Yes, Pay Now"
+            };
+        }
 
+        Swal.fire(swalOptions).then((result) => {
+            if (result.isConfirmed) {
+                performPaymentToggle(shareId);
+            }
+        });
+    };
+
+    function performPaymentToggle(shareId) {
         myshowLoader();
         axios.post(baseUrl + `/booking/referral-shares/${shareId}/toggle-payment`)
             .then(res => {
-                showToastMessage("success", res.data.message);
-                loadReferralData(); // Refresh table
+                showToastMessage("success", res.data.message || "Status updated!");
+                loadReferralData(); 
             })
             .catch(err => {
                 let msg = err.response?.data?.error || "Transaction failed";
                 showToastMessage("error", msg);
             })
             .finally(() => myhideLoader());
-    };
+    }
 
-    // Open Edit Modal
     window.openEditModal = function(shareId, currentAmount) {
         $("#edit_share_id").val(shareId);
         $("#edit_share_amount").val(currentAmount);
         editModal.show();
     };
 
-    // Submit Edit Amount
     function submitAmountUpdate() {
         const id = $("#edit_share_id").val();
         const amount = $("#edit_share_amount").val();
 
         if (amount < 0) {
-            alert("Amount cannot be negative");
+            Swal.fire("Invalid Amount", "Amount cannot be negative", "error");
             return;
         }
 
@@ -223,11 +238,11 @@ $(document).ready(function () {
             .then(res => {
                 showToastMessage("success", "Amount updated");
                 editModal.hide();
-                loadReferralData(); // Refresh table
+                loadReferralData();
             })
             .catch(err => {
                 let msg = err.response?.data?.error || "Update failed";
-                alert(msg);
+                showToastMessage("error", msg);
             })
             .finally(() => {
                 $("#saveAmountBtn").prop("disabled", false);

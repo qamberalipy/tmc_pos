@@ -897,7 +897,7 @@ def update_test_film_status(booking_id, test_id, film_issued):
     
 def get_referral_shares_service(filters):
     try:
-        # 1. Base Query with Joins
+        print("Filters received:", filters)
         query = db.session.query(
             ReferralShare, 
             TestBooking, 
@@ -927,6 +927,9 @@ def get_referral_shares_service(filters):
                 query = query.filter(TestBooking.create_at <= end_of_day)
             except ValueError:
                 query = query.filter(TestBooking.create_at <= filters['to_date'])
+                
+        if filters.get('is_paid') is not None:
+            query = query.filter(ReferralShare.is_paid == filters['is_paid'])
 
         # 4. Execute Query
         results = query.order_by(TestBooking.create_at.desc()).all()
