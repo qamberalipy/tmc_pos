@@ -33,6 +33,7 @@ function getAllTestRegistrations() {
                     t.sample_collection || "-",
                     t.department_id || "-",
                     t.charges || "-",
+                    t.report_charges || "0", // <--- NEW: Report Charges Column
                     t.required_days == "0" ? "Same day" : (t.required_days || "-"),
                     t.sequence_no || "-",
                     t.description || "-",
@@ -54,16 +55,17 @@ function getAllTestRegistrations() {
 // -----------------------------
 $(document).on("click", ".edit-testReg", function () {
     let id = $(this).data("id");
-
+    myshowLoader();
     axios.get(baseUrl + "/registrations/test-registration/" + id)
         .then(res => {
             let t = res.data;
-
+            myhideLoader();
             // Fill modal fields
             $("#test_name").val(t.test_name);
             $("#sample_collection").val(t.sample_collection);
-            $("#department_name").val(t.department_id); // adjust if mapping dept_id to name
+            $("#department_name").val(t.department_id); 
             $("#charge").val(t.charges);
+            $("#report_charges").val(t.report_charges || 0); // <--- NEW: Fill report charges
             $("#required_days").val(t.required_days);
             $("#sequence").val(t.sequence_no);
             $("#no_of_films").val(t.no_of_films);
@@ -75,6 +77,7 @@ $(document).on("click", ".edit-testReg", function () {
             $("#addtestRegModal").modal("show");
         })
         .catch(err => {
+            myhideLoader(); 
             console.error("Error fetching testReg by ID:", err);
             showToastMessage("error", "Failed to fetch test details!");
         });
@@ -84,6 +87,7 @@ $(document).on("click", ".edit-testReg", function () {
 // Update Test Registration
 // -----------------------------
 $(document).on("click", "#update_testReg", function () {
+    myshowLoader();
     let id = $(this).data("id");
 
     let payload = {
@@ -91,6 +95,7 @@ $(document).on("click", "#update_testReg", function () {
         sample_collection: $("#sample_collection").val().trim(),
         department_id: $("#department_name").val(),
         charges: $("#charge").val(),
+        report_charges: $("#report_charges").val(), // <--- NEW: Send updated report charges
         required_days: $("#required_days").val(),
         sequence_no: $("#sequence").val(),
         no_of_films: $("#no_of_films").val(),
@@ -99,11 +104,13 @@ $(document).on("click", "#update_testReg", function () {
 
     axios.put(baseUrl + "/registrations/test-registration/" + id, payload)
         .then(res => {
+            myhideLoader();
             showToastMessage("success", res.data.message || "Test Registration updated!");
             $("#addtestRegModal").modal("hide");
             getAllTestRegistrations();
         })
         .catch(err => {
+            myhideLoader();
             console.error("Error updating test registration:", err);
             showToastMessage("error", "Failed to update Test Registration!");
         });
@@ -115,13 +122,15 @@ $(document).on("click", "#update_testReg", function () {
 $(document).on("change", ".status-toggle", function () {
     let id = $(this).data("id");
     let isActive = $(this).is(":checked");
-
+    myshowLoader();
     axios.patch(baseUrl + "/registrations/test-registration/" + id + "/status", { is_active: isActive })
         .then(res => {
+            myhideLoader();
             showToastMessage("success", res.data.message);
             getAllTestRegistrations();
         })
         .catch(err => {
+            myhideLoader(); 
             console.error("Error toggling status:", err);
             showToastMessage("error", "Failed to update status!");
         });

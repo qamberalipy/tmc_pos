@@ -319,3 +319,20 @@ def update_share_route(share_id):
 
     response, status = booking_services.update_share_amount_service(share_id, new_amount, user_id)
     return jsonify(response), status
+
+@booking_bp.route("/update-share-provider", methods=["POST"])
+@login_required
+def update_share_provider():
+    data = request.get_json()
+    user_id = session.get("user_id")
+    
+    booking_id = data.get("booking_id")
+    new_referred_id = data.get("new_referred_id")
+
+    if not booking_id:
+        return jsonify({"error": "Booking ID is required"}), 400
+
+    result, status = booking_services.update_booking_share_provider(
+        booking_id, new_referred_id, user_id
+    )
+    return jsonify(result), status
