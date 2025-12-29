@@ -1,18 +1,16 @@
 $(document).ready(function () {
-    // Utility functions placeholders (Safety checks)
+    // Utility functions (Mocking your existing utils if not defined globally)
     if (typeof window.myshowLoader !== "function") window.myshowLoader = function () {};
     if (typeof window.myhideLoader !== "function") window.myhideLoader = function () {};
     if (typeof window.showToastMessage !== "function") window.showToastMessage = function (t, m) { console.log(t, m); };
     
-    // Ensure baseUrl is defined (use empty string if relative path)
     const baseUrl = window.baseUrl || ""; 
-
     let reportTable = null;
 
-    // --- 1. Load Doctors Immediately ---
+    // --- 1. Load Doctors ---
     loadDoctors();
 
-    // --- 2. Initialize Dates (Default to current month) ---
+    // --- 2. Initialize Dates ---
     (function initDates() {
         const fromEl = $("#from_date");
         const toEl = $("#to_date");
@@ -25,8 +23,6 @@ $(document).ready(function () {
     })();
 
     // --- 3. Event Listeners ---
-    
-    // Quick Range Buttons
     $(".range-btn").on("click", function () {
         const range = $(this).data("range");
         const today = new Date();
@@ -42,22 +38,14 @@ $(document).ready(function () {
         $("#from_date").val(fromDate);
         $("#to_date").val(toDate);
         
-        // Only load if a doctor is selected
+        // Only load if a doctor is already selected
         if ($("#doctor_select").val()) {
             loadReportData();
         }
     });
 
-    // Search Button
-    $("#searchBtn").on("click", function () {
-        loadReportData();
-    });
-
-    // Auto-load when doctor is changed
-    $("#doctor_select").on("change", function() {
-        loadReportData();
-    });
-
+    $("#searchBtn").on("click", function () { loadReportData(); });
+    $("#doctor_select").on("change", function() { loadReportData(); });
 
     // --- 4. Main Functions ---
 
@@ -65,13 +53,10 @@ $(document).ready(function () {
         axios.get(baseUrl + "/users/get_all_doctors")
             .then(res => {
                 let options = `<option value="" selected disabled>-- Select Doctor --</option>`;
-                // Handle different response structures
                 const doctors = Array.isArray(res.data) ? res.data : (res.data.data || []);
-                
                 doctors.forEach(dr => { 
                     options += `<option value="${dr.id}">${dr.name}</option>`; 
                 });
-                
                 $("#doctor_select").html(options);
             })
             .catch(err => {
@@ -82,8 +67,6 @@ $(document).ready(function () {
 
     function loadReportData() {
         const doctor_id = $("#doctor_select").val(); 
-        
-        // STOP if no doctor selected
         if (!doctor_id) {
             showToastMessage("error", "Please select a Radiologist first.");
             return;
@@ -92,21 +75,17 @@ $(document).ready(function () {
         myshowLoader();
         const from_date = $("#from_date").val();
         const to_date = $("#to_date").val();
-
-        // --- UPDATED URL AS REQUESTED ---
+        // Assuming your route structure matches this
         const url = `/reports/radiologist-logs/${doctor_id}`;
 
         axios.get(url, { params: { start_date: from_date, end_date: to_date } })
             .then((res) => {
-                // FIX: Robust check for data array vs wrapper object
                 let rows = [];
                 if (Array.isArray(res.data)) {
                     rows = res.data;
                 } else if (res.data && Array.isArray(res.data.data)) {
                     rows = res.data.data;
                 }
-                
-                // console.log("Report Data Loaded:", rows); // Debugging
                 buildDynamicTable(rows);
             })
             .catch((err) => {
@@ -120,13 +99,14 @@ $(document).ready(function () {
     }
 
     function buildDynamicTable(data) {
-        // Destroy existing table to reset columns
         if (reportTable) {
             reportTable.destroy();
-            $('#report_table').empty(); 
+            // CRITICAL FIX: Explicitly restore the table structure including tfoot
+            // because DataTables destroys it.
+            $('#report_table').empty().append('<thead></thead><tbody></tbody><tfoot></tfoot>'); 
         }
 
-        // --- Step A: Find Unique Dynamic Columns ---
+        // Identify Dynamic Columns (Test Names)
         let uniqueTests = new Set();
         data.forEach(row => {
             if (row.test_breakdown) {
@@ -135,22 +115,21 @@ $(document).ready(function () {
         });
         const dynamicColumns = Array.from(uniqueTests).sort();
 
-        // --- Step B: Define Columns ---
+        // Define Columns
         let columnsConfig = [
             { title: "S.No", data: "s_no" },
             { title: "Date", data: "date" },
             { title: "Radiologist Name", data: "radiologist_name" }
         ];
 
-        // Add Dynamic Test Columns
+        // Add dynamic columns
         dynamicColumns.forEach(testName => {
             columnsConfig.push({
                 title: testName, 
-                data: null, // Use null so we get the full row object in render
+                data: null, 
                 render: function (data, type, row) {
                     const count = (row.test_breakdown && row.test_breakdown[testName]) 
-                        ? row.test_breakdown[testName] 
-                        : 0;
+                        ? row.test_breakdown[testName] : 0;
                     return count !== 0 ? `<b>${count}</b>` : "0";
                 }
             });
@@ -160,86 +139,97 @@ $(document).ready(function () {
         columnsConfig.push(
             { title: "Total Tests", data: "total_tests", className: "fw-bold text-primary" },
             { title: "Reports Made", data: "reports_made" },
-            { title: "Films Issued", data: "films_issued" }
+            { title: "Films Issued", data: "films_issued" },
+            { 
+                title: "Total Amount", 
+                data: "total_amount", 
+                className: "text-end fw-bold text-success",
+                render: function(data) {
+                    return data 
+                        ? "Rs. " + parseFloat(data).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})
+                        : "Rs. 0.00";
+                }
+            }
         );
 
-        // --- Step C: Initialize DataTable ---
+        // Initialize DataTable
         reportTable = $("#report_table").DataTable({
             data: data,
             columns: columnsConfig,
             responsive: false, 
+            paging: false,     
+            info: false,       
             scrollX: true,     
-            pageLength: 50,    
+            scrollY: "60vh",   
+            scrollCollapse: true,
             dom: 'Bfrtip',
             order: [[1, 'asc']], 
             buttons: [
-                {
-                    extend: 'excelHtml5',
-                    text: '<i class="bi bi-file-earmark-excel"></i> Excel',
-                    className: 'btn btn-success btn-sm',
-                    title: 'Radiologist Performance Report',
-                    exportOptions: { columns: ':visible' }
-                },
-                {
-                    extend: 'pdfHtml5',
-                    text: '<i class="bi bi-file-earmark-pdf"></i> PDF',
-                    className: 'btn btn-danger btn-sm',
-                    orientation: 'landscape',
-                    pageSize: 'A3', 
-                    title: 'Radiologist Performance Report'
-                }
+                { extend: 'excelHtml5', text: '<i class="bi bi-file-earmark-excel"></i> Excel', className: 'btn btn-success btn-sm', footer: true },
+                { extend: 'pdfHtml5', text: '<i class="bi bi-file-earmark-pdf"></i> PDF', className: 'btn btn-danger btn-sm', orientation: 'landscape', pageSize: 'A3', footer: true }
             ],
             language: { emptyTable: "No data available" },
             
-            // --- Step D: Footer Totals (FIXED) ---
-            footerCallback: function (row, data, start, end, display) {
-                let api = this.api();
+            // --- GRAND TOTAL LOGIC ---
+            footerCallback: function (tfootNode, data, start, end, display) {
+                var api = this.api();
                 
-                // Helper to parse numbers
-                let intVal = function (i) {
-                    return typeof i === 'string' ? i.replace(/[\$,]/g, '') * 1 : typeof i === 'number' ? i : 0;
+                // Safe number parser
+                var intVal = function (i) {
+                    if (typeof i === 'string') {
+                        let clean = i.replace(/[^0-9.-]+/g, ""); 
+                        return clean ? parseFloat(clean) : 0;
+                    }
+                    return typeof i === 'number' ? i : 0;
                 };
-        
-                // Create Footer Row if missing
-                if ($('#report_table tfoot').length === 0) {
-                    $('#report_table').append('<tfoot><tr></tr></tfoot>');
-                }
-                let footerRow = $('#report_table tfoot tr');
-                footerRow.empty(); 
-        
-                // Loop through all columns
-                api.columns().every(function (index) {
-                    // FIX: Capture header name HERE so it's available inside reduce
-                    let headerName = this.header().textContent; 
 
-                    if (index === 0) {
-                         footerRow.append(`<th></th>`);
-                    } else if (index === 1) {
-                         footerRow.append(`<th></th>`);
-                    } else if (index === 2) {
-                        footerRow.append(`<th style="text-align:right">Total:</th>`);
-                    } else {
+                // Create the Row
+                var $row = $('<tr class="grand-total-row"></tr>');
+
+                api.columns().every(function (index) {
+                    let headerName = $(this.header()).text().trim();
+
+                    if (index === 0 || index === 1) {
+                        $row.append('<th></th>'); 
+                    } 
+                    else if (index === 2) {
+                        $row.append('<th class="text-end text-uppercase">GRAND TOTAL:</th>');
+                    } 
+                    else {
                         // Calculate Sum
                         let sum = this.data().reduce(function (a, b) {
-                            // If 'b' is an object, it's a dynamic column (data: null)
                             if (typeof b === 'object' && b !== null) {
-                                // We use the captured 'headerName'
+                                // Logic for dynamic columns
                                 let count = (b.test_breakdown && b.test_breakdown[headerName]) ? b.test_breakdown[headerName] : 0;
                                 return intVal(a) + intVal(count);
-                            } 
-                            // If 'b' is a primitive (number/string), it's a standard column (total_tests, etc.)
-                            else {
+                            } else {
+                                // Logic for standard columns
                                 return intVal(a) + intVal(b);
                             }
                         }, 0);
                         
-                        footerRow.append(`<th style="text-align:center">${sum}</th>`);
+                        if (headerName.includes("Total Amount")) {
+                            let money = "Rs. " + sum.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                            $row.append(`<th class="text-end text-success">${money}</th>`);
+                        } else {
+                            $row.append(`<th class="text-center">${sum}</th>`);
+                        }
                     }
                 });
+
+                // 1. Update the Internal (Hidden) Footer
+                $(tfootNode).html($row);
+
+                // 2. CRITICAL FIX: Force Update the Visible Scrolling Footer
+                // DataTables creates a separate DIV for the scroll footer. We must copy our row there.
+                var $scrollFoot = $(api.table().container()).find('.dataTables_scrollFootInner tfoot');
+                if ($scrollFoot.length > 0) {
+                    $scrollFoot.html($row.clone());
+                }
             }
         });
 
-        // Move buttons to custom container
+        // Move buttons to the custom container
         try {
             const btnContainer = reportTable.buttons().container();
             $("#exportButtons").empty().append(btnContainer);
