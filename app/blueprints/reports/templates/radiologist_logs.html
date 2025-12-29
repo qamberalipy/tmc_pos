@@ -71,17 +71,27 @@
       margin-bottom: 1rem;
   }
   
-  /* Table styling to match Excel Image */
+  /* Table styling */
   #report_table th {
       background-color: #f8f9fa;
       vertical-align: middle;
       text-align: center;
       font-weight: 700;
+      white-space: nowrap;
   }
   #report_table td {
       text-align: center;
       vertical-align: middle;
   }
+  
+  /* Align amount column to right */
+  #report_table td.text-end, #report_table th.text-end {
+      text-align: right !important;
+  }
+
+  /* --- GRAND TOTAL ROW STYLING --- */
+  /* This ensures the footer is visible and styled even in scroll mode */
+
 </style>
 {% endblock stylesheets %}
 
@@ -105,11 +115,7 @@
         <div class="d-flex align-items-end gap-2">
             <div class="me-2" style="min-width: 200px;">
                 <label class="form-label small mb-1">Radiologist</label>
-                <select id="doctor_select" class="form-select">
-                    {% for doc in doctors %}
-                        <option value="{{ doc.id }}">{{ doc.name }}</option>
-                    {% endfor %}
-                </select>
+                <select id="doctor_select" class="form-select"></select>
             </div>
 
             <div class="me-2">

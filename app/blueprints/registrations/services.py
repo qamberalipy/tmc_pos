@@ -301,6 +301,7 @@ def _format_test_registration(t, branch_name=None, created_by_name=None):
         "sample_collection": t.sample_collection,
         "department_id": t.department_id,
         "charges": t.charges,
+        "report_charges": t.report_charges,  # <--- Add this
         "required_days": t.required_days,
         "sequence_no": t.sequence_no,
         "no_of_films": t.no_of_films,
@@ -326,6 +327,7 @@ def create_test_registration(data):
             sample_collection=data.get("sample_collection"),
             department_id=data.get("department_id"),
             charges=data["charges"],
+            report_charges=data.get("report_charges", 0.0),  # <--- Add this
             required_days=data["required_days"],
             sequence_no=data["sequence_no"],
             no_of_films=data.get("no_of_films"),
@@ -342,7 +344,7 @@ def create_test_registration(data):
         db.session.rollback()
         print(f"Error creating test registration: {str(e)}")
         return {"error": str(e.__dict__.get("orig", e))}, 500
-
+    
 # 🔹 Get All
 def get_all_test_registrations(branch_id=None):
     try:
@@ -362,6 +364,7 @@ def get_all_test_registrations(branch_id=None):
         return [_format_test_registration(t, branch_name, created_by_name) for t, branch_name, created_by_name in results], 200
 
     except SQLAlchemyError as e:
+        print(f"Error fetching test registrations: {str(e)}")
         return {"error": str(e.__dict__.get("orig", e))}, 500
 
 # 🔹 Get 
@@ -408,15 +411,23 @@ def update_test_registration(test_id, data):
         t = Test_registration.query.get(test_id)
         if not t:
             return {"error": "Test Registration not found"}, 404
-
+        print(f"Updating Test Registration ID {test_id} with data: {data}")
         if data.get("test_name"):
             t.test_name = data["test_name"]
         if "sample_collection" in data:
             t.sample_collection = data["sample_collection"]
         if "department_id" in data:
-            t.department_id = data["department_id"]
+            dept_val = data["department_id"]
+            # Check if it has a real value (not empty string, not None)
+            if dept_val and str(dept_val).strip():
+                t.department_id = int(dept_val)
+            else:
+                # If empty string "", set to None (NULL in database)
+                t.department_id = None
         if "charges" in data:
             t.charges = data["charges"]
+        if "report_charges" in data:           # <--- Add this block
+            t.report_charges = data["report_charges"]
         if "required_days" in data:
             t.required_days = data["required_days"]
         if "sequence_no" in data:
@@ -434,9 +445,9 @@ def update_test_registration(test_id, data):
         return {"message": "Test Registration updated successfully"}, 200
 
     except SQLAlchemyError as e:
+        print(f"Error updating test registration: {str(e)}")
         db.session.rollback()
         return {"error": str(e.__dict__.get("orig", e))}, 500
-
 # 🔹 Toggle Status
 def toggle_test_registration_status(test_id, is_active):
     try:

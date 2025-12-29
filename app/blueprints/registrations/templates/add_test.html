@@ -1,6 +1,5 @@
 {% extends "base.html" %}
 {% block stylesheets %}
-
 <link rel="stylesheet" href="{{ url_for('registrations.static', filename='css/style.css') }}">
 {% endblock stylesheets %}
 
@@ -9,14 +8,12 @@
 {% block user_page %}
 <div class="main-div">
 
-
   <div class="jumbotron jumbotron-fluid rounded bg-white border-0 shadow-sm border-left py-3 px-4">
     <div class="justify-content-between mb-3 row">
       <div class="col-6 col-md-6">
         <h5 class="text-pos">Test Registration</h5>
       </div>
-      <div class="col-6 col-  md-6 text-end">
-      
+      <div class="col-6 col-md-6 text-end">
       </div>
     </div>
     <div class="text-dark">
@@ -33,20 +30,17 @@
               <option value="department1">Department 1</option>
               <option value="department2">Department 2</option>
             </select>
-            <!-- <label class="my-2">Category</label>
-            <select class="form-select" id="category" name="category">
-              <option value="">Select Category</option>
-              <option value="category1">Category 1</option>
-              <option value="category2">Category 2</option>
-            </select> -->
+            
             <label class="my-2">Charge</label>
             <input type="text" class="form-control" id="charge" name="charge">
-                        <label class="my-2">Required Days</label>
+            
+            <label class="my-2">Report Charges</label>
+            <input type="number" class="form-control" id="report_charges" name="report_charges" value="0">
+
+            <label class="my-2">Required Days</label>
             <input type="number" class="form-control" id="required_days" name="required_days">
           </div>
           <div class="col-lg-6 col-md-6 col-sm-12 col-xl-6">
-
-          
 
             <label class="my-2">Sequence No</label>
             <input type="text" class="form-control" id="sequence" name="sequence">
@@ -59,14 +53,10 @@
         <div class="mt-3 w-100 text-end">
           <button type="submit" class="btn w-25 btn-primary">Submit</button>
         </div>
-
-
       </form>
-
     </div>
   </div>
 </div>
-
 {% endblock %}
 
 {% block javascript %}
@@ -74,6 +64,7 @@
   $(document).ready(function () {
     getAllDepartmentsList();
     $("form").on("submit", function (e) {
+
         e.preventDefault();
 
         let payload = {
@@ -81,14 +72,13 @@
             sample_collection: $("#sample_collection").val().trim(),
             department_id: $("#department_name").val() || null,
             charges: $("#charge").val().trim(),
+            report_charges: $("#report_charges").val().trim() || 0, // <--- Add this
             required_days: $("#required_days").val().trim(),
             sequence_no: $("#sequence").val().trim(),
             no_of_films: $("#no_of_films").val().trim(),
             description: $("#description").val().trim()
         };
 
-        // 🔹 Basic 
-        
         if (!payload.test_name) {
             showToastMessage("error", "Test Name is required!");
             return;
@@ -103,15 +93,16 @@
         }
 
         // 🔹 Send API Request
+        myshowLoader();
         axios.post(`${baseUrl}/registrations/test-registration`, payload)
             .then(res => {
+              myhideLoader();
                 let response = res.data;
                 showToastMessage("success", response.message || "Test Registration created successfully!");
-
-                // Reset form
                 $("form")[0].reset();
             })
             .catch(err => {
+              myhideLoader();
                 console.error("Error creating test registration:", err);
                 let msg = err.response?.data?.error || "Failed to create test registration!";
                 showToastMessage("error", msg);
@@ -119,7 +110,7 @@
     });
 });
 
-  function getAllDepartmentsList() {
+function getAllDepartmentsList() {
     return axios.get(baseUrl + '/admin/department/list')
         .then(res => {
             let departments = res.data;
@@ -136,5 +127,4 @@
         });
 }
 </script>
-
 {% endblock %}

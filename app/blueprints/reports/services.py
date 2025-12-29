@@ -582,7 +582,6 @@ def update_doctor_report(report_id, data, user_id):
     }
 
 def get_radiologist_performance_data(doctor_id, start_date_str=None, end_date_str=None):
-    
     from_date = datetime.strptime(start_date_str, "%Y-%m-%d")
     to_date = datetime.strptime(end_date_str, "%Y-%m-%d").replace(hour=23, minute=59, second=59)
 
@@ -591,7 +590,9 @@ def get_radiologist_performance_data(doctor_id, start_date_str=None, end_date_st
         User.name.label('radiologist_name'),
         Test_registration.test_name,
         DoctorReportingdetails.status,
-        TestBookingDetails.no_of_films
+        TestBookingDetails.no_of_films,
+        # --- NEW FIELD: Fetch the charge for this test ---
+        Test_registration.report_charges 
     ).select_from(DoctorReportingdetails)\
     .join(User, cast(User.id, String) == DoctorReportingdetails.doctor_id)\
     .join(Test_registration, Test_registration.id == DoctorReportingdetails.test_id)\
@@ -599,7 +600,6 @@ def get_radiologist_performance_data(doctor_id, start_date_str=None, end_date_st
         (cast(TestBookingDetails.booking_id, String) == DoctorReportingdetails.booking_id) & 
         (TestBookingDetails.test_id == DoctorReportingdetails.test_id)
     ).filter(
-       
         DoctorReportingdetails.doctor_id == str(doctor_id), 
         DoctorReportingdetails.report_at >= from_date,
         DoctorReportingdetails.report_at <= to_date
@@ -615,6 +615,9 @@ def get_radiologist_performance_data(doctor_id, start_date_str=None, end_date_st
         doctor = row.radiologist_name
         test_name = row.test_name
         
+        # Determine price (Default to 0 if null)
+        price = row.report_charges if row.report_charges else 0.0
+
         key = (date_str, doctor)
 
         if key not in grouped_data:
@@ -624,11 +627,16 @@ def get_radiologist_performance_data(doctor_id, start_date_str=None, end_date_st
                 "tests_counts": defaultdict(int),
                 "total_tests": 0,
                 "reports_made": 0,
-                "films_issued": 0
+                "films_issued": 0,
+                "total_revenue": 0.0  # <--- Initialize Total
             }
 
+        # Count the test
         grouped_data[key]["tests_counts"][test_name] += 1
         grouped_data[key]["total_tests"] += 1
+        
+        # Add price to daily total
+        grouped_data[key]["total_revenue"] += price
 
         if row.status == "Reported":
             grouped_data[key]["reports_made"] += 1
@@ -641,6 +649,10 @@ def get_radiologist_performance_data(doctor_id, start_date_str=None, end_date_st
 
     for index, key in enumerate(sorted_keys, 1):
         data = grouped_data[key]
+        
+        # Create a breakdown string with prices if needed, or just counts
+        # Current logic just sends counts: {"MRI": 2, "CT": 1}
+        
         final_report.append({
             "s_no": index,
             "date": data["date"],
@@ -648,7 +660,8 @@ def get_radiologist_performance_data(doctor_id, start_date_str=None, end_date_st
             "test_breakdown": dict(data["tests_counts"]),
             "total_tests": data["total_tests"],
             "reports_made": data["reports_made"],
-            "films_issued": data["films_issued"]
+            "films_issued": data["films_issued"],
+            "total_amount": round(data["total_revenue"], 2) # <--- Final Total
         })
 
     return final_report

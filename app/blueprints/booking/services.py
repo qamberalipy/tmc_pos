@@ -138,6 +138,88 @@ def create_test_booking(data):
     except Exception as e:
         return {"error": str(e)}, 400
 
+def update_booking_share_provider(booking_id, new_referred_id, user_id):
+    try:
+        # 1. Fetch Booking
+        booking = TestBooking.query.get(booking_id)
+        if not booking:
+            return {"error": "Booking not found"}, 404
+
+        # 2. Check if Share is already paid (Safety Check)
+        # If we allow changing this, your Accounts/Expenses will be wrong 
+        # (Expense paid to Person A, but Record shows Person B).
+        existing_share = ReferralShare.query.filter_by(booking_id=booking_id).first()
+        if existing_share and existing_share.is_paid:
+            return {
+                "error": "Cannot change provider: Commission is ALREADY PAID. Please 'Unpay' it in the Referral List first."
+            }, 400
+
+        # 3. Handle 'None' or empty string input
+        new_id = int(new_referred_id) if new_referred_id else None
+        
+        # ---------------------------------------------------------
+        # UPDATE LOGIC: Sync referred_dr, referred_non_dr, and give_share_to
+        # ---------------------------------------------------------
+        if new_id:
+            # Fetch the referred person details to know if they are a Doctor or Not
+            provider = Referred.query.get(new_id)
+            if not provider:
+                return {"error": "Selected provider not found in database"}, 404
+
+            # Update the main share column
+            booking.give_share_to = new_id
+
+            # Sync legacy columns based on is_doctor status
+            if provider.is_doctor:
+                booking.referred_dr = new_id
+                booking.referred_non_dr = None  # Clear the non-doctor field
+            else:
+                booking.referred_non_dr = new_id
+                booking.referred_dr = None      # Clear the doctor field
+        else:
+            # If removing the share, clear ALL related fields
+            booking.give_share_to = None
+            booking.referred_dr = None
+            booking.referred_non_dr = None
+
+        # Metadata updates
+        booking.update_by = user_id
+        booking.update_at = datetime.utcnow()
+        db.session.add(booking)
+
+        # 4. Sync ReferralShare Table
+        if existing_share:
+            if new_id:
+                # Update existing record
+                existing_share.referred_id = new_id
+                db.session.add(existing_share)
+            else:
+                # If removing the referrer, delete the share record
+                db.session.delete(existing_share)
+        
+        elif new_id:
+            # No existing share, but new referrer selected -> Create new Share Record
+            new_share = ReferralShare(
+                booking_id=booking.id,
+                referred_id=new_id,
+                share_amount=0,  # Default to 0, admin updates later
+                is_paid=False,
+                created_by=user_id
+            )
+            db.session.add(new_share)
+
+        db.session.commit()
+        
+        return {
+            "message": "Referral share and booking details updated successfully",
+            "new_provider_id": new_id
+        }, 200
+
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error updating share: {str(e)}")
+        return {"error": str(e)}, 500
+
 def clear_booking_due(booking_id, amount_to_pay, payment_type, user_id):
     try:
         booking = TestBooking.query.get(booking_id)
@@ -693,7 +775,7 @@ def _format_test_booking(row):
         "mr_no": row.mr_no,
         "date": row.create_at.strftime("%Y-%m-%d") if row.create_at else None,
         "referred_dr": row.referred_dr,
-        
+        "give_share_to": row.give_share_to,
         # This contains: [{"id": 12, "test_name": "xyz", "film_issued": False}, ...]
         "test_booking_details": row.test_booking_details, 
         
@@ -749,6 +831,7 @@ def get_all_test_bookings(branch_id=None, from_date=None, to_date=None):
                 TestBooking.update_at,
                 Branch.branch_name.label("branch_name"),
                 User.name.label("created_by_name"),
+                TestBooking.give_share_to,
                 # --- Aggregating Test Details into a JSON List ---
                 func.json_agg(
                     func.json_build_object(

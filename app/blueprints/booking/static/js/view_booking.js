@@ -1,5 +1,7 @@
 $(document).ready(function () {
-    // --- INITIALIZATION ---
+    // ---------------------------------------------------------
+    // 1. INITIALIZATION & SETUP
+    // ---------------------------------------------------------
     const today = new Date();
     const toDate = today.toISOString().split("T")[0];
     const past = new Date();
@@ -10,11 +12,19 @@ $(document).ready(function () {
     $("#to_date").val(toDate);
 
     window.selectedBookingIds = new Set();
-    getAllTestBookings();
 
-    // --- EVENT LISTENERS ---
+    // Load Data
+    getAllTestBookings();
+    loadShareProviders(); // <--- Loads the dropdown list for the modal
+
+    // ---------------------------------------------------------
+    // 2. EVENT LISTENERS (Static Elements)
+    // ---------------------------------------------------------
+
+    // Search Filter
     $("#searchBtn").on("click", function () { getAllTestBookings(); });
 
+    // Save Comment
     $("#saveCommentBtn").on("click", function () {
         let bookingId = $(this).data("booking-id");
         let commentText = $("#newComment").val().trim();
@@ -33,6 +43,7 @@ $(document).ready(function () {
             .finally(() => myhideLoader());
     });
 
+    // Save Film Edit
     $("#SaveEditfilms").off("click").on("click", function () {
         const bookingId = parseInt($("#bookingIdInput").val());
         const testId = $("#testIdSelect").val();
@@ -65,7 +76,38 @@ $(document).ready(function () {
             .finally(() => myhideLoader());
     });
 
-    // --- BULK ASSIGN LOGIC ---
+    // --- NEW: Save Referral Share Update ---
+    $("#btnSaveShareUpdate").on("click", function () {
+        let bookingId = $("#shareUpdateBookingId").val();
+        let newProviderId = $("#shareProviderSelect").val(); // Takes value (ID) or empty string
+
+        if (!bookingId) return;
+
+        let $btn = $(this);
+        let originalText = $btn.text();
+        $btn.prop("disabled", true).text("Updating...");
+
+        axios.post(baseUrl + "/booking/update-share-provider", {
+            booking_id: bookingId,
+            new_referred_id: newProviderId
+        })
+            .then(res => {
+                showToastMessage("success", "Share provider updated successfully!");
+                $("#updateShareModal").modal("hide");
+                getAllTestBookings(); // Refresh table to show changes
+            })
+            .catch(err => {
+                let msg = err.response?.data?.error || "Failed to update share.";
+                showToastMessage("error", msg);
+            })
+            .finally(() => {
+                $btn.prop("disabled", false).text(originalText);
+            });
+    });
+
+    // ---------------------------------------------------------
+    // 3. BULK ASSIGN LOGIC
+    // ---------------------------------------------------------
     $("#selectAllBookings").on("change", function () {
         const isChecked = $(this).is(":checked");
         $(".chk-booking").prop("checked", isChecked);
@@ -130,6 +172,9 @@ $(document).ready(function () {
 
 let grandTotalFilms = 0;
 
+// ---------------------------------------------------------
+// 4. MAIN TABLE RENDERER
+// ---------------------------------------------------------
 function getAllTestBookings() {
     myshowLoader();
     const from_date = $("#from_date").val();
@@ -150,7 +195,7 @@ function getAllTestBookings() {
             let tests = t.test_booking_details || [];
             let testIdsStr = tests.map(obj => obj.id).join(",");
 
-            // 1. Tests & Status Rendering
+            // 1. TESTS & STATUS RENDERING
             let testHtml = `<div class="d-flex flex-column gap-2 py-1">`;
             tests.forEach(obj => {
                 const isChecked = obj.film_issued ? 'checked' : '';
@@ -169,12 +214,25 @@ function getAllTestBookings() {
             });
             testHtml += `<div style="display:none;" class="test-info-cell" data-ids="${testIdsStr}"></div></div>`;
 
-            // 2. Action Buttons
+            // 2. CAPTURE CURRENT SHARE ID (From your updated Python API)
+            // If API returns null/None, this becomes empty string ""
+            let currentShareId = t.give_share_to || "";
+
+            // 3. ACTION BUTTONS
             let actions = `
             <div class="d-flex gap-1 justify-content-center">
-                <a href="${baseUrl}/booking/receipt/${t.booking_id}" target="_blank" class="btn btn-action text-success shadow-sm"><i class="bi bi-printer"></i></a>
-                <button class="btn btn-action text-primary shadow-sm comment-booking" data-id="${t.booking_id}"><i class="bi bi-chat-left-text"></i></button>
-                <button class="btn btn-action text-dark shadow-sm edit-films" data-id="${t.booking_id}" data-test-ids="${testIdsStr}"><i class="bi bi-plus-square"></i></button>
+                <a href="${baseUrl}/booking/receipt/${t.booking_id}" target="_blank" class="btn btn-action text-success shadow-sm" title="Print Receipt"><i class="bi bi-printer"></i></a>
+                
+                <button class="btn btn-action text-primary shadow-sm comment-booking" data-id="${t.booking_id}" title="Comments"><i class="bi bi-chat-left-text"></i></button>
+                
+                <button class="btn btn-action text-dark shadow-sm edit-films" data-id="${t.booking_id}" data-test-ids="${testIdsStr}" title="Edit Films"><i class="bi bi-plus-square"></i></button>
+                
+                <button class="btn btn-action text-warning shadow-sm edit-share" 
+                        data-id="${t.booking_id}" 
+                        data-share="${currentShareId}" 
+                        title="Update Share">
+                        <i class="bi bi-person-gear"></i>
+                </button>
             </div>`;
 
             rowsToAdd.push([
@@ -195,7 +253,11 @@ function getAllTestBookings() {
     }).catch(err => console.error(err)).finally(() => myhideLoader());
 }
 
+// ---------------------------------------------------------
+// 5. TABLE EVENT BINDINGS
+// ---------------------------------------------------------
 function rebindTableEvents() {
+    // Open Comment Modal
     $("#testReg_table").off("click", ".comment-booking").on("click", ".comment-booking", function () {
         let bookingId = $(this).data("id");
         $("#saveCommentBtn").data("booking-id", bookingId);
@@ -203,6 +265,7 @@ function rebindTableEvents() {
         $("#commentsModal").modal("show");
     });
 
+    // Open Film Edit Modal
     $("#testReg_table").off("click", ".edit-films").on("click", ".edit-films", function () {
         const bookingId = $(this).data("id");
         const $testSelect = $("#testIdSelect");
@@ -224,10 +287,64 @@ function rebindTableEvents() {
             })
             .finally(() => myhideLoader());
     });
+
+    // --- NEW: Open Share Update Modal ---
+    // --- Open Share Update Modal ---
+    $("#testReg_table").off("click", ".edit-share").on("click", ".edit-share", function () {
+        let bookingId = $(this).data("id");
+        let currentShare = $(this).data("share");
+
+        $("#shareUpdateBookingId").val(bookingId);
+
+        // CHECK: If 0, null, or empty -> Reset to "" (No Share)
+        if (!currentShare || currentShare == 0 || currentShare == "0") {
+            $("#shareProviderSelect").val("").trigger('change');
+        } else {
+            $("#shareProviderSelect").val(currentShare).trigger('change');
+        }
+
+        $("#updateShareModal").modal("show");
+    });
+}
+
+// ---------------------------------------------------------
+// 6. HELPER FUNCTIONS
+// ---------------------------------------------------------
+
+// --- NEW: Load Share Providers (Doctors/Referrers) ---
+function loadShareProviders() {
+    axios.get(baseUrl + "/registrations/referred/list")
+        .then(res => {
+            let data = res.data || [];
+            let $select = $("#shareProviderSelect");
+            $select.empty().append('<option value="">-- No Share --</option>');
+
+            // Separate logic for Doctors vs Others to group them nicely
+            // Adjust 'd.is_doctor' or 'd.type' based on your exact API response structure
+            let doctors = data.filter(d => d.is_doctor || d.type === true);
+            let others = data.filter(d => !d.is_doctor && d.type !== true);
+
+            if (doctors.length > 0) {
+                let $group = $('<optgroup label="Doctors">');
+                doctors.forEach(d => {
+                    $group.append(`<option value="${d.id}">${d.name}</option>`);
+                });
+                $select.append($group);
+            }
+
+            if (others.length > 0) {
+                let $group = $('<optgroup label="Others">');
+                others.forEach(d => {
+                    $group.append(`<option value="${d.id}">${d.name}</option>`);
+                });
+                $select.append($group);
+            }
+        })
+        .catch(err => console.error("Failed to load providers", err));
 }
 
 // Film Toggle Logic
-$(document).on("change", ".film-issue-toggle", function() {
+$(document).on("change", ".film-issue-toggle", function () {
     const $toggle = $(this);
     const $card = $toggle.closest('.test-status-card');
     const $statusLabel = $card.find('.status-indicator');
@@ -242,17 +359,17 @@ $(document).on("change", ".film-issue-toggle", function() {
         $card.removeClass('status-issued').addClass('status-pending');
         $statusLabel.text('PENDING');
     }
-    
+
     $card.css('opacity', '0.6');
     axios.post(baseUrl + "/booking/update-film-status", {
         booking_id: bookingId, test_id: testId, film_issued: isIssued
     })
-    .then(() => showToastMessage("success", "Film status updated"))
-    .catch(err => {
-        $toggle.prop('checked', !isIssued);
-        handleAxiosError(err);
-    })
-    .finally(() => $card.css('opacity', '1'));
+        .then(() => showToastMessage("success", "Film status updated"))
+        .catch(err => {
+            $toggle.prop('checked', !isIssued);
+            handleAxiosError(err);
+        })
+        .finally(() => $card.css('opacity', '1'));
 });
 
 $(document).on("input", "#changedFilmsInput", function () {

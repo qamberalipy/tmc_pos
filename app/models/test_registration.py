@@ -11,6 +11,8 @@ class Test_registration(db.Model):
 
     department_id = db.Column(db.Integer)
     charges = db.Column(db.Float, nullable=False)
+    report_charges = db.Column(db.Float, default=0.0)
+
     required_days = db.Column(db.String(225), nullable=False)
     sequence_no = db.Column(db.String(225))
     no_of_films = db.Column(db.Integer)
