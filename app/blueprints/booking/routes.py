@@ -336,3 +336,11 @@ def update_share_provider():
         booking_id, new_referred_id, user_id
     )
     return jsonify(result), status
+
+@booking_bp.route("/search-patient", methods=["GET"])
+def search_patient_api():
+    term = request.args.get("term", "").strip()
+    branch_id = session.get("branch_id")
+    
+    result, status = booking_services.search_patient_service(term, branch_id)
+    return jsonify(result), status

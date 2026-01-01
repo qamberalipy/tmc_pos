@@ -31,6 +31,7 @@ $(document).ready(function () {
     $("#net_receivable").on("input", function () {
         handleReceivableChange();
     });
+
     // ============================================
     // Contact No Formatting (03XX XXXXXXX)
     // ============================================
@@ -41,27 +42,16 @@ $(document).ready(function () {
             $(this).val("03");
         }
     });
-    $("#patient_title").on("change", function () {
-        let title = $(this).val();
 
-        if (title === "mr") {
-            $("#gender").val("male");
-        } 
-        else if (["mrs", "ms", "miss"].includes(title)) {
-            $("#gender").val("female");
-        }
-    });
-    // 2. Handle Input Masking
+    // 2. Handle Input Masking (Digits Only, Max 11, Space after 4th)
     $("#contact_no").on("input", function () {
         let val = $(this).val();
 
-        // Remove all non-numeric characters (Allowing only digits)
+        // Remove all non-numeric characters
         val = val.replace(/\D/g, '');
 
         // Ensure it always starts with 03 if there is data
         if (val.length > 0 && !val.startsWith("03")) {
-            // If user types '3' or '0' or any number, force prefix 03
-            // logic: keep the user input but prefix 03 (stripping the first chars if they clash)
              val = "03" + val; 
         }
 
@@ -79,15 +69,141 @@ $(document).ready(function () {
         $(this).val(val);
     });
 
-    // 3. Prevent user from deleting the "03" easily (Optional: keep 03 if they try to empty it completely while typing)
+    // 3. Clean up on blur
     $("#contact_no").on("blur", function () {
-        // If only '03' remains and user leaves, clear it to avoid submitting just "03"
         if ($(this).val() === "03") {
             $(this).val("");
         }
     });
+
     // ============================================
-    // Add Referred Functionality (NEW)
+    // Auto-Select Gender based on Title
+    // ============================================
+    $("#patient_title").on("change", function () {
+        let title = $(this).val();
+
+        if (title === "mr") {
+            $("#gender").val("male");
+        } 
+        else if (["mrs", "ms", "miss"].includes(title)) {
+            $("#gender").val("female");
+        }
+    });
+
+    // ============================================
+    // Find Existing Patient Logic (Search & Fill)
+    // ============================================
+
+    // 1. Open Modal and Focus
+    $("#btn_open_patient_search").on("click", function() {
+        // Clear previous results
+        $("#txt_patient_search").val("");
+        $("#patient_results_table tbody").html('<tr><td colspan="5" class="text-center text-muted">Type something and search...</td></tr>');
+        
+        $("#patientSearchModal").modal("show");
+        setTimeout(() => $("#txt_patient_search").focus(), 500);
+    });
+
+    // 2. Trigger Search on Enter Key
+    $("#txt_patient_search").on("keypress", function(e) {
+        if(e.which === 13) {
+            $("#btn_do_search").click();
+        }
+    });
+
+    // 3. Perform Search API Call
+    $("#btn_do_search").on("click", async function() {
+        let term = $("#txt_patient_search").val().trim();
+        if(term.length < 2) {
+            showToastMessage("error", "Please enter at least 2 characters");
+            return;
+        }
+
+        try {
+            myshowLoader();
+            // Assumes route is exposed at /booking/search-patient
+            let res = await axios.get(baseUrl + "/booking/search-patient", { params: { term: term } });
+            let data = res.data; // Array of patients
+
+            let $tbody = $("#patient_results_table tbody");
+            $tbody.empty();
+
+            if(!data || data.length === 0) {
+                $tbody.append(`<tr><td colspan="5" class="text-center text-danger">No patients found.</td></tr>`);
+            } else {
+                data.forEach(p => {
+                    let pMr = p.mr_no || "-";
+                    let pName = p.patient_name || "-";
+                    let pContact = p.contact_no || "-";
+                    let pInfo = `${p.gender || '-'} / ${p.age || '-'}`;
+                    
+                    // Encode data to pass to button
+                    let patientData = encodeURIComponent(JSON.stringify(p));
+
+                    let row = `
+                        <tr>
+                            <td class="fw-bold">${pMr}</td>
+                            <td>${pName}</td>
+                            <td>${pContact}</td>
+                            <td>${pInfo}</td>
+                            <td>
+                                <button class="btn btn-sm btn-primary select-patient-btn" data-patient="${patientData}">
+                                    Select
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                    $tbody.append(row);
+                });
+            }
+
+        } catch(err) {
+            console.error(err);
+            showToastMessage("error", "Failed to search patient");
+        } finally {
+            myhideLoader();
+        }
+    });
+
+    // 4. Handle "Select" Click
+    $(document).on("click", ".select-patient-btn", function() {
+        let rawData = decodeURIComponent($(this).data("patient"));
+        let p = JSON.parse(rawData);
+
+        // --- Auto Fill Fields ---
+        
+        // 1. MR No
+        $("#mr_ref_no").val(p.mr_no);
+
+        // 2. Name
+        $("#patient_name").val(p.patient_name).removeClass("input-error");
+
+        // 3. Contact (Trigger input event to format)
+        if(p.contact_no) {
+            $("#contact_no").val(p.contact_no).trigger("input").removeClass("input-error");
+        }
+
+        // 4. Gender & Title
+        if(p.gender) {
+            let g = p.gender.toLowerCase();
+            $("#gender").val(g).trigger("change"); 
+            
+            if(g === 'male') $("#patient_title").val("mr");
+            else if(g === 'female') $("#patient_title").val("mrs");
+        }
+
+        // 5. Age
+        if(p.age) {
+            $("#age").val(p.age).removeClass("input-error");
+        }
+
+        // Close Modal & Show Success
+        $("#patientSearchModal").modal("hide");
+        showToastMessage("success", "Patient details auto-filled!");
+    });
+
+    // ============================================
+    // Add Referred Functionality
     // ============================================
 
     // 1. Open Modal for Doctor
@@ -122,7 +238,6 @@ $(document).ready(function () {
         try {
             myshowLoader();
 
-            // Backend requires location & specialization, sending defaults
             let payload = {
                 name: name,
                 is_doctor: isDoctor,
@@ -131,10 +246,8 @@ $(document).ready(function () {
                 contact_no: ""
             };
 
-            // Post to Backend
             let res = await axios.post(baseUrl + "/registrations/referred", payload);
 
-            // Backend returns {message, id} usually
             if (res.status === 201 || res.status === 200) {
                 let newId = res.data.id;
                 let newName = name;
@@ -142,10 +255,7 @@ $(document).ready(function () {
                 showToastMessage("success", "Added successfully!");
                 $("#addReferredModal").modal("hide");
 
-                // Determine which dropdown to update
                 let targetSelect = isDoctor ? "#referred_dr" : "#referred_non_dr";
-
-                // Create new option, add it, and select it
                 let newOption = new Option(newName, newId, true, true);
                 $(targetSelect).append(newOption).trigger('change');
             }
@@ -179,14 +289,13 @@ async function loadDropdowns() {
         myshowLoader();
 
         const [referredRes, testRes] = await Promise.all([
-            axios.get(baseUrl + "/registrations/referred"), // Updated to match Blueprint
+            axios.get(baseUrl + "/registrations/referred"), 
             axios.get(baseUrl + "/registrations/test/list")
         ]);
 
         populateReferredDropdowns(referredRes.data || []);
         populateTestDropdown(testRes.data || []);
 
-        console.log("✅ Dropdowns loaded successfully");
     } catch (err) {
         console.error("❌ Error loading dropdowns:", err);
         showToastMessage("error", "Failed to load dropdown data!");
@@ -196,7 +305,6 @@ async function loadDropdowns() {
 }
 
 function populateReferredDropdowns(data) {
-    // Assuming backend returns is_doctor as boolean or 1/0
     let doctors = data.filter(r => r.is_doctor == true);
     let nonDoctors = data.filter(r => r.is_doctor == false);
 
@@ -240,7 +348,6 @@ async function addTestToState(testId) {
         let existing = bookingState.tests.find(t => t.id == testId);
         if (existing) {
             showToastMessage("warning", `${existing.name} already added!`);
-            return;
         } else {
             let res = await axios.get(baseUrl + "/registrations/test-registration/" + testId);
             let test = res.data;
@@ -399,7 +506,7 @@ $(document).on("click", "#submit_booking", async function () {
 
         myshowLoader();
 
-        let isValid = true; // Flag to track validation
+        let isValid = true; 
 
         // --- 1. Validate Share Logic ---
         let give_share_to = null;
@@ -408,10 +515,8 @@ $(document).on("click", "#submit_booking", async function () {
         if (shareType === "doctor") {
             give_share_to = $("#referred_dr").val();
             if (!give_share_to) {
-                $("#referred_dr").addClass("input-error").focus(); // Highlight & Focus
-                // If using Select2, we might need to highlight its container manually:
+                $("#referred_dr").addClass("input-error").focus();
                 $("#referred_dr").next(".select2-container").find(".select2-selection").addClass("border-danger");
-
                 showToastMessage("error", "Please select a doctor to give share!");
                 myhideLoader();
                 return;
@@ -421,7 +526,6 @@ $(document).on("click", "#submit_booking", async function () {
             if (!give_share_to) {
                 $("#referred_non_dr").addClass("input-error").focus();
                 $("#referred_non_dr").next(".select2-container").find(".select2-selection").addClass("border-danger");
-
                 showToastMessage("error", "Please select a Non-Doctor to give share!");
                 myhideLoader();
                 return;
@@ -430,7 +534,7 @@ $(document).on("click", "#submit_booking", async function () {
 
         // --- 2. Collect Data ---
         const payload = {
-            mr_no: $("#mr_ref_no").val().trim() || null,
+            mr_no: $("#mr_ref_no").val().trim() || null, // Will use auto-gen if null
             patient_name: $("#patient_name").val().trim(),
             gender: $("#gender").val(),
             age: $("#age").val() ? parseInt($("#age").val()) : null,
@@ -460,30 +564,26 @@ $(document).on("click", "#submit_booking", async function () {
 
         // --- 3. Validate Required Fields & Highlight ---
 
-        // Patient Name
         if (!payload.patient_name) {
             $("#patient_name").addClass("input-error");
             isValid = false;
         }
 
-        // Gender (Usually has a default, but good to check)
         if (!payload.gender) {
             $("#gender").addClass("input-error");
             isValid = false;
         }
+        
         if (!payload.age || isNaN(payload.age) || payload.age <= 0) {
             $("#age").addClass("input-error");
             isValid = false;
         }
 
-        // Contact No
         if (!payload.contact_no) {
             $("#contact_no").addClass("input-error");
             isValid = false;
         }
 
-        // Net Receivable (Ensure it's not empty/NaN, though 0 might be allowed depending on business logic)
-        // If 0 is allowed, change check to: isNaN(payload.net_receivable)
         if (payload.net_receivable === "" || isNaN(payload.net_receivable)) {
             $("#net_receivable").addClass("input-error");
             isValid = false;
@@ -492,7 +592,6 @@ $(document).on("click", "#submit_booking", async function () {
         // Stop if validation failed
         if (!isValid) {
             showToastMessage("error", "Please fill all required fields!");
-            // Scroll to the first error
             $('html, body').animate({
                 scrollTop: $(".input-error").first().offset().top - 100
             }, 500);
@@ -502,7 +601,6 @@ $(document).on("click", "#submit_booking", async function () {
         }
 
         // --- 4. POST to API ---
-        // Payload Cleanup before sending
         payload.gender = capitalizeFirstLetter(payload.gender);
 
         const res = await axios.post(baseUrl + "/booking/create/", payload, {
@@ -520,8 +618,6 @@ $(document).on("click", "#submit_booking", async function () {
             $("#print_receipt_btn").attr("href", baseUrl + "/booking/receipt/" + responseData.booking_id);
 
             $("html, body").animate({ scrollTop: 0 }, 500);
-
-            // Clean up Select2 manual borders if any
             $(".select2-selection").removeClass("border-danger");
 
             resetBookingForm();
@@ -547,12 +643,46 @@ function capitalizeFirstLetter(str) {
 }
 
 function resetBookingForm() {
-    $("#mr_ref_no, #patient_name, #age, #contact_no, #discount_value, #net_receivable, #dues").val("");
+    // Clear MR No so backend generates a new one for next patient
+    $("#mr_ref_no").val(""); 
+    
+    $("#patient_name, #age, #contact_no, #discount_value, #net_receivable, #dues").val("");
     $("#gender").val("male");
     $("#discount_type").val("None");
     $("#payment_type").val("Cash");
     $("input[name='shareType'][value='nobody']").prop("checked", true);
 
+    bookingState.tests = [];
+    recalcState();
+    renderBooking();
+}function resetBookingForm() {
+    // 1. Text Fields
+    $("#mr_ref_no").val(""); 
+    $("#patient_name, #age, #contact_no, #discount_value, #net_receivable, #dues, #txt_patient_search").val("");
+    
+    // 2. Standard Dropdowns (Gender, Age Type, Discount, Payment)
+    $("#gender").val("male");
+    $("#patient_title").val("mr"); // Reset Title
+    $("#age_type").val("years");   // Reset Age Type to default
+    $("#discount_type").val("None");
+    $("#payment_type").val("Cash");
+
+    // 3. Referred Dropdowns (Doctor & Non-Doctor)
+    $("#referred_dr").val("").trigger("change");
+    $("#referred_non_dr").val("").trigger("change");
+
+    // 4. Test Select Dropdown (Important for Select2)
+    $("#select_test").val("").trigger("change");
+
+    // 5. Radio Buttons (Share Type)
+    $("input[name='shareType'][value='nobody']").prop("checked", true);
+
+    // 6. Global State Reset
+    $(".input-error").removeClass("input-error"); // Remove any red borders
+    
+    // 7. Reset Totals Display
+    $("#net_amount").val("0"); 
+    
     bookingState.tests = [];
     recalcState();
     renderBooking();

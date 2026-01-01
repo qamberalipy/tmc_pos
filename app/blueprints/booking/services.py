@@ -1,11 +1,11 @@
 import json
 from flask import session
-from sqlalchemy import func, and_, cast, String,case,Date
+from sqlalchemy import func, and_, cast, String,case,Date,or_
 from app.blueprints import booking
 from app.extensions import db
 from app.models import TestBookingDetails,User,Branch,Referred
 from werkzeug.security import generate_password_hash
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import SQLAlchemyError,IntegrityError
 from decimal import Decimal, InvalidOperation
 from datetime import datetime, date, time
 from werkzeug.exceptions import BadRequest
@@ -16,6 +16,7 @@ from app.models.test_registration import Test_registration
 from app.models.expenses import Expenses
 from app.models.referred import ReferralShare
 from app.models.expenses import PaymentTransaction
+
 def to_decimal(value, field_name="Value"):
     if value is None:
         return Decimal("0.00")
@@ -25,21 +26,29 @@ def to_decimal(value, field_name="Value"):
         raise ValueError(f"{field_name} must be a valid number")
 
 def create_test_booking(data):
-    try:
-        # --- Required fields validation ---
-        required = ["patient_name", "gender", "contact_no", "branch_id", "net_receivable", "create_by"]
-        missing = [f for f in required if not data.get(f)]
-        if missing:
-            raise ValueError(f"Missing: {', '.join(missing)}")
+    max_retries = 3
+    attempt = 0
 
-        net_receivable = to_decimal(data["net_receivable"], "net_receivable")
-        discount_value = to_decimal(data.get("discount_value", 0), "discount_value")
-        paid_amount = to_decimal(data.get("paid_amount", 0), "paid_amount")
-        due_amount = to_decimal(data.get("due_amount", 0), "due_amount")
+    while attempt < max_retries:
+        try:
+            # --- 1. Generate MR No ---
+            # If not provided, generate it. 
+            if not data.get("mr_no"):
+                data["mr_no"] = _generate_mr_no()
 
-        # --- Start transaction ---
-        with db.session.begin():
-            # 1. Create booking
+            # --- 2. Required fields validation ---
+            required = ["patient_name", "gender", "contact_no", "branch_id", "net_receivable", "create_by"]
+            missing = [f for f in required if not data.get(f)]
+            if missing:
+                return {"error": f"Missing required fields: {', '.join(missing)}"}, 400
+
+            # Convert decimals once
+            net_receivable = to_decimal(data["net_receivable"], "net_receivable")
+            discount_value = to_decimal(data.get("discount_value", 0), "discount_value")
+            paid_amount = to_decimal(data.get("paid_amount", 0), "paid_amount")
+            due_amount = to_decimal(data.get("due_amount", 0), "due_amount")
+
+            # --- 3. Booking Object Creation ---
             booking = TestBooking(
                 mr_no=data.get("mr_no"),
                 patient_name=data["patient_name"],
@@ -59,12 +68,9 @@ def create_test_booking(data):
                 create_by=data["create_by"]
             )
             db.session.add(booking)
-            db.session.flush()  # Ensures booking.id is available
+            db.session.flush()  # FLUSH to get the ID, but don't commit yet
 
-            # ---------------------------------------------------------
-            # NEW LOGIC: Create the Share Record
-            # We allow 0 amount initially so it can be updated later
-            # ---------------------------------------------------------
+            # --- 4. Share Record ---
             if data.get('referred_dr'):
                 share_amount = to_decimal(data.get('share_amount', 0), "share_amount")
                 new_share = ReferralShare(
@@ -76,7 +82,7 @@ def create_test_booking(data):
                 )
                 db.session.add(new_share)
 
-            # 2. Record Financial Transaction (Initial Payment IN)
+            # --- 5. Financial Transaction ---
             if paid_amount > 0:
                 transaction = PaymentTransaction(
                     branch_id=booking.branch_id,
@@ -90,30 +96,30 @@ def create_test_booking(data):
                 )
                 db.session.add(transaction)
 
-            # 3. Prepare test details
+            # --- 6. Test Details (Bulk Preparation) ---
             test_details_list = data.get('tests', [])
             details = []
-
+            
+            # Pre-fetch reporting dates logic if needed, inside loop is fine for small N
             for idx, test in enumerate(test_details_list, start=1):
                 if not test.get("test_id"):
-                    raise ValueError(f"Test #{idx} missing test_id")
-                
-                amount = to_decimal(test.get("amount"), f"tests[{idx}].amount")
+                    # Rollback immediately if validation fails deep inside
+                    db.session.rollback()
+                    return {"error": f"Test #{idx} missing test_id"}, 400
                 
                 reporting_date = None
                 if test.get("reporting_date"):
                     try:
-                        # Assuming convert_to_utc is imported or handled here
                         val = test["reporting_date"]
                         reporting_date = datetime.strptime(val, "%Y-%m-%d").date() if isinstance(val, str) else val
                     except ValueError:
-                        pass # Handle date parsing strictly if needed
+                        pass 
 
                 details.append(TestBookingDetails(
                     booking_id=booking.id,
                     test_id=test["test_id"],
                     quantity=test.get("quantity", 1),
-                    amount=amount,
+                    amount=to_decimal(test.get("amount"), f"tests[{idx}].amount"),
                     no_of_films=test.get("no_of_films"),
                     required_days=test.get("required_days"),
                     reporting_date=reporting_date,
@@ -121,22 +127,58 @@ def create_test_booking(data):
                 ))
 
             if details:
-                db.session.add_all(details)
+                db.session.add_all(details) # Efficient for this size
             
-            # 4. Handle initial film usage (Mock function call as per previous context)
-            # add_film_usage(...) 
-        
-        return {
-            "message": "Booking created successfully",
-            "booking_id": booking.id,
-            "total_tests": len(test_details_list)
-        }, 201
+            # --- 7. Final Commit ---
+            db.session.commit()
+            
+            return {
+                "message": "Booking created successfully",
+                "booking_id": booking.id,
+                "mr_no": booking.mr_no, # Return MR so frontend can see it
+                "total_tests": len(test_details_list)
+            }, 201
 
-    except SQLAlchemyError as e:
-        db.session.rollback()
-        return {"error": str(e.__dict__.get("orig", e))}, 500
-    except Exception as e:
-        return {"error": str(e)}, 400
+        except IntegrityError:
+            db.session.rollback()
+            # Race Condition detected on MR_NO unique constraint
+            attempt += 1
+            if attempt < max_retries:
+                print(f"MR No collision detected. Retrying... (Attempt {attempt})")
+                data["mr_no"] = None # Reset MR to force regeneration
+                continue # Restart loop
+            else:
+                return {"error": "System busy (MR Generation collision). Please try again."}, 500
+
+        except SQLAlchemyError as e:
+            db.session.rollback()
+            print("Database error:", str(e))
+            return {"error": str(e.__dict__.get("orig", e))}, 500
+        except Exception as e:
+            db.session.rollback()
+            print("General error:", str(e))
+            return {"error": str(e)}, 400
+
+def _generate_mr_no():
+    now = datetime.utcnow()
+    prefix = now.strftime("%y%m") 
+    last_booking = (
+        db.session.query(TestBooking.mr_no) # Fetch ONLY the column we need (Performance)
+        .filter(TestBooking.mr_no.like(f"{prefix}-%"))
+        .order_by(TestBooking.id.desc())
+        .first()
+    )
+
+    if last_booking and last_booking.mr_no:
+        try:
+            last_seq = int(last_booking.mr_no.split("-")[1])
+            new_seq = last_seq + 1
+        except (IndexError, ValueError):
+            new_seq = 1
+    else:
+        new_seq = 1
+
+    return f"{prefix}-{new_seq:04d}"
 
 def update_booking_share_provider(booking_id, new_referred_id, user_id):
     try:
@@ -1136,4 +1178,50 @@ def update_share_amount_service(share_id, new_amount, user_id):
         return {"message": "Amount updated successfully", "new_amount": float(share.share_amount)}, 200
 
     except Exception as e:
+        return {"error": str(e)}, 500
+
+def search_patient_service(term, branch_id):
+    try:
+        if not term:
+            return [], 200
+
+        results = (
+            db.session.query(TestBooking)
+            .filter(TestBooking.branch_id == branch_id)
+            .filter(
+                or_(
+                    TestBooking.mr_no.ilike(f"%{term}%"),
+                    TestBooking.contact_no.ilike(f"%{term}%"),
+                    TestBooking.patient_name.ilike(f"%{term}%") # Added Name search for convenience
+                )
+            )
+            .order_by(TestBooking.create_at.desc())
+            .limit(50) # Limit db fetch
+            .all()
+        )
+
+        # Deduplicate results based on MR No or Contact No (to avoid showing same patient multiple times)
+        unique_patients = []
+        seen_identifiers = set()
+
+        for row in results:
+            # Create a unique key. Prefer MR No, fallback to Contact No
+            identifier = row.mr_no if row.mr_no else row.contact_no
+            
+            if identifier and identifier not in seen_identifiers:
+                seen_identifiers.add(identifier)
+                unique_patients.append({
+                    "mr_no": row.mr_no,
+                    "patient_name": row.patient_name,
+                    "gender": row.gender,
+                    "age": row.age,
+                    "contact_no": row.contact_no,
+                    "last_visit": row.create_at.strftime("%Y-%m-%d") if row.create_at else ""
+                })
+
+        # Return top 10 unique results
+        return unique_patients[:10], 200
+
+    except Exception as e:
+        print(f"Error searching patient: {e}")
         return {"error": str(e)}, 500
