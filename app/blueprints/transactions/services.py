@@ -162,7 +162,7 @@ def toggle_expense_deleted(expense_id, is_deleted):
         return {"error": str(e.__dict__.get("orig", e))}, 500
 
 
-def get_all_expenses(branch_id_str=None):
+def get_all_expenses(branch_id_str=None, from_date=None, to_date=None):
     try:
         query = (
             db.session.query(
@@ -177,11 +177,26 @@ def get_all_expenses(branch_id_str=None):
             .filter(Expenses.is_deleted == False)
         )
 
-        # If branch_id_str comes as string, convert to int
+        # Filter by Branch
         if branch_id_str:
             query = query.filter(Expenses.branch_id == int(branch_id_str))
 
-        results = query.all()
+        # --- NEW: Date Filters ---
+        if from_date:
+            # from_date string 'YYYY-MM-DD' works directly with >= for datetime in most DBs (defaults to 00:00:00)
+            query = query.filter(Expenses.created_at >= from_date)
+
+        if to_date:
+            try:
+                # Convert string 'YYYY-MM-DD' to datetime end-of-day
+                date_obj = datetime.datetime.strptime(to_date, '%Y-%m-%d')
+                end_of_day = date_obj.replace(hour=23, minute=59, second=59)
+                query = query.filter(Expenses.created_at <= end_of_day)
+            except ValueError:
+                # Fallback if format is weird, though frontend sends YYYY-MM-DD
+                query = query.filter(Expenses.created_at <= to_date)
+
+        results = query.order_by(Expenses.created_at.desc()).all()
 
         return [
             _format_expense(e, branch_name, created_by_name, expense_head_name)
@@ -192,7 +207,6 @@ def get_all_expenses(branch_id_str=None):
         db.session.rollback()
         print({"error": str(e.__dict__.get("orig", e))})
         return {"error": str(e.__dict__.get("orig", e))}, 500
-
 # Get One by ID (joined)
 def get_expense_by_id(expense_id):
     try:

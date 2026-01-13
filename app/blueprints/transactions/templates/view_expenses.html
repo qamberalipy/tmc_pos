@@ -5,12 +5,13 @@
 <link rel="stylesheet" href="https://cdn.datatables.net/responsive/2.2.6/css/responsive.dataTables.min.css">
 <link rel="stylesheet" href="https://cdn.datatables.net/select/1.3.1/css/select.dataTables.min.css">
 <link rel="stylesheet" href="https://cdn.datatables.net/buttons/1.6.5/css/buttons.dataTables.min.css">
-<link rel="stylesheet" href="{{ url_for('transactions.static', filename='css/style.css') }}">  <!-- Adjust blueprint if needed -->
+<link rel="stylesheet" href="{{ url_for('transactions.static', filename='css/style.css') }}">
 {% endblock stylesheets %}
 
 {% block user_page %}
 <div class="main-div">
   <div class="jumbotron jumbotron-fluid rounded bg-white border-0 shadow-sm border-left py-3 px-4">
+    
     <div class="row justify-content-between mb-3">
       <div class="col-6">
         <h5 class="text-pos">Expenses</h5>
@@ -18,6 +19,22 @@
       <div class="col-6 text-end">
         <button class="btn btn-primary" id="trigger_add_expense">Add Expense</button>
       </div>
+    </div>
+
+    <div class="row g-2 mb-3 align-items-end">
+        <div class="col-6 col-md-3">
+            <label class="form-label small fw-bold text-muted">From Date</label>
+            <input type="date" id="from_date" class="form-control form-control-sm">
+        </div>
+        <div class="col-6 col-md-3">
+            <label class="form-label small fw-bold text-muted">To Date</label>
+            <input type="date" id="to_date" class="form-control form-control-sm">
+        </div>
+        <div class="col-12 col-md-2">
+            <button class="btn btn-dark btn-sm w-100" onclick="getAllExpenses()">
+                <i class="bi bi-search"></i> Search
+            </button>
+        </div>
     </div>
 
     <div class="text-dark">
@@ -43,7 +60,6 @@
   </div>
 </div>
 
-<!-- Add/Edit Expense Modal -->
 <div class="modal fade" id="expenseModal" tabindex="-1" aria-labelledby="expenseModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
@@ -60,11 +76,7 @@
                 <label for="expense_head_id" class="form-label">Expense Head</label>
                 <select class="form-select" id="expense_head_id" name="expense_head_id" required>
                   <option value="">Select Expense Head</option>
-                  <option value="1">Utilities</option>
-                  <option value="2">Office Supplies</option>
-                  <option value="3">Travel</option>
-                  <!-- Dynamically populate in JS if needed -->
-                </select>
+                  </select>
               </div>
               <div class="mb-2">
                 <label for="amount" class="form-label">Amount</label>
@@ -111,5 +123,5 @@
 <script src="https://cdn.datatables.net/responsive/2.2.6/js/dataTables.responsive.min.js"></script>
 <script src="https://cdn.datatables.net/buttons/1.6.5/js/dataTables.buttons.min.js"></script>
 <script src="https://cdn.datatables.net/select/1.3.1/js/dataTables.select.min.js"></script>
-<script src="{{ url_for('transactions.static', filename='js/expenses.js') }}"></script>  <!-- New JS file -->
+<script src="{{ url_for('transactions.static', filename='js/expenses.js') }}"></script>
 {% endblock %}

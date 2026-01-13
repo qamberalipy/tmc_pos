@@ -1082,6 +1082,7 @@ def get_referral_shares_service(filters):
                 "test_list": test_names,
                 "booking_date": booking.create_at.strftime('%Y-%m-%d'),
                 "created_by": booking.create_by,
+                "booking_amount": float(booking.net_receivable) if booking.net_receivable else 0.0, # Added this line
                 "share_amount": float(share.share_amount),
                 "is_paid": share.is_paid,
                 "paid_at": share.paid_at.strftime('%Y-%m-%d') if share.paid_at else None
@@ -1091,27 +1092,34 @@ def get_referral_shares_service(filters):
 
     except Exception as e:
         return {"error": str(e)}, 500
-    
-def toggle_share_payment_service(share_id, user_id, branch_id):
+
+
+def toggle_share_payment_service(share_id, user_id, branch_id, custom_description=None):
     try:
         share = ReferralShare.query.get(share_id)
-        if not share:
+        if not share:   
             return {"error": "Record not found"}, 404
 
-        # COMMISSIONS_EXPENSE_HEAD_ID should be a constant or fetched config
-        COMMISSION_HEAD_ID = 1  # REPLACE WITH ACTUAL ID
+        COMMISSION_HEAD_ID = 4  # Ensure this ID exists in your DB
 
         if not share.is_paid:
             # --- MARK AS PAID ---
             if share.share_amount <= 0:
                 return {"error": "Cannot pay a share with 0 amount"}, 400
 
-            # 1. Create Expense
+            # Create Description
+            base_desc = f"Ref Share for Booking #{share.booking_id}"
+            if custom_description:
+                final_desc = f"{base_desc} - {custom_description}"
+            else:
+                final_desc = base_desc
+
+            # 1. Create Expense with the Description
             new_expense = Expenses(
                 branch_id=branch_id,
                 expense_head_id=COMMISSION_HEAD_ID,
                 amount=share.share_amount,
-                description=f"Ref Share for Booking #{share.booking_id}",
+                description=final_desc,  # <--- Updated here
                 payment_method="Cash", 
                 created_by=user_id
             )

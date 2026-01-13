@@ -305,7 +305,14 @@ def toggle_payment_route(share_id):
     user_id = session.get('user_id')
     branch_id = session.get('branch_id')
     
-    response, status = booking_services.toggle_share_payment_service(share_id, user_id, branch_id)
+    # Get the optional description from the frontend
+    data = request.get_json() or {}
+    custom_desc = data.get('description') 
+
+    # Pass it to the service
+    response, status = booking_services.toggle_share_payment_service(
+        share_id, user_id, branch_id, custom_desc
+    )
     return jsonify(response), status
 
 @booking_bp.route('/referral-shares/<int:share_id>', methods=['PUT'])
