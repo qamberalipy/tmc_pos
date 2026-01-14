@@ -3,11 +3,12 @@
 // Open modal for adding new Expense
 $(document).on("click", "#trigger_add_expense", function () {
     $("#expense_form")[0].reset();
-    $("#expense_id").val(""); // clear hidden ID
+    $("#expense_id").val(""); 
     $("#expenseModalLabel").text("Add Expense");
     $("#expenseModal").modal("show");
-    $('#payment_method').val('').trigger('change'); // Reset select2
+    $('#payment_method').val('').trigger('change');
 });
+
 function loadExpenseHeads() {
     const $select = $("#expense_head_id");
     $select.html('<option value="">Loading...</option>');
@@ -39,18 +40,25 @@ function loadExpenseHeads() {
         });
 }
 
-
 // Load all Expenses into DataTable
 function getAllExpenses() {
     myshowLoader();
-    return axios.get(`${baseUrl}/transactions/expenses`)
+
+    // --- NEW: Prepare Params ---
+    const params = {
+        from_date: $("#from_date").val(),
+        to_date: $("#to_date").val()
+    };
+
+    return axios.get(`${baseUrl}/transactions/expenses`, { params: params })
         .then(res => {
             let data = res.data;
             let dtable = $("#expense_table").DataTable({
                 pageLength: 14,
                 lengthChange: false,
                 destroy: true,
-                responsive: true
+                responsive: true,
+                order: [[0, "desc"]] // Sort by ID descending by default
             });
             dtable.clear().draw();
             console.log(data);
@@ -103,12 +111,10 @@ $(document).on("click", ".delete-expense", function () {
         confirmButtonText: "Yes, delete it!"
     }).then(result => {
         if (result.isConfirmed) {
-            axios.patch(`${baseUrl}/transactions/expenses/${expId}/deleted`, {
-                is_deleted: true
-            })
+            axios.patch(`${baseUrl}/transactions/expenses/${expId}/deleted`, { is_deleted: true })
             .then(res => {
                 showToastMessage("success", res.data.message || "Expense deleted successfully!");
-                getAllExpenses(); // Refresh table
+                getAllExpenses(); 
             })
             .catch(err => {
                 console.error(err);
@@ -131,22 +137,9 @@ $(document).on("submit", "#expense_form", function (e) {
     let payment_method = $("#payment_method").val();
     let paid_to = $("#paid_to").val().trim();
 
-    // Client-side validation
-    if (!expense_head_id) {
-        myhideLoader();
-        showToastMessage("error", "Expense Head is required!");
-        return;
-    }
-    if (!amount || isNaN(amount) || parseInt(amount) <= 0) {
-        myhideLoader();
-        showToastMessage("error", "Valid Amount is required!");
-        return;
-    }
-    if (!payment_method) {
-        myhideLoader();
-        showToastMessage("error", "Payment Method is required!");
-        return;
-    }
+    if (!expense_head_id) { myhideLoader(); showToastMessage("error", "Expense Head is required!"); return; }
+    if (!amount || isNaN(amount) || parseInt(amount) <= 0) { myhideLoader(); showToastMessage("error", "Valid Amount is required!"); return; }
+    if (!payment_method) { myhideLoader(); showToastMessage("error", "Payment Method is required!"); return; }
 
     let payload = {
         expense_head_id: parseInt(expense_head_id),
@@ -159,21 +152,15 @@ $(document).on("submit", "#expense_form", function (e) {
 
     let request;
     if (expId) {
-        // Update
         request = axios.put(`${baseUrl}/transactions/expenses/${expId}`, payload);
     } else {
-        // Create
         request = axios.post(`${baseUrl}/transactions/expenses`, payload);
     }
 
     request.then(res => {
-        if (res.data.error) {
-            showToastMessage("error", res.data.error);
-            return;
-        }
         showToastMessage("success", res.data.message || "Saved successfully!");
         $("#expenseModal").modal("hide");
-        getAllExpenses(); // Refresh table
+        getAllExpenses(); 
     })
     .catch(err => {
         console.error(err);
@@ -192,16 +179,14 @@ $(document).on("click", ".edit-expense", function () {
     axios.get(`${baseUrl}/transactions/expenses/${expId}`)
         .then(res => {
             const exp = res.data;
-            console.log("Update data",exp);
             $("#expenseModalLabel").text("Edit Expense");
             $("#expense_id").val(exp.id);
-            $("#expense_head_id").val(exp.expense_head_id);  // Assumes ID is in response
+            $("#expense_head_id").val(exp.expense_head_id); 
             $("#amount").val(exp.amount);
             $("#payment_method").val(exp.payment_method);
             $("#ref_no").val(exp.ref_no);
             $("#paid_to").val(exp.paid_to);
             $("#description").val(exp.description);
-
             $("#expenseModal").modal("show");
         })
         .catch(err => {
@@ -213,9 +198,22 @@ $(document).on("click", ".edit-expense", function () {
         });
 });
 
+// --- NEW: Helper to format date YYYY-MM-DD ---
+function getTodayDate() {
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+}
+
 // Load expenses on page ready
 $(document).ready(function () {
+    // 1. Initialize Dates to Today
+    const today = getTodayDate();
+    $("#from_date").val(today);
+    $("#to_date").val(today);
 
-    loadExpenseHeads()
+    loadExpenseHeads();
     getAllExpenses();
 });

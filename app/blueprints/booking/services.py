@@ -313,7 +313,9 @@ def clear_booking_due(booking_id, amount_to_pay, payment_type, user_id):
         print("Error in clear_booking_due:", e)
         return {"error": str(e)}, 500   
      
-def get_dues_list(branch_id, from_date=None, to_date=None):
+# In services.py
+
+def get_dues_list(branch_id, from_date=None, to_date=None, status=None):
     try:
         # 1. Validation and Date Setup
         if not from_date or not to_date:
@@ -335,20 +337,23 @@ def get_dues_list(branch_id, from_date=None, to_date=None):
         if not branch_id:
             return {"error": "branch_id is required"}, 400
 
-        # 2. Query with Date Filter Added
-        bookings = (
-            db.session.query(TestBooking)
-            .filter(
-                TestBooking.branch_id == int(branch_id),
-                TestBooking.due_amount > 0,
-                TestBooking.create_at >= start_dt,  # <--- Filter start
-                TestBooking.create_at <= end_dt     # <--- Filter end
-            )
-            .order_by(TestBooking.create_at.desc())
-            .all()
+        # 2. Base Query
+        query = db.session.query(TestBooking).filter(
+            TestBooking.branch_id == int(branch_id),
+            TestBooking.create_at >= start_dt,
+            TestBooking.create_at <= end_dt
         )
 
-        # 3. Serialize Data
+        # 3. Apply Status Filter
+        # If status is 'all', we skip this block and return everything
+        if status == 'unpaid':
+            query = query.filter(TestBooking.due_amount > 0)
+        elif status == 'paid':
+            query = query.filter(TestBooking.due_amount <= 0)
+
+        bookings = query.order_by(TestBooking.create_at.desc()).all()
+
+        # 4. Serialize Data
         dues_list = []
         total_due_amount = 0
 
@@ -359,12 +364,14 @@ def get_dues_list(branch_id, from_date=None, to_date=None):
                 "patient_name": b.patient_name,
                 "contact_no": b.contact_no,
                 "date": b.create_at.strftime("%Y-%m-%d %I:%M %p") if b.create_at else None,
-                "total_amount": float(b.net_receivable or 0), # Added 'or 0' for safety
+                "total_amount": float(b.net_receivable or 0),
                 "paid_amount": float(b.paid_amount or 0),
                 "due_amount": float(b.due_amount or 0),
                 "created_by": b.create_by
             })
-            total_due_amount += float(b.due_amount or 0)
+            # Only add to total outstanding if it is actually due
+            if b.due_amount and b.due_amount > 0:
+                total_due_amount += float(b.due_amount)
 
         return {
             "dues": dues_list,
@@ -1082,6 +1089,7 @@ def get_referral_shares_service(filters):
                 "test_list": test_names,
                 "booking_date": booking.create_at.strftime('%Y-%m-%d'),
                 "created_by": booking.create_by,
+                "booking_amount": float(booking.net_receivable) if booking.net_receivable else 0.0, # Added this line
                 "share_amount": float(share.share_amount),
                 "is_paid": share.is_paid,
                 "paid_at": share.paid_at.strftime('%Y-%m-%d') if share.paid_at else None
@@ -1091,27 +1099,34 @@ def get_referral_shares_service(filters):
 
     except Exception as e:
         return {"error": str(e)}, 500
-    
-def toggle_share_payment_service(share_id, user_id, branch_id):
+
+
+def toggle_share_payment_service(share_id, user_id, branch_id, custom_description=None):
     try:
         share = ReferralShare.query.get(share_id)
-        if not share:
+        if not share:   
             return {"error": "Record not found"}, 404
 
-        # COMMISSIONS_EXPENSE_HEAD_ID should be a constant or fetched config
-        COMMISSION_HEAD_ID = 1  # REPLACE WITH ACTUAL ID
+        COMMISSION_HEAD_ID = 4  # Ensure this ID exists in your DB
 
         if not share.is_paid:
             # --- MARK AS PAID ---
             if share.share_amount <= 0:
                 return {"error": "Cannot pay a share with 0 amount"}, 400
 
-            # 1. Create Expense
+            # Create Description
+            base_desc = f"Ref Share for Booking #{share.booking_id}"
+            if custom_description:
+                final_desc = f"{base_desc} - {custom_description}"
+            else:
+                final_desc = base_desc
+
+            # 1. Create Expense with the Description
             new_expense = Expenses(
                 branch_id=branch_id,
                 expense_head_id=COMMISSION_HEAD_ID,
                 amount=share.share_amount,
-                description=f"Ref Share for Booking #{share.booking_id}",
+                description=final_desc,  # <--- Updated here
                 payment_method="Cash", 
                 created_by=user_id
             )

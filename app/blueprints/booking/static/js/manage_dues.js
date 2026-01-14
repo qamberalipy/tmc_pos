@@ -19,12 +19,8 @@ $(document).ready(function () {
         submitClearDue();
     });
 
-    // -------------------------------------------------------
-    // 🔥 NEW: Event Delegation for "Clear Due" Button
-    // -------------------------------------------------------
+    // 5. Event Delegation for "Clear Due" Button
     $(document).on("click", ".btn-open-pay", function() {
-        console.log("Clear Due button clicked");
-        // Fetch data from the button's data attributes
         let bookingId = $(this).data("id");
         let dueAmount = $(this).data("due");
 
@@ -40,6 +36,7 @@ function getDuesList() {
 
     let fromDate = $("#from_date").val();
     let toDate = $("#to_date").val();
+    let status = $("#status_filter").val(); // <--- NEW: Get Status Filter
 
     if (!fromDate || !toDate) {
         if (typeof showToastMessage === 'function') showToastMessage("error", "Please select both dates");
@@ -50,6 +47,8 @@ function getDuesList() {
     const params = new URLSearchParams();
     params.append('from_date', fromDate);
     params.append('to_date', toDate);
+    // Only append status if it exists (defaults to 'unpaid' in backend if missing)
+    if (status) params.append('status', status); 
 
     axios.get(`${baseUrl}/booking/dues?` + params.toString())
         .then(res => {
@@ -62,7 +61,7 @@ function getDuesList() {
                 responsive: true,
                 pageLength: 10,
                 ordering: false,
-                language: { emptyTable: "No outstanding dues found for this period." }
+                language: { emptyTable: "No records found for this period." }
             });
 
             dtable.clear();
@@ -83,21 +82,31 @@ function getDuesList() {
                 // C. Financials
                 let totalHtml = parseFloat(item.total_amount).toFixed(2);
                 let paidHtml = parseFloat(item.paid_amount).toFixed(2);
+                let dueVal = parseFloat(item.due_amount);
                 
-                // D. Due Amount
-                let dueHtml = `
-                    <span class="badge badge-due p-2" style="font-size: 0.9rem;">
-                        ${parseFloat(item.due_amount).toFixed(2)}
-                    </span>`;
+                // D. Due Amount Badge (UPDATED LOGIC)
+                let dueHtml = "";
+                if (dueVal > 0.01) { // Tolerance for floating point
+                    dueHtml = `<span class="badge badge-due p-2" style="font-size: 0.9rem;">
+                                ${dueVal.toFixed(2)}
+                               </span>`;
+                } else {
+                    dueHtml = `<span class="badge bg-success p-2">PAID</span>`;
+                }
 
-                // E. Action Button (UPDATED)
-                // Removed 'onclick', Added class 'btn-open-pay' and data attributes
-                let actionBtn = `
-                    <button class="btn btn-sm btn-outline-danger shadow-sm btn-open-pay" 
-                            data-id="${item.booking_id}" 
-                            data-due="${item.due_amount}">
-                        <i class="bi bi-cash-stack"></i> Clear Due
-                    </button>`;
+                // E. Action Button (UPDATED LOGIC)
+                // Only show "Clear Due" button if there is actually a due amount
+                let actionBtn = "";
+                if (dueVal > 0.01) {
+                    actionBtn = `
+                        <button class="btn btn-sm btn-outline-danger shadow-sm btn-open-pay" 
+                                data-id="${item.booking_id}" 
+                                data-due="${item.due_amount}">
+                            <i class="bi bi-cash-stack"></i> Clear Due
+                        </button>`;
+                } else {
+                    actionBtn = `<span class="text-muted small"><i class="bi bi-check-all"></i> Completed</span>`;
+                }
 
                 rowsToAdd.push([
                     bookingIdHtml,
@@ -169,7 +178,7 @@ function submitClearDue() {
         .then(res => {
             if (typeof showToastMessage === 'function') showToastMessage("success", res.data.message);
             $("#clearDueModal").modal("hide");
-            getDuesList();
+            getDuesList(); // Refresh list to update status/amount
         })
         .catch(err => {
             console.error(err);

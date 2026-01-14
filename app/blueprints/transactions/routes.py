@@ -37,7 +37,12 @@ def fetch_expenses():
     branch_id = None if role == "admin" else session.get("branch_id")
     branch_id_str = None if branch_id is None else str(branch_id)
 
-    result, status = transactions_services.get_all_expenses(branch_id_str)
+    # --- NEW: Get Params ---
+    from_date = request.args.get('from_date')
+    to_date = request.args.get('to_date')
+
+    # Pass them to service
+    result, status = transactions_services.get_all_expenses(branch_id_str, from_date, to_date)
     return jsonify(result), status
 
 

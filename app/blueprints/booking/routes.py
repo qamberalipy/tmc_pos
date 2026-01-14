@@ -3,6 +3,7 @@ from . import booking_bp
 from app.blueprints.booking import services as booking_services
 from app.decorators import login_required
 from app.extensions import db
+from datetime import datetime, timedelta
 
 @booking_bp.route('/view/test-booking')
 @login_required
@@ -91,6 +92,15 @@ def get_all_test_bookings():
     branch_id = None if role == "admin" else session.get("branch_id")
     from_date = request.args.get("from_date")
     to_date = request.args.get("to_date")
+    if role != 'admin':
+        # Calculate date 40 days ago
+        limit_date_obj = datetime.utcnow() - timedelta(days=40)
+        limit_date_str = limit_date_obj.strftime('%Y-%m-%d')
+
+        # If User requests a date older than limit, or no date provided, force the limit
+        if not from_date or from_date < limit_date_str:
+            from_date = limit_date_str
+
     result, status = booking_services.get_all_test_bookings(branch_id, from_date, to_date)
     print("All Bookings Data:", result)
     return jsonify(result), status
@@ -120,8 +130,10 @@ def get_branch_dues():
     branch_id = session.get("branch_id")
     to_date = request.args.get("to_date")
     from_date = request.args.get("from_date")
-    result, status = booking_services.get_dues_list(branch_id, from_date, to_date)
-    return jsonify(result), status 
+    status = request.args.get("status", "unpaid") # Default to 'unpaid' if missing
+    
+    result, status_code = booking_services.get_dues_list(branch_id, from_date, to_date, status)
+    return jsonify(result), status_code
 
 @booking_bp.route("/clear-due/<int:booking_id>", methods=["POST"])
 def clear_booking_due_api(booking_id):
@@ -305,7 +317,14 @@ def toggle_payment_route(share_id):
     user_id = session.get('user_id')
     branch_id = session.get('branch_id')
     
-    response, status = booking_services.toggle_share_payment_service(share_id, user_id, branch_id)
+    # Get the optional description from the frontend
+    data = request.get_json() or {}
+    custom_desc = data.get('description') 
+
+    # Pass it to the service
+    response, status = booking_services.toggle_share_payment_service(
+        share_id, user_id, branch_id, custom_desc
+    )
     return jsonify(response), status
 
 @booking_bp.route('/referral-shares/<int:share_id>', methods=['PUT'])

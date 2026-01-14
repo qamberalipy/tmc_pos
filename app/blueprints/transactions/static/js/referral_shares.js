@@ -11,19 +11,11 @@ $(document).ready(function () {
 
     // --- 1. Initialization ---
     initDates();
-    loadReferrers(); // Now includes Select2 init
+    loadReferrers(); 
     loadReferralData(); 
 
     // --- 2. Event Listeners ---
-    
-    // Search Button
     $("#searchBtn").on("click", loadReferralData);
-    
-    // Dropdown Changes (Auto-reload optional, usually better to wait for search button in complex filters)
-    // Uncomment if you want auto-search on change:
-    // $("#referrer_select, #status_filter").on("change", loadReferralData);
-
-    // Save Edit Amount
     $("#saveAmountBtn").on("click", submitAmountUpdate);
 
     // --- 3. Core Functions ---
@@ -40,7 +32,6 @@ $(document).ready(function () {
         }
     }
 
-    // Load Dropdown for Doctors & Init Select2
     function loadReferrers() {
         axios.get(baseUrl + "/registrations/referred/list")
             .then(res => {
@@ -52,33 +43,27 @@ $(document).ready(function () {
                 });
                 $("#referrer_select").html(options);
 
-                // Initialize Select2 with Bootstrap styling
                 $("#referrer_select").select2({
                     placeholder: "-- Search Referrer --",
                     allowClear: true,
                     width: '100%',
-                    dropdownParent: $('#referrer_select').parent() // Ensures it renders correctly
+                    dropdownParent: $('#referrer_select').parent() 
                 });
             })
             .catch(err => console.error("Error loading referrers:", err));
     }
 
-    // Main Data Loader
     function loadReferralData() {
         myshowLoader();
         
-        // Prepare Filters
         const params = {
             from_date: $("#from_date").val(),
             to_date: $("#to_date").val(),
             referred_id: $("#referrer_select").val()
         };
 
-        // Add Status Filter (Paid/Unpaid)
         const statusVal = $("#status_filter").val();
         if (statusVal !== "") {
-            // Passing "1" (Paid) or "0" (Unpaid)
-            // Ensure your backend handles '0' string correctly as False/0
             params.is_paid = statusVal; 
         }
 
@@ -105,7 +90,7 @@ $(document).ready(function () {
             data: data,
             responsive: true,
             autoWidth: false,
-            order: [[0, 'desc']], // Sort by Date Desc
+            order: [[0, 'desc']], 
             columns: [
                 { data: "booking_date", width: "12%" },
                 { 
@@ -123,6 +108,12 @@ $(document).ready(function () {
                                   <small class="text-muted">${tests}</small>
                                 </div>`;
                     }
+                },
+                // --- NEW COLUMN: Total Bill ---
+                { 
+                    data: "booking_amount", 
+                    className: "text-end",
+                    render: function(data) { return parseFloat(data).toFixed(2); }
                 },
                 { 
                     data: "share_amount", 
@@ -172,10 +163,10 @@ $(document).ready(function () {
     // --- 4. Action Handlers ---
 
     window.togglePayment = function(shareId, isCurrentlyPaid) {
-        let swalOptions = {};
-
+        
+        // CASE 1: Reversing Payment (No Note Needed)
         if(isCurrentlyPaid) {
-            swalOptions = {
+            Swal.fire({
                 title: "Reverse Payment?",
                 text: "This will mark the commission as UNPAID and remove the expense.",
                 icon: "warning",
@@ -183,29 +174,38 @@ $(document).ready(function () {
                 confirmButtonColor: "#dc3545",
                 cancelButtonColor: "#6c757d",
                 confirmButtonText: "Yes, Reverse it!"
-            };
-        } else {
-            swalOptions = {
-                title: "Confirm Payment?",
-                text: "This will create an expense record and mark as PAID.",
-                icon: "info",
-                showCancelButton: true,
-                confirmButtonColor: "#198754",
-                cancelButtonColor: "#6c757d",
-                confirmButtonText: "Yes, Pay Now"
-            };
-        }
-
-        Swal.fire(swalOptions).then((result) => {
-            if (result.isConfirmed) {
-                performPaymentToggle(shareId);
-            }
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    performPaymentToggle(shareId, null);
+                }
+            });
+            return;
+        } 
+        
+        // CASE 2: Making Payment (Ask for Note)
+        Swal.fire({
+            title: "Confirm Payment",
+            text: "Add a note for this expense (optional):",
+            input: 'text',
+            inputPlaceholder: "e.g. Paid via Check / Paid to Assistant",
+            showCancelButton: true,
+            confirmButtonText: "Pay Now",
+            confirmButtonColor: "#198754",
+            showLoaderOnConfirm: true,
+            preConfirm: (note) => {
+                return performPaymentToggle(shareId, note);
+            },
+            allowOutsideClick: () => !Swal.isLoading()
         });
     };
 
-    function performPaymentToggle(shareId) {
-        myshowLoader();
-        axios.post(baseUrl + `/booking/referral-shares/${shareId}/toggle-payment`)
+    function performPaymentToggle(shareId, note) {
+        // Prepare Payload
+        const payload = {};
+        if (note) payload.description = note;
+
+        // If triggered by Swal preConfirm, axios returns a promise that Swal waits for
+        return axios.post(baseUrl + `/booking/referral-shares/${shareId}/toggle-payment`, payload)
             .then(res => {
                 showToastMessage("success", res.data.message || "Status updated!");
                 loadReferralData(); 
@@ -213,8 +213,9 @@ $(document).ready(function () {
             .catch(err => {
                 let msg = err.response?.data?.error || "Transaction failed";
                 showToastMessage("error", msg);
-            })
-            .finally(() => myhideLoader());
+                // If inside Swal, this helps show the error
+                Swal.showValidationMessage(`Request failed: ${msg}`);
+            });
     }
 
     window.openEditModal = function(shareId, currentAmount) {
