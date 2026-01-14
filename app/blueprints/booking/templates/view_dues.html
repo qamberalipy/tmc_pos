@@ -34,7 +34,16 @@
             </div>
         </div>
 
-        <div class="row g-3 mb-4 align-items-end">
+       <div class="row g-3 mb-4 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label fw-semibold">Status</label>
+                <select class="form-select shadow-sm" id="status_filter">
+                    <option value="unpaid" selected>Unpaid / Due</option>
+                    <option value="paid">Fully Paid</option>
+                    <option value="all">All Records</option>
+                </select>
+            </div>
+
             <div class="col-md-3">
                 <label class="form-label fw-semibold">From Date</label>
                 <input type="date" class="form-control shadow-sm" id="from_date">

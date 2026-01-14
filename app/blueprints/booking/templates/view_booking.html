@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+
 {% block stylesheets %}
 <link rel="stylesheet" href="https://cdn.datatables.net/1.10.22/css/jquery.dataTables.min.css">
 <link rel="stylesheet" href="https://cdn.datatables.net/responsive/2.2.6/css/responsive.dataTables.min.css">
@@ -25,6 +26,14 @@
 
     /* Financial Highlight */
     .col-finance { background-color: #f8fafc; border-left: 1px solid #e2e8f0; }
+    
+    /* NEW: Due Column Highlight */
+    .col-due {
+        background-color: #fff5f5; /* Light red tint for visibility */
+        border-left: 1px solid #fed7d7;
+        font-weight: bold;
+    }
+
     .text-xs { font-size: 0.75rem; }
     
     .modern-switch {
@@ -91,7 +100,7 @@
                         <th>Referral</th>
                         <th class="text-end col-finance">Total</th>
                         <th class="text-end col-finance">Paid</th>
-                        <th class="text-end col-finance" style="border-right: 1px solid #e2e8f0;">Balance</th>
+                        <th class="text-end col-due" style="border-right: 1px solid #e2e8f0;">Due</th>
                         <th class="text-center">Action</th>
                     </tr>
                 </thead>
@@ -110,6 +119,11 @@
             </div>
             <div class="modal-body">
                 <p class="text-muted mb-3">You are assigning <strong id="modalSelectedCount">0</strong> booking(s) to a doctor.</p>
+                
+                <div class="alert alert-warning small">
+                    <i class="bi bi-exclamation-triangle me-1"></i> Only <b>ISSUED</b> tests will be sent.
+                </div>
+
                 <div class="form-group">
                     <label class="fw-bold mb-2">Select Doctor *</label>
                     <select id="doctorSelectDropdown" class="form-control form-select">
@@ -190,6 +204,7 @@
         </div>
     </div>
 </div>
+
 <div class="modal fade" id="updateShareModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">

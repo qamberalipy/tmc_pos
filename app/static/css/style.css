@@ -8,7 +8,6 @@
   --bs-primary: #021a71!important;
 }
 
-
 body {
   font-family: "Roboto", sans-serif !important;
   background: #f1f1f1 !important;
@@ -98,13 +97,8 @@ hr {
 }
 
 @keyframes animate-loader {
-  0% {
-    transform: rotate(0deg);
-  }
-
-  100% {
-    transform: rotate(360deg);
-  }
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
 /*--------------------------------------------------------------
@@ -176,7 +170,7 @@ hr {
 .dropdown-menu .dropdown-item {
   font-size: 14px;
   padding: 10px 15px;
-  transition: 0.3s;
+  transition: 0.3s ease-in-out;
 }
 
 .dropdown-menu .dropdown-item i {
@@ -205,31 +199,13 @@ hr {
 }
 
 @-webkit-keyframes dropdown-animate {
-  0% {
-    opacity: 0;
-  }
-
-  100% {
-    opacity: 1;
-  }
-
-  0% {
-    opacity: 0;
-  }
+  0% { opacity: 0; }
+  100% { opacity: 1; }
 }
 
 @keyframes dropdown-animate {
-  0% {
-    opacity: 0;
-  }
-
-  100% {
-    opacity: 1;
-  }
-
-  0% {
-    opacity: 0;
-  }
+  0% { opacity: 0; }
+  100% { opacity: 1; }
 }
 
 .btn-primary,
@@ -263,14 +239,13 @@ hr {
   header .logo {
     display: none !important;
   }
-
   .header .toggle-sidebar-btn {
     padding-left: 0px;
   }
 }
 
 .header {
-  transition: all 0.5s;
+  transition: all 0.5s ease;
   z-index: 997;
   height: 60px;
   box-shadow: 0 0 0.1rem 0.1rem rgba(161, 157, 184, 0.3);
@@ -286,8 +261,8 @@ hr {
 }
 
 /*--------------------------------------------------------------
-  # Header Nav
-  --------------------------------------------------------------*/
+# Header Nav
+--------------------------------------------------------------*/
 .header-nav ul {
   list-style: none;
 }
@@ -349,27 +324,27 @@ hr {
 }
 
 /*--------------------------------------------------------------
-  # Sidebar
-  --------------------------------------------------------------*/
+# Sidebar (Redesigned)
+--------------------------------------------------------------*/
 .sidebar {
   position: fixed;
   top: 60px;
   left: 0;
   bottom: 0;
-  width: 300px;
+  width: 280px; /* Slightly narrower for modern look */
   z-index: 996;
-  transition: all 0.3s;
-  padding: 20px;
+  transition: all 0.3s ease;
+  padding: 20px 15px; /* More breathing room */
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: #aab7cf transparent;
-  box-shadow: 0 0 0.1rem 0.1rem rgba(161, 157, 184, 0.3);
-  background-color: #fff;
+  box-shadow: 0 0 15px rgba(0, 0, 0, 0.05);
+  background-color: #ffffff;
 }
 
 @media (max-width: 1199px) {
   .sidebar {
-    left: -300px;
+    left: -280px;
   }
 }
 
@@ -384,10 +359,8 @@ hr {
 }
 
 @media (min-width: 1200px) {
-
-  #main,
-  #footer {
-    margin-left: 300px;
+  #main, #footer {
+    margin-left: 280px;
   }
 }
 
@@ -398,83 +371,155 @@ hr {
 }
 
 @media (min-width: 1200px) {
-
   .toggle-sidebar #main,
   .toggle-sidebar #footer {
     margin-left: 0;
   }
-
   .toggle-sidebar .sidebar {
-    left: -300px;
+    left: -280px;
   }
 }
 
+/* Sidebar Navigation Items */
 .sidebar-nav {
   padding: 0;
   margin: 0;
   list-style: none;
 }
 
-.sidebar-nav hr {
-  margin: 10px;
-}
-
-.sidebar-nav li {
+.sidebar-nav .nav-heading {
+  font-size: 11px;
+  text-transform: uppercase;
+  color: #899bbd;
+  font-weight: 600;
+  margin: 15px 0 5px 10px; /* Aligned with text */
+  letter-spacing: 0.5px;
+  background: transparent;
   padding: 0;
-  margin: 0;
-  list-style: none;
 }
 
 .sidebar-nav .nav-item {
   margin-bottom: 5px;
 }
 
-.sidebar-nav .nav-heading {
-  font-size: 12px;
-  text-transform: uppercase;
-  color: dimgray;
-  padding: 15px 0 10px 15px;
-  margin: 15px 0px;
-  font-weight: 500;
-  background: #f5f5f5d4;
-}
-
+/* Base Nav Link Style */
 .sidebar-nav .nav-link {
   display: flex;
   align-items: center;
-  letter-spacing: 0.2px;
   font-size: 14px;
-  color: #899bbd;
-  border-left: none;
-  background: #fff;
-  transition: 0.3;
-  padding: 10px 15px;
-  border-radius: 4px;
+  font-weight: 500;
+  color: #555;     /* Neutral default text */
+  transition: 0.3s ease;
+  background: #fff; /* Default background */
+  padding: 12px 15px;
+  border-radius: 8px; /* Rounded corners (Pill shape) */
+  border: 1px solid transparent; 
+  margin-bottom: 4px;
 }
 
 .sidebar-nav .nav-link i {
-  font-size: 16px;
-  margin-right: 10px;
-  color: #899bbd;
+  font-size: 18px;
+  margin-right: 12px;
+  color: #798eb3; /* Neutral Icon Color */
+  transition: 0.3s ease;
 }
 
+/* Default Hover/Active (Admin/Registration) - Theme Blue */
+.sidebar-nav .nav-link:hover,
 .sidebar-nav .nav-link.active {
+  background-color: #f0f4fc; /* Light Blue BG */
   color: var(--bs-primary);
-  border: 2px solid var(--bs-primary);
+  /* font-weight: 600; */
 }
 
+.sidebar-nav .nav-link:hover i,
 .sidebar-nav .nav-link.active i {
   color: var(--bs-primary);
 }
 
-.sidebar-nav .nav-link:hover {
-  color: var(--bs-primary);
-  background: #f6f9ff;
+/* ================================================== */
+/* 🔥 SIDEBAR COLOR PSYCHOLOGY (Backgrounds) 🔥      */
+/* ================================================== */
+
+/* 1. BOOKING GROUP - Emerald Green (Growth, Money, Action) */
+.nav-group-booking .nav-link i {
+    color: #10b981 !important; 
 }
 
-.sidebar-nav .nav-link:hover i {
-  color: var(--bs-primary);
+/* Active/Hover State for Booking */
+.nav-group-booking .nav-link:hover, 
+.nav-group-booking .nav-link.active {
+    background-color: #ecfdf5 !important; /* Light Green Background */
+    color: #047857 !important;            /* Dark Green Text */
+    border: 1px solid #a7f3d0;            /* Subtle Green Border */
 }
+.nav-group-booking .nav-link.active {
+    background-color: #d1fae5 !important; /* Slightly darker on active */
+    box-shadow: 0 2px 4px rgba(16, 185, 129, 0.1);
+}
+
+/* 2. TRANSACTIONS GROUP - Amber (Caution, Review, Finance) */
+.nav-group-transactions .nav-link i {
+    color: #f59e0b !important;
+}
+
+/* Active/Hover State for Transactions */
+.nav-group-transactions .nav-link:hover,
+.nav-group-transactions .nav-link.active {
+    background-color: #fffbeb !important; /* Light Amber Background */
+    color: #b45309 !important;            /* Dark Amber Text */
+    border: 1px solid #fde68a;
+}
+.nav-group-transactions .nav-link.active {
+    background-color: #fef3c7 !important;
+    box-shadow: 0 2px 4px rgba(245, 158, 11, 0.1);
+}
+
+/* 3. REPORTS GROUP - Indigo (Data, Intelligence) */
+.nav-group-reports .nav-link i {
+    color: #6366f1 !important;
+}
+
+/* Active/Hover State for Reports */
+.nav-group-reports .nav-link:hover,
+.nav-group-reports .nav-link.active {
+    background-color: #eef2ff !important; /* Light Indigo Background */
+    color: #4338ca !important;            /* Dark Indigo Text */
+    border: 1px solid #c7d2fe;
+}
+.nav-group-reports .nav-link.active {
+    background-color: #e0e7ff !important;
+    box-shadow: 0 2px 4px rgba(99, 102, 241, 0.1);
+}
+
+/* Dropdown/Submenu Styling */
+.sidebar-nav .collapse {
+    padding-left: 20px; /* Indent submenus */
+    border-left: 2px solid #f1f1f1; /* Guide line */
+    margin-left: 18px;
+}
+.sidebar-nav .collapse .nav-link {
+    font-size: 13px;
+    padding: 8px 15px;
+    background: transparent !important; /* No BG for children unless hovered */
+    border: none !important;
+    color: #666;
+}
+.sidebar-nav .collapse .nav-link:hover,
+.sidebar-nav .collapse .nav-link.active {
+    color: var(--bs-primary);
+    background: transparent !important;
+    padding-left: 10px; /* Slight movement effect */
+}
+.sidebar-nav .collapse .nav-link i {
+    font-size: 14px; /* Smaller icons for submenu */
+}
+
+/* Collapsed Parent Icon Opacity */
+.sidebar-nav .nav-link.collapsed i {
+    opacity: 0.8; 
+}
+
 
 /*--------------------------------------------------------------
 # Main
@@ -482,7 +527,7 @@ hr {
 #main {
   margin-top: 60px;
   padding: 20px 10px;
-  transition: all 0.3s;
+  transition: all 0.3s ease;
 }
 
 @media (max-width: 1199px) {
@@ -511,9 +556,7 @@ hr {
   color: gray;
 }
 
-
-/* 
-#___________________________Table CSS_______________________________# */
+/* #___________________________Table CSS_______________________________# */
 
 .table {
   border-collapse: collapse;
@@ -526,7 +569,6 @@ hr {
   border: none !important;
   border-bottom: 1px solid #E2E8F0 !important;
   padding: 10px 8px !important;
-
 }
 
 table.table tbody tr.selected {
@@ -538,7 +580,6 @@ table.table tbody tr.selected {
 }
 
 .table th {
-
   background: #ffffff;
   color: #171717;
   font-weight: 600 !important;

@@ -313,7 +313,9 @@ def clear_booking_due(booking_id, amount_to_pay, payment_type, user_id):
         print("Error in clear_booking_due:", e)
         return {"error": str(e)}, 500   
      
-def get_dues_list(branch_id, from_date=None, to_date=None):
+# In services.py
+
+def get_dues_list(branch_id, from_date=None, to_date=None, status=None):
     try:
         # 1. Validation and Date Setup
         if not from_date or not to_date:
@@ -335,20 +337,23 @@ def get_dues_list(branch_id, from_date=None, to_date=None):
         if not branch_id:
             return {"error": "branch_id is required"}, 400
 
-        # 2. Query with Date Filter Added
-        bookings = (
-            db.session.query(TestBooking)
-            .filter(
-                TestBooking.branch_id == int(branch_id),
-                TestBooking.due_amount > 0,
-                TestBooking.create_at >= start_dt,  # <--- Filter start
-                TestBooking.create_at <= end_dt     # <--- Filter end
-            )
-            .order_by(TestBooking.create_at.desc())
-            .all()
+        # 2. Base Query
+        query = db.session.query(TestBooking).filter(
+            TestBooking.branch_id == int(branch_id),
+            TestBooking.create_at >= start_dt,
+            TestBooking.create_at <= end_dt
         )
 
-        # 3. Serialize Data
+        # 3. Apply Status Filter
+        # If status is 'all', we skip this block and return everything
+        if status == 'unpaid':
+            query = query.filter(TestBooking.due_amount > 0)
+        elif status == 'paid':
+            query = query.filter(TestBooking.due_amount <= 0)
+
+        bookings = query.order_by(TestBooking.create_at.desc()).all()
+
+        # 4. Serialize Data
         dues_list = []
         total_due_amount = 0
 
@@ -359,12 +364,14 @@ def get_dues_list(branch_id, from_date=None, to_date=None):
                 "patient_name": b.patient_name,
                 "contact_no": b.contact_no,
                 "date": b.create_at.strftime("%Y-%m-%d %I:%M %p") if b.create_at else None,
-                "total_amount": float(b.net_receivable or 0), # Added 'or 0' for safety
+                "total_amount": float(b.net_receivable or 0),
                 "paid_amount": float(b.paid_amount or 0),
                 "due_amount": float(b.due_amount or 0),
                 "created_by": b.create_by
             })
-            total_due_amount += float(b.due_amount or 0)
+            # Only add to total outstanding if it is actually due
+            if b.due_amount and b.due_amount > 0:
+                total_due_amount += float(b.due_amount)
 
         return {
             "dues": dues_list,

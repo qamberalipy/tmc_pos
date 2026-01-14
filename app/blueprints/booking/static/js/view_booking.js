@@ -15,13 +15,12 @@ $(document).ready(function () {
 
     // Load Data
     getAllTestBookings();
-    loadShareProviders(); // <--- Loads the dropdown list for the modal
+    loadShareProviders(); 
 
     // ---------------------------------------------------------
-    // 2. EVENT LISTENERS (Static Elements)
+    // 2. EVENT LISTENERS
     // ---------------------------------------------------------
 
-    // Search Filter
     $("#searchBtn").on("click", function () { getAllTestBookings(); });
 
     // Save Comment
@@ -146,19 +145,36 @@ $(document).ready(function () {
         if (!doctorId) return showToastMessage("error", "Please select a doctor.");
 
         let bookingDetails = [];
+        let hasUnissuedSkipped = false;
+
         window.selectedBookingIds.forEach(function (bId) {
             let $checkbox = $(`.chk-booking[value="${bId}"]`);
             if ($checkbox.length > 0) {
-                let idsString = $checkbox.closest('tr').find('.test-info-cell').data('ids');
-                let idsArray = idsString ? idsString.toString().split(',').map(Number) : [];
-                bookingDetails.push({ booking_id: bId, test_ids: idsArray });
+                // --- CHANGED HERE: Grab only ISSUED IDs ---
+                let issuedIdsString = $checkbox.closest('tr').find('.test-info-cell').data('issued-ids');
+                
+                // If there are valid issued tests
+                if (issuedIdsString && issuedIdsString.toString().length > 0) {
+                    let idsArray = issuedIdsString.toString().split(',').map(Number);
+                    bookingDetails.push({ booking_id: bId, test_ids: idsArray });
+                } else {
+                    hasUnissuedSkipped = true;
+                }
             }
         });
+
+        if (bookingDetails.length === 0) {
+            showToastMessage("warning", "None of the selected bookings have ISSUED tests.");
+            return;
+        }
 
         myshowLoader();
         axios.post(baseUrl + "/reports/assign-bookings", { doctor_id: doctorId, bookings: bookingDetails })
             .then(res => {
-                showToastMessage("success", "Bookings assigned successfully!");
+                let msg = "Bookings assigned successfully!";
+                if(hasUnissuedSkipped) msg += " (Unissued tests were skipped)";
+                showToastMessage("success", msg);
+                
                 $("#assignDoctorModal").modal("hide");
                 window.selectedBookingIds.clear();
                 updateBulkButtonState();
@@ -173,7 +189,7 @@ $(document).ready(function () {
 let grandTotalFilms = 0;
 
 // ---------------------------------------------------------
-// 4. MAIN TABLE RENDERER
+// 4. MAIN TABLE RENDERER (UPDATED)
 // ---------------------------------------------------------
 function getAllTestBookings() {
     myshowLoader();
@@ -193,7 +209,10 @@ function getAllTestBookings() {
         let rowsToAdd = [];
         $.each(res.data, function (i, t) {
             let tests = t.test_booking_details || [];
-            let testIdsStr = tests.map(obj => obj.id).join(",");
+            
+            // --- CHANGED: Separate All IDs vs Issued IDs ---
+            let allTestIdsStr = tests.map(obj => obj.id).join(",");
+            let issuedTestIdsStr = tests.filter(obj => obj.film_issued === true).map(obj => obj.id).join(",");
 
             // 1. TESTS & STATUS RENDERING
             let testHtml = `<div class="d-flex flex-column gap-2 py-1">`;
@@ -212,27 +231,21 @@ function getAllTestBookings() {
                     </div>
                 </div>`;
             });
-            testHtml += `<div style="display:none;" class="test-info-cell" data-ids="${testIdsStr}"></div></div>`;
+            // Store both all IDs and ONLY issued IDs in data attributes
+            testHtml += `<div style="display:none;" class="test-info-cell" 
+                            data-ids="${allTestIdsStr}" 
+                            data-issued-ids="${issuedTestIdsStr}">
+                         </div></div>`;
 
-            // 2. CAPTURE CURRENT SHARE ID (From your updated Python API)
-            // If API returns null/None, this becomes empty string ""
             let currentShareId = t.give_share_to || "";
 
             // 3. ACTION BUTTONS
             let actions = `
             <div class="d-flex gap-1 justify-content-center">
                 <a href="${baseUrl}/booking/receipt/${t.booking_id}" target="_blank" class="btn btn-action text-success shadow-sm" title="Print Receipt"><i class="bi bi-printer"></i></a>
-                
                 <button class="btn btn-action text-primary shadow-sm comment-booking" data-id="${t.booking_id}" title="Comments"><i class="bi bi-chat-left-text"></i></button>
-                
-                <button class="btn btn-action text-dark shadow-sm edit-films" data-id="${t.booking_id}" data-test-ids="${testIdsStr}" title="Edit Films"><i class="bi bi-plus-square"></i></button>
-                
-                <button class="btn btn-action text-warning shadow-sm edit-share" 
-                        data-id="${t.booking_id}" 
-                        data-share="${currentShareId}" 
-                        title="Update Share">
-                        <i class="bi bi-person-gear"></i>
-                </button>
+                <button class="btn btn-action text-dark shadow-sm edit-films" data-id="${t.booking_id}" data-test-ids="${allTestIdsStr}" title="Edit Films"><i class="bi bi-plus-square"></i></button>
+                <button class="btn btn-action text-warning shadow-sm edit-share" data-id="${t.booking_id}" data-share="${currentShareId}" title="Update Share"><i class="bi bi-person-gear"></i></button>
             </div>`;
 
             rowsToAdd.push([
@@ -243,6 +256,7 @@ function getAllTestBookings() {
                 `<div class="text-xs fw-medium">${t.referred_dr || 'Self'}</div>`,
                 `<div class="text-end text-muted text-xs">${t.total_amount}</div>`,
                 `<div class="text-end fw-bold">${t.received}</div>`,
+                // Due Column (Balance)
                 `<div class="text-end fw-bold ${t.balance > 0 ? 'text-danger' : 'text-success'}">${t.balance}</div>`,
                 actions
             ]);
@@ -257,7 +271,6 @@ function getAllTestBookings() {
 // 5. TABLE EVENT BINDINGS
 // ---------------------------------------------------------
 function rebindTableEvents() {
-    // Open Comment Modal
     $("#testReg_table").off("click", ".comment-booking").on("click", ".comment-booking", function () {
         let bookingId = $(this).data("id");
         $("#saveCommentBtn").data("booking-id", bookingId);
@@ -265,7 +278,6 @@ function rebindTableEvents() {
         $("#commentsModal").modal("show");
     });
 
-    // Open Film Edit Modal
     $("#testReg_table").off("click", ".edit-films").on("click", ".edit-films", function () {
         const bookingId = $(this).data("id");
         const $testSelect = $("#testIdSelect");
@@ -288,21 +300,15 @@ function rebindTableEvents() {
             .finally(() => myhideLoader());
     });
 
-    // --- NEW: Open Share Update Modal ---
-    // --- Open Share Update Modal ---
     $("#testReg_table").off("click", ".edit-share").on("click", ".edit-share", function () {
         let bookingId = $(this).data("id");
         let currentShare = $(this).data("share");
-
         $("#shareUpdateBookingId").val(bookingId);
-
-        // CHECK: If 0, null, or empty -> Reset to "" (No Share)
         if (!currentShare || currentShare == 0 || currentShare == "0") {
             $("#shareProviderSelect").val("").trigger('change');
         } else {
             $("#shareProviderSelect").val(currentShare).trigger('change');
         }
-
         $("#updateShareModal").modal("show");
     });
 }
@@ -311,39 +317,29 @@ function rebindTableEvents() {
 // 6. HELPER FUNCTIONS
 // ---------------------------------------------------------
 
-// --- NEW: Load Share Providers (Doctors/Referrers) ---
 function loadShareProviders() {
     axios.get(baseUrl + "/registrations/referred/list")
         .then(res => {
             let data = res.data || [];
             let $select = $("#shareProviderSelect");
             $select.empty().append('<option value="">-- No Share --</option>');
-
-            // Separate logic for Doctors vs Others to group them nicely
-            // Adjust 'd.is_doctor' or 'd.type' based on your exact API response structure
             let doctors = data.filter(d => d.is_doctor || d.type === true);
             let others = data.filter(d => !d.is_doctor && d.type !== true);
 
             if (doctors.length > 0) {
                 let $group = $('<optgroup label="Doctors">');
-                doctors.forEach(d => {
-                    $group.append(`<option value="${d.id}">${d.name}</option>`);
-                });
+                doctors.forEach(d => { $group.append(`<option value="${d.id}">${d.name}</option>`); });
                 $select.append($group);
             }
-
             if (others.length > 0) {
                 let $group = $('<optgroup label="Others">');
-                others.forEach(d => {
-                    $group.append(`<option value="${d.id}">${d.name}</option>`);
-                });
+                others.forEach(d => { $group.append(`<option value="${d.id}">${d.name}</option>`); });
                 $select.append($group);
             }
         })
         .catch(err => console.error("Failed to load providers", err));
 }
 
-// Film Toggle Logic
 $(document).on("change", ".film-issue-toggle", function () {
     const $toggle = $(this);
     const $card = $toggle.closest('.test-status-card');
