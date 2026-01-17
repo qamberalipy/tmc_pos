@@ -139,10 +139,19 @@ $(document).ready(function () {
                     orderable: false,
                     render: function(data, type, row) {
                         if (row.is_paid) {
+                            // Case: Already Paid -> Show Reverse Button
                             return `<button class="btn btn-sm btn-outline-danger" onclick="togglePayment(${row.share_id}, true)" title="Reverse Payment">
                                       <i class="bi bi-arrow-counterclockwise"></i> Reverse
                                     </button>`;
                         } else {
+                            // Case: Unpaid -> Check if Dues Pending
+                            if (row.booking_due > 0) {
+                                return `<button class="btn btn-sm btn-secondary disabled" style="cursor: not-allowed; opacity: 0.6;" title="Cannot Pay: Booking has pending dues">
+                                          <i class="bi bi-exclamation-circle-fill"></i> Dues Pending
+                                        </button>`;
+                            }
+
+                            // Case: Unpaid & No Dues -> Show Pay Buttons
                             return `<div class="btn-group btn-group-sm">
                                       <button class="btn btn-success" onclick="togglePayment(${row.share_id}, false)" title="Mark as Paid">
                                         <i class="bi bi-cash-stack"></i> Pay

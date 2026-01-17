@@ -956,7 +956,7 @@ def add_booking_comment(booking_id: int, data):
 
         print("Saved:", booking.technician_comments)
 
-        return {"message": "Comment added successfully", "data": new_comment}, 201
+        return {"message": "Comment added successfully", "data": new_comment}, 21
 
     except SQLAlchemyError as e:
         db.session.rollback()
@@ -1089,7 +1089,9 @@ def get_referral_shares_service(filters):
                 "test_list": test_names,
                 "booking_date": booking.create_at.strftime('%Y-%m-%d'),
                 "created_by": booking.create_by,
-                "booking_amount": float(booking.net_receivable) if booking.net_receivable else 0.0, # Added this line
+                "booking_amount": float(booking.net_receivable) if booking.net_receivable else 0.0,
+                # --- NEW: Send Due Amount ---
+                "booking_due": float(booking.due_amount) if booking.due_amount else 0.0,
                 "share_amount": float(share.share_amount),
                 "is_paid": share.is_paid,
                 "paid_at": share.paid_at.strftime('%Y-%m-%d') if share.paid_at else None
@@ -1110,6 +1112,11 @@ def toggle_share_payment_service(share_id, user_id, branch_id, custom_descriptio
         COMMISSION_HEAD_ID = 4  # Ensure this ID exists in your DB
 
         if not share.is_paid:
+            # --- VALIDATION: Check Booking Due ---
+            booking = TestBooking.query.get(share.booking_id)
+            if booking and booking.due_amount > 0:
+                return {"error": f"Cannot pay commission. Booking #{booking.id} has pending dues of {booking.due_amount}. Please clear dues first."}, 400
+
             # --- MARK AS PAID ---
             if share.share_amount <= 0:
                 return {"error": "Cannot pay a share with 0 amount"}, 400
@@ -1126,7 +1133,7 @@ def toggle_share_payment_service(share_id, user_id, branch_id, custom_descriptio
                 branch_id=branch_id,
                 expense_head_id=COMMISSION_HEAD_ID,
                 amount=share.share_amount,
-                description=final_desc,  # <--- Updated here
+                description=final_desc,  
                 payment_method="Cash", 
                 created_by=user_id
             )

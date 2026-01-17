@@ -20,19 +20,16 @@ function getAssignedReports() {
     let statuses = $("#status_filter").val(); // Returns an array e.g., ['Pending', 'Reported']
 
     // 2. Build Query Parameters for Axios
-    // We use URLSearchParams to handle the array 'status' correctly for Flask (status=A&status=B)
     const params = new URLSearchParams();
     
     if (fromDate) params.append('from_date', fromDate);
     if (toDate) params.append('to_date', toDate);
     
-    // Loop through selected statuses and append them individually
     if (statuses && statuses.length > 0) {
         statuses.forEach(s => params.append('status', s));
     }
 
     // 3. Make API Call
-    // Note: We use params.toString() to attach query string
     axios.get(baseUrl + "/reports/assigned-reports?" + params.toString())
         .then(res => {
             let data = res.data;
@@ -71,18 +68,30 @@ function getAssignedReports() {
                 // --- E. Date ---
                 let assignedAt = item.assigned_at || "-";
 
-                // --- F. Action Buttons ---
+                // --- F. Action Buttons (LOGIC UPDATED) ---
                 let printBtn = "";
-                
-                // CHECK: If report_details_id exists, enable button. Else, disable it.
-                if (item.report_details_id) {
+                let balance = parseFloat(item.balance || 0);
+
+                // Priority 1: Check Dues
+                if (balance > 0) {
+                    printBtn = `
+                        <button class="btn btn-sm btn-outline-danger disabled" 
+                                style="cursor: not-allowed; opacity: 0.7;" 
+                                title="Cannot Print: Dues Pending (${balance})">
+                            <i class="bi bi-exclamation-circle"></i> Due
+                        </button>`;
+                }
+                // Priority 2: Check if Report Exists
+                else if (item.report_details_id) {
                     printBtn = `
                         <button class="btn btn-sm btn-dark" 
-                                onclick="viewReport(${item.report_details_id})" 
+                                onclick="viewReport(${item.report_details_id}, ${balance})" 
                                 title="Print Report">
                             <i class="bi bi-printer-fill"></i> Print
                         </button>`;
-                } else {
+                } 
+                // Priority 3: Pending/Declined
+                else {
                     printBtn = `
                         <button class="btn btn-sm btn-light text-muted border" 
                                 disabled 
@@ -118,8 +127,18 @@ function getAssignedReports() {
 // =======================================================
 // 🔥 VIEW / PRINT REPORT
 // =======================================================
-function viewReport(reportDetailsId) {
+function viewReport(reportDetailsId, dueAmount) {
     if (!reportDetailsId) return;
+
+    // Safety Check
+    if (dueAmount > 0) {
+        if (typeof showToastMessage === 'function') {
+            showToastMessage("error", "Cannot print report. Clear dues first.");
+        } else {
+            alert("Cannot print report. Clear dues first.");
+        }
+        return;
+    }
 
     // Open route in new tab
     let url = baseUrl + "/reports/view-patient-report/" + reportDetailsId;
