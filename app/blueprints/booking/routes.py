@@ -363,3 +363,20 @@ def search_patient_api():
     
     result, status = booking_services.search_patient_service(term, branch_id)
     return jsonify(result), status
+
+@booking_bp.route("/refund/<int:booking_id>", methods=["POST"])
+def refund_booking_route(booking_id):
+    user_id = session.get("user_id")
+    branch_id = session.get("branch_id")
+    
+    # Get reason from request body
+    data = request.get_json() or {}
+    reason = data.get("reason", "Customer Request")
+
+    if not user_id:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    result, status = booking_services.process_refund_service(
+        booking_id, user_id, branch_id, reason
+    )
+    return jsonify(result), status

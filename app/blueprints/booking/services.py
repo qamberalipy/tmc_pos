@@ -13,6 +13,7 @@ from app.helper import convert_to_utc
 from sqlalchemy.ext.mutable import MutableDict, MutableList
 from app.models.test_booking import TestFilmUsage, TestBooking,FilmInventoryTransaction
 from app.models.test_registration import Test_registration
+from app.models.doctor_reporting_details import DoctorReportingdetails
 from app.models.expenses import Expenses
 from app.models.referred import ReferralShare
 from app.models.expenses import PaymentTransaction
@@ -1246,4 +1247,87 @@ def search_patient_service(term, branch_id):
 
     except Exception as e:
         print(f"Error searching patient: {e}")
+        return {"error": str(e)}, 500
+    
+def process_refund_service(booking_id, user_id, branch_id, refund_reason=""):
+    try:
+        # 1. Fetch the Booking
+        booking = TestBooking.query.get(booking_id)
+        if not booking:
+            return {"error": "Booking not found"}, 404
+
+        # 2. Determine Refund Amount (What was actually paid)
+        refund_amount = booking.paid_amount if booking.paid_amount else 0
+
+        # 3. Create Expense Record (Reflects on Current Date)
+        # Expense Head ID 6 as requested
+        EXPENSE_HEAD_ID_REFUND = 6
+        
+        expense_desc = f"Refund for Booking #{booking.id} - {booking.patient_name}. Reason: {refund_reason}"
+        
+        # Only create expense if there is money to refund
+        if refund_amount > 0:
+            new_expense = Expenses(
+                branch_id=branch_id,
+                expense_head_id=EXPENSE_HEAD_ID_REFUND,
+                amount=refund_amount,
+                description=expense_desc,
+                payment_method="Cash",
+                created_by=user_id
+            )
+            db.session.add(new_expense)
+            db.session.flush() # Generate ID
+
+            # Create Financial Transaction for the Expense (Money OUT)
+            exp_trans = PaymentTransaction(
+                branch_id=branch_id,
+                expense_id=new_expense.id,
+                amount=refund_amount,
+                direction="OUT",
+                transaction_type="Expense",
+                created_by=user_id,
+                payment_date=datetime.utcnow()
+            )
+            db.session.add(exp_trans)
+
+        # 4. Remove Existence from Everywhere
+        
+        # A. Remove Referral Shares
+        ReferralShare.query.filter_by(booking_id=booking_id).delete()
+
+        # B. Remove Films Usage & Revert Inventory
+        # We delete the usage logs and the inventory transaction logs linked to this booking
+        TestFilmUsage.query.filter_by(booking_id=booking_id).delete()
+        FilmInventoryTransaction.query.filter_by(booking_id=booking_id).delete()
+
+        # C. Remove Doctor Reporting Assignments
+        DoctorReportingdetails.query.filter_by(booking_id=str(booking_id)).delete()
+
+        # D. Remove Booking Details (The specific tests)
+        TestBookingDetails.query.filter_by(booking_id=booking_id).delete()
+
+        # E. Unlink Original Payment Transactions (Don't delete, just unlink to keep history valid)
+        # If we delete the 'IN' transaction, the cash register for the 23rd won't match.
+        # We just unlink it so it doesn't crash when booking is deleted.
+        old_transactions = PaymentTransaction.query.filter_by(booking_id=booking_id).all()
+        for trans in old_transactions:
+            trans.booking_id = None
+            trans.payment_type = "Other" # Optional: mark as generic
+            # Append note to description or leave as is.
+            db.session.add(trans)
+
+        # F. Delete the Booking itself
+        db.session.delete(booking)
+
+        # 5. Commit Changes
+        db.session.commit()
+
+        return {
+            "message": f"Booking #{booking_id} refunded and removed successfully.",
+            "refund_amount": float(refund_amount)
+        }, 200
+
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error processing refund: {str(e)}")
         return {"error": str(e)}, 500
