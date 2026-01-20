@@ -553,7 +553,7 @@ def update_doctor_report(report_id, data, user_id):
         "clinical_info",
         "scanning_protocols",
         "findings",
-        "incidental_findings"
+        "incidental_findings",  # <--- Add this comma
         "conclusion"
     }
 

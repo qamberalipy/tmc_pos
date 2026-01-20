@@ -534,7 +534,7 @@ $(document).on("click", "#submit_booking", async function () {
 
         // --- 2. Collect Data ---
         const payload = {
-            mr_no: $("#mr_ref_no").val().trim() || null, // Will use auto-gen if null
+            mr_no: $("#mr_ref_no").val().trim() || null, 
             patient_name: $("#patient_name").val().trim(),
             gender: $("#gender").val(),
             age: $("#age").val() ? parseInt($("#age").val()) : null,
@@ -546,9 +546,15 @@ $(document).on("click", "#submit_booking", async function () {
 
             discount_type: $("#discount_type").val(),
             discount_value: parseFloat($("#discount_value").val()) || 0,
-            net_receivable: parseFloat($("#net_receivable").val()) || 0,
+            
+            net_receivable: bookingState.totals.net, 
+            // --- 🔥 FIX END ---
+
             payment_type: $("#payment_type").val() || "Cash",
+            
+            // This remains mapped to the input field (What the user actually paid)
             paid_amount: parseFloat($("#net_receivable").val()) || 0,
+            
             due_amount: parseFloat($("#dues").val()) || 0,
             total_no_of_films: bookingState.totals.films,
             tests: bookingState.tests.map(t => ({
@@ -584,7 +590,8 @@ $(document).on("click", "#submit_booking", async function () {
             isValid = false;
         }
 
-        if (payload.net_receivable === "" || isNaN(payload.net_receivable)) {
+        // Updated Validation: Check the Input Field directly, not the payload total
+        if ($("#net_receivable").val().trim() === "") {
             $("#net_receivable").addClass("input-error");
             isValid = false;
         }
@@ -607,6 +614,7 @@ $(document).on("click", "#submit_booking", async function () {
             headers: { "Content-Type": "application/json" }
         });
 
+        // [ ... Rest of the success handling logic ... ]
         var responseData = res.data[0];
         var responseStatus = res.data[1];
 
@@ -633,6 +641,8 @@ $(document).on("click", "#submit_booking", async function () {
         myhideLoader();
     }
 });
+
+// [ ... Rest of Helpers ... ]
 
 // -------------------------------
 // Helpers
