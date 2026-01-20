@@ -105,7 +105,22 @@ function getDuesList() {
                             <i class="bi bi-cash-stack"></i> Clear Due
                         </button>`;
                 } else {
-                    actionBtn = `<span class="text-muted small"><i class="bi bi-check-all"></i> Completed</span>`;
+                    // It is PAID. Check if we have a transaction ID to print a receipt.
+                    if (item.last_transaction_id) {
+                        actionBtn = `
+                            <div class="d-flex align-items-center">
+                               
+                                <a href="${baseUrl}/booking/receipt/due/${item.last_transaction_id}" 
+                                   target="_blank" 
+                                   class="btn btn-sm btn-light border shadow-sm text-secondary" 
+                                   title="Print Last Receipt">
+                                    <i class="bi bi-printer-fill"></i>
+                                </a>
+                            </div>`;
+                    } else {
+                        // Fallback if no transaction record exists
+                        actionBtn = `<span class="badge bg-success">PAID</span>`;
+                    }
                 }
 
                 rowsToAdd.push([
@@ -151,6 +166,8 @@ function openPayModal(bookingId, dueAmount) {
 // =======================================================
 // ✅ SUBMIT PAYMENT
 // =======================================================
+// Locate the submitClearDue function and update the success block
+
 function submitClearDue() {
     let bookingId = $("#pay_booking_id").val();
     let amountToPay = parseFloat($("#pay_amount").val());
@@ -178,6 +195,15 @@ function submitClearDue() {
         .then(res => {
             if (typeof showToastMessage === 'function') showToastMessage("success", res.data.message);
             $("#clearDueModal").modal("hide");
+            
+            // --- NEW CODE STARTS HERE ---
+            // Open the Receipt in a new tab/window
+            if (res.data.transaction_id) {
+                let receiptUrl = `${baseUrl}/booking/receipt/due/${res.data.transaction_id}`;
+                window.open(receiptUrl, '_blank');
+            }
+            // --- NEW CODE ENDS HERE ---
+
             getDuesList(); // Refresh list to update status/amount
         })
         .catch(err => {

@@ -75,13 +75,12 @@ $(document).ready(function () {
             .finally(() => myhideLoader());
     });
 
-    // --- NEW: Save Referral Share Update ---
+    // Save Referral Share Update
     $("#btnSaveShareUpdate").on("click", function () {
         let bookingId = $("#shareUpdateBookingId").val();
-        let newProviderId = $("#shareProviderSelect").val(); // Takes value (ID) or empty string
+        let newProviderId = $("#shareProviderSelect").val(); 
 
         if (!bookingId) return;
-
         let $btn = $(this);
         let originalText = $btn.text();
         $btn.prop("disabled", true).text("Updating...");
@@ -93,7 +92,7 @@ $(document).ready(function () {
             .then(res => {
                 showToastMessage("success", "Share provider updated successfully!");
                 $("#updateShareModal").modal("hide");
-                getAllTestBookings(); // Refresh table to show changes
+                getAllTestBookings();
             })
             .catch(err => {
                 let msg = err.response?.data?.error || "Failed to update share.";
@@ -105,7 +104,53 @@ $(document).ready(function () {
     });
 
     // ---------------------------------------------------------
-    // 3. BULK ASSIGN LOGIC
+    // 3. REFUND LOGIC (NEW)
+    // ---------------------------------------------------------
+    $(document).on("click", ".refund-booking", function() {
+        let bookingId = $(this).data("id");
+        
+        Swal.fire({
+            title: "Process Refund?",
+            text: "This will DELETE the booking and creating a refund expense. This cannot be undone!",
+            icon: "warning",
+            input: "text",
+            inputPlaceholder: "Enter reason for refund...",
+            showCancelButton: true,
+            confirmButtonColor: "#dc3545", // Red for danger
+            confirmButtonText: "Yes, Refund & Delete",
+            showLoaderOnConfirm: true,
+            preConfirm: (reason) => {
+                if (!reason) {
+                    Swal.showValidationMessage("Reason is required to process refund");
+                    return false;
+                }
+                // Call the backend API
+                return axios.post(baseUrl + `/booking/refund/${bookingId}`, { reason: reason })
+                    .then(res => {
+                        return res.data;
+                    })
+                    .catch(error => {
+                        let msg = error.response?.data?.error || error.message;
+                        Swal.showValidationMessage(`Request failed: ${msg}`);
+                    });
+            },
+            allowOutsideClick: () => !Swal.isLoading()
+        }).then((result) => {
+            if (result.isConfirmed) {
+                Swal.fire({
+                    title: "Refunded!",
+                    text: result.value.message,
+                    icon: "success",
+                    timer: 2000,
+                    showConfirmButton: false
+                });
+                getAllTestBookings(); // Refresh the table
+            }
+        });
+    });
+
+    // ---------------------------------------------------------
+    // 4. BULK ASSIGN LOGIC
     // ---------------------------------------------------------
     $("#selectAllBookings").on("change", function () {
         const isChecked = $(this).is(":checked");
@@ -239,13 +284,22 @@ function getAllTestBookings() {
 
             let currentShareId = t.give_share_to || "";
 
-            // 3. ACTION BUTTONS
+            // 3. ACTION BUTTONS (Added Refund Button)
             let actions = `
             <div class="d-flex gap-1 justify-content-center">
                 <a href="${baseUrl}/booking/receipt/${t.booking_id}" target="_blank" class="btn btn-action text-success shadow-sm" title="Print Receipt"><i class="bi bi-printer"></i></a>
+                
                 <button class="btn btn-action text-primary shadow-sm comment-booking" data-id="${t.booking_id}" title="Comments"><i class="bi bi-chat-left-text"></i></button>
+                
                 <button class="btn btn-action text-dark shadow-sm edit-films" data-id="${t.booking_id}" data-test-ids="${allTestIdsStr}" title="Edit Films"><i class="bi bi-plus-square"></i></button>
+                
                 <button class="btn btn-action text-warning shadow-sm edit-share" data-id="${t.booking_id}" data-share="${currentShareId}" title="Update Share"><i class="bi bi-person-gear"></i></button>
+                
+                <button class="btn btn-action text-danger shadow-sm refund-booking" 
+                        data-id="${t.booking_id}" 
+                        title="Refund & Delete">
+                    <i class="bi bi-arrow-counterclockwise"></i>
+                </button>
             </div>`;
 
             rowsToAdd.push([
@@ -256,7 +310,6 @@ function getAllTestBookings() {
                 `<div class="text-xs fw-medium">${t.referred_dr || 'Self'}</div>`,
                 `<div class="text-end text-muted text-xs">${t.total_amount}</div>`,
                 `<div class="text-end fw-bold">${t.received}</div>`,
-                // Due Column (Balance)
                 `<div class="text-end fw-bold ${t.balance > 0 ? 'text-danger' : 'text-success'}">${t.balance}</div>`,
                 actions
             ]);
@@ -268,7 +321,7 @@ function getAllTestBookings() {
 }
 
 // ---------------------------------------------------------
-// 5. TABLE EVENT BINDINGS
+// 6. TABLE EVENT BINDINGS
 // ---------------------------------------------------------
 function rebindTableEvents() {
     $("#testReg_table").off("click", ".comment-booking").on("click", ".comment-booking", function () {
@@ -314,7 +367,7 @@ function rebindTableEvents() {
 }
 
 // ---------------------------------------------------------
-// 6. HELPER FUNCTIONS
+// 7. HELPER FUNCTIONS
 // ---------------------------------------------------------
 
 function loadShareProviders() {

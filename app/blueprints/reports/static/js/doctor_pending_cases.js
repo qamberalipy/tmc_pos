@@ -4,10 +4,13 @@ $(document).ready(function () {
 
     // Bind Save Button Click
     $("#btnSaveReport").on("click", saveReport);
+
+    // Bind Real-time Character Counting
+    $("#reportForm textarea").on("input", updateCharCount);
 });
 
 // =======================================================
-// 🔥 1. FETCH DATA AND RENDER TABLE
+// 1. FETCH DATA AND RENDER TABLE
 // =======================================================
 function getDoctorBookings() {
     if (typeof myshowLoader === 'function') myshowLoader();
@@ -48,8 +51,7 @@ function getDoctorBookings() {
                 let assignedBy = item.assigned_by || "-";
                 let assignedAt = item.assigned_at || "-";
 
-                // 🔥 ACTION BUTTON: Triggers fetchAndOpenReport instead of href
-                // Escape single quotes in names just in case (e.g., "Parkinson's Test")
+                // ACTION BUTTON: Triggers fetchAndOpenReport instead of href
                 let safeTestName = (item.test_name || "").replace(/'/g, "\\'");
 
                 let actionBtn = `
@@ -80,7 +82,7 @@ function getDoctorBookings() {
 }
 
 // =======================================================
-// 🔥 2. OPEN REPORT MODAL (GET API)
+// 2. OPEN REPORT MODAL (GET API)
 // =======================================================
 function declineAssignment(reportingId) {
     Swal.fire({
@@ -138,6 +140,9 @@ function fetchAndOpenReport(bookingId, testId, testName) {
     $("#rep_testName").val(testName); 
     $("#rep_testId").val(testId); 
     $("#rep_bookingId").val(bookingId);
+    
+    // Reset Char Count Badge
+    $("#charCountBadge").text("0 / 3200").removeClass("bg-danger").addClass("bg-success");
 
     axios.get(baseUrl + "/booking/test-booking/" + bookingId)
         .then(res => {
@@ -149,10 +154,6 @@ function fetchAndOpenReport(bookingId, testId, testName) {
             $("#rep_gender").val(data.gender);
             $("#rep_refDr").val(data.referred_by || "Self");
 
-            // We do NOT need to populate #rep_testSelect anymore
-            // because we already set #rep_testName above.
-
-            // 4. Show Modal
             $("#reportModal").modal("show");
         })
         .catch(err => {
@@ -163,10 +164,45 @@ function fetchAndOpenReport(bookingId, testId, testName) {
             if (typeof myhideLoader === 'function') myhideLoader(); 
         });
 }
+
 // =======================================================
-// 🔥 3. SAVE REPORT (POST API)
+// 3. CHAR COUNT VALIDATION
+// =======================================================
+function updateCharCount() {
+    let totalChars = 0;
+    // Sum up length of all text areas inside the form
+    $("#reportForm textarea").each(function() {
+        totalChars += $(this).val().length;
+    });
+
+    let limit = 3200; // Approx limit for A4 page
+    let badge = $("#charCountBadge");
+    
+    badge.text(`${totalChars} / ${limit}`);
+
+    if (totalChars > limit) {
+        badge.removeClass("bg-success").addClass("bg-danger");
+        return false; // Over limit
+    } else {
+        badge.removeClass("bg-danger").addClass("bg-success");
+        return true; // OK
+    }
+}
+
+// =======================================================
+// 4. SAVE REPORT (POST API)
 // =======================================================
 function saveReport() {
+    // Check validation first
+    if (!updateCharCount()) {
+        Swal.fire({
+            icon: 'error',
+            title: 'Report too long',
+            text: 'The report content exceeds the one-page limit (3200 chars). Please shorten the findings or conclusion.'
+        });
+        return;
+    }
+
     // 1. Gather Data
     let bookingId = $("#rep_bookingId").val();
     let patientName = $("#rep_patientName").val();
@@ -174,13 +210,12 @@ function saveReport() {
     let age = $("#rep_age").val();
     let referredBy = $("#rep_refDr").val();
     
-    // --- UPDATED THIS LINE ---
-    // Use the hidden input ID we created in the previous step
     let testId = $("#rep_testId").val(); 
     
     let clinicalInfo = $("#rep_clinical").val();
     let protocols = $("#rep_protocols").val();
     let findings = $("#rep_findings").val().trimStart();
+    let incidental = $("#rep_incidental").val(); // New Field
     let conclusion = $("#rep_conclusion").val();
     
     // Get logged-in doctor ID from hidden field
@@ -203,6 +238,7 @@ function saveReport() {
         clinical_info: clinicalInfo,
         scanning_protocols: protocols,
         findings: findings,
+        incidental_findings: incidental, // Payload Update
         conclusion: conclusion
     };
 
@@ -216,7 +252,6 @@ function saveReport() {
             $("#reportModal").modal("hide");
             
             // Refresh the table
-            // Ensure this matches the function name you use to load the table (e.g. loadPendingBookings or getDoctorBookings)
             if (typeof loadPendingBookings === 'function') {
                 loadPendingBookings();
             } else if (typeof getDoctorBookings === 'function') {
@@ -232,7 +267,7 @@ function saveReport() {
 }
 
 // =======================================================
-// 🟢 EVENT HANDLERS (COMMENTS & TOASTS)
+// 5. EVENT HANDLERS (COMMENTS & TOASTS)
 // =======================================================
 function bindTableEvents() {
     $("#doctorPendingTable").off("click", ".view-comments");
@@ -278,7 +313,7 @@ function loadComments(comments) {
     $("#commentsHistory").html(html);
 }
 
-// Simple Toast fallback if not defined elsewhere
+// Simple Toast fallback
 if (typeof showToastMessage !== 'function') {
     window.showToastMessage = function(type, msg) {
         alert(type.toUpperCase() + ": " + msg);

@@ -13,6 +13,7 @@ from app.helper import convert_to_utc
 from sqlalchemy.ext.mutable import MutableDict, MutableList
 from app.models.test_booking import TestFilmUsage, TestBooking,FilmInventoryTransaction
 from app.models.test_registration import Test_registration
+from app.models.doctor_reporting_details import DoctorReportingdetails
 from app.models.expenses import Expenses
 from app.models.referred import ReferralShare
 from app.models.expenses import PaymentTransaction
@@ -262,6 +263,7 @@ def update_booking_share_provider(booking_id, new_referred_id, user_id):
         print(f"Error updating share: {str(e)}")
         return {"error": str(e)}, 500
 
+
 def clear_booking_due(booking_id, amount_to_pay, payment_type, user_id):
     try:
         booking = TestBooking.query.get(booking_id)
@@ -276,16 +278,15 @@ def clear_booking_due(booking_id, amount_to_pay, payment_type, user_id):
         if pay_amt > booking.due_amount:
             return {"error": f"Payment {pay_amt} exceeds due amount {booking.due_amount}"}, 400
 
-        # --- 1. Update Booking Balance ---
+        # Update Booking Balance
         booking.paid_amount += pay_amt
         booking.due_amount -= pay_amt
         booking.update_at = datetime.utcnow()
         booking.update_by = user_id
         
-        # Add to session (SQLAlchemy tracks changes automatically, but adding explicitly is safe)
         db.session.add(booking)
 
-        # --- 2. Create Transaction Record (Cash IN) ---
+        # Create Transaction Record
         transaction = PaymentTransaction(
             branch_id=booking.branch_id,
             booking_id=booking.id,
@@ -298,22 +299,65 @@ def clear_booking_due(booking_id, amount_to_pay, payment_type, user_id):
         )
         db.session.add(transaction)
 
-        # --- 3. Commit Changes ---
-        # This saves both the booking update and the new transaction together
+        # Commit to generate transaction ID
         db.session.commit()
 
         return {
             "message": "Due cleared successfully", 
             "remaining_due": float(booking.due_amount),
-            "paid_now": float(pay_amt)
+            "paid_now": float(pay_amt),
+            "transaction_id": transaction.id  # <--- ADD THIS LINE
         }, 200
 
     except Exception as e:
-        db.session.rollback() # Undo everything if error occurs
+        db.session.rollback()
         print("Error in clear_booking_due:", e)
-        return {"error": str(e)}, 500   
-     
-# In services.py
+        return {"error": str(e)}, 500
+
+# 2. ADD NEW function to fetch receipt data
+def get_due_receipt_details(transaction_id):
+    try:
+        # Fetch the transaction
+        txn = PaymentTransaction.query.get(transaction_id)
+        if not txn:
+            return {"error": "Transaction not found"}, 404
+        
+        # Fetch related booking and branch info
+        booking = TestBooking.query.get(txn.booking_id)
+        branch = Branch.query.get(txn.branch_id)
+        user = User.query.get(txn.created_by)
+
+        data = {
+            "receipt_no": txn.id,
+            "date": txn.payment_date.strftime("%d-%b-%Y %I:%M %p"),
+            "amount_paid": float(txn.amount),
+            "payment_mode": txn.payment_type,
+            
+            # Patient Details
+            "booking_id": booking.id,
+            "mr_no": booking.mr_no,
+            "patient_name": booking.patient_name,
+            "contact_no": booking.contact_no,
+            "age": booking.age,
+            "gender": booking.gender,
+
+            # Financials
+            "total_booking_amount": float(booking.net_receivable),
+            "remaining_due": float(booking.due_amount),
+            
+            # Branch/System Info
+            "branch_name": branch.branch_name if branch else "Main Branch",
+            "branch_address": branch.address if branch else "",
+            "branch_contact": branch.contact_number if branch else "",
+            "received_by": user.name if user else "System"
+        }
+        return data, 200
+
+    except Exception as e:
+        print(f"Error fetching due receipt: {str(e)}")
+        return {"error": "Failed to generate receipt"}, 500
+
+# ... (Keep existing imports)
 
 def get_dues_list(branch_id, from_date=None, to_date=None, status=None):
     try:
@@ -345,7 +389,6 @@ def get_dues_list(branch_id, from_date=None, to_date=None, status=None):
         )
 
         # 3. Apply Status Filter
-        # If status is 'all', we skip this block and return everything
         if status == 'unpaid':
             query = query.filter(TestBooking.due_amount > 0)
         elif status == 'paid':
@@ -358,6 +401,16 @@ def get_dues_list(branch_id, from_date=None, to_date=None, status=None):
         total_due_amount = 0
 
         for b in bookings:
+            # --- NEW: Fetch the last transaction ID for this booking ---
+            # We use this to generate the receipt for the payment that likely cleared the due
+            last_txn = (db.session.query(PaymentTransaction.id)
+                        .filter(PaymentTransaction.booking_id == b.id)
+                        .order_by(PaymentTransaction.id.desc())
+                        .first())
+            
+            last_txn_id = last_txn[0] if last_txn else None
+            # -----------------------------------------------------------
+
             dues_list.append({
                 "booking_id": b.id,
                 "mr_no": b.mr_no,
@@ -367,9 +420,10 @@ def get_dues_list(branch_id, from_date=None, to_date=None, status=None):
                 "total_amount": float(b.net_receivable or 0),
                 "paid_amount": float(b.paid_amount or 0),
                 "due_amount": float(b.due_amount or 0),
-                "created_by": b.create_by
+                "created_by": b.create_by,
+                "last_transaction_id": last_txn_id  # <--- Return this to frontend
             })
-            # Only add to total outstanding if it is actually due
+            
             if b.due_amount and b.due_amount > 0:
                 total_due_amount += float(b.due_amount)
 
@@ -383,7 +437,7 @@ def get_dues_list(branch_id, from_date=None, to_date=None, status=None):
         return {"error": str(e.__dict__.get("orig", e))}, 500
     except Exception as e:
         return {"error": str(e)}, 500
-
+    
 def update_booking_total_films(booking_id):
     total = db.session.query(
         db.func.sum(TestFilmUsage.films_used)
@@ -956,7 +1010,7 @@ def add_booking_comment(booking_id: int, data):
 
         print("Saved:", booking.technician_comments)
 
-        return {"message": "Comment added successfully", "data": new_comment}, 201
+        return {"message": "Comment added successfully", "data": new_comment}, 21
 
     except SQLAlchemyError as e:
         db.session.rollback()
@@ -1089,7 +1143,9 @@ def get_referral_shares_service(filters):
                 "test_list": test_names,
                 "booking_date": booking.create_at.strftime('%Y-%m-%d'),
                 "created_by": booking.create_by,
-                "booking_amount": float(booking.net_receivable) if booking.net_receivable else 0.0, # Added this line
+                "booking_amount": float(booking.net_receivable) if booking.net_receivable else 0.0,
+                # --- NEW: Send Due Amount ---
+                "booking_due": float(booking.due_amount) if booking.due_amount else 0.0,
                 "share_amount": float(share.share_amount),
                 "is_paid": share.is_paid,
                 "paid_at": share.paid_at.strftime('%Y-%m-%d') if share.paid_at else None
@@ -1110,6 +1166,11 @@ def toggle_share_payment_service(share_id, user_id, branch_id, custom_descriptio
         COMMISSION_HEAD_ID = 4  # Ensure this ID exists in your DB
 
         if not share.is_paid:
+            # --- VALIDATION: Check Booking Due ---
+            booking = TestBooking.query.get(share.booking_id)
+            if booking and booking.due_amount > 0:
+                return {"error": f"Cannot pay commission. Booking #{booking.id} has pending dues of {booking.due_amount}. Please clear dues first."}, 400
+
             # --- MARK AS PAID ---
             if share.share_amount <= 0:
                 return {"error": "Cannot pay a share with 0 amount"}, 400
@@ -1126,7 +1187,7 @@ def toggle_share_payment_service(share_id, user_id, branch_id, custom_descriptio
                 branch_id=branch_id,
                 expense_head_id=COMMISSION_HEAD_ID,
                 amount=share.share_amount,
-                description=final_desc,  # <--- Updated here
+                description=final_desc,  
                 payment_method="Cash", 
                 created_by=user_id
             )
@@ -1239,4 +1300,87 @@ def search_patient_service(term, branch_id):
 
     except Exception as e:
         print(f"Error searching patient: {e}")
+        return {"error": str(e)}, 500
+    
+def process_refund_service(booking_id, user_id, branch_id, refund_reason=""):
+    try:
+        # 1. Fetch the Booking
+        booking = TestBooking.query.get(booking_id)
+        if not booking:
+            return {"error": "Booking not found"}, 404
+
+        # 2. Determine Refund Amount (What was actually paid)
+        refund_amount = booking.paid_amount if booking.paid_amount else 0
+
+        # 3. Create Expense Record (Reflects on Current Date)
+        # Expense Head ID 6 as requested
+        EXPENSE_HEAD_ID_REFUND = 6
+        
+        expense_desc = f"Refund for Booking #{booking.id} - {booking.patient_name}. Reason: {refund_reason}"
+        
+        # Only create expense if there is money to refund
+        if refund_amount > 0:
+            new_expense = Expenses(
+                branch_id=branch_id,
+                expense_head_id=EXPENSE_HEAD_ID_REFUND,
+                amount=refund_amount,
+                description=expense_desc,
+                payment_method="Cash",
+                created_by=user_id
+            )
+            db.session.add(new_expense)
+            db.session.flush() # Generate ID
+
+            # Create Financial Transaction for the Expense (Money OUT)
+            exp_trans = PaymentTransaction(
+                branch_id=branch_id,
+                expense_id=new_expense.id,
+                amount=refund_amount,
+                direction="OUT",
+                transaction_type="Expense",
+                created_by=user_id,
+                payment_date=datetime.utcnow()
+            )
+            db.session.add(exp_trans)
+
+        # 4. Remove Existence from Everywhere
+        
+        # A. Remove Referral Shares
+        ReferralShare.query.filter_by(booking_id=booking_id).delete()
+
+        # B. Remove Films Usage & Revert Inventory
+        # We delete the usage logs and the inventory transaction logs linked to this booking
+        TestFilmUsage.query.filter_by(booking_id=booking_id).delete()
+        FilmInventoryTransaction.query.filter_by(booking_id=booking_id).delete()
+
+        # C. Remove Doctor Reporting Assignments
+        DoctorReportingdetails.query.filter_by(booking_id=str(booking_id)).delete()
+
+        # D. Remove Booking Details (The specific tests)
+        TestBookingDetails.query.filter_by(booking_id=booking_id).delete()
+
+        # E. Unlink Original Payment Transactions (Don't delete, just unlink to keep history valid)
+        # If we delete the 'IN' transaction, the cash register for the 23rd won't match.
+        # We just unlink it so it doesn't crash when booking is deleted.
+        old_transactions = PaymentTransaction.query.filter_by(booking_id=booking_id).all()
+        for trans in old_transactions:
+            trans.booking_id = None
+            trans.payment_type = "Other" # Optional: mark as generic
+            # Append note to description or leave as is.
+            db.session.add(trans)
+
+        # F. Delete the Booking itself
+        db.session.delete(booking)
+
+        # 5. Commit Changes
+        db.session.commit()
+
+        return {
+            "message": f"Booking #{booking_id} refunded and removed successfully.",
+            "refund_amount": float(refund_amount)
+        }, 200
+
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error processing refund: {str(e)}")
         return {"error": str(e)}, 500

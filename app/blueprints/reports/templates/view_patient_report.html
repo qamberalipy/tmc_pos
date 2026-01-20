@@ -252,6 +252,13 @@
                 <div class="content-block">{{ report.findings }}</div>
             </div>
 
+            {% if report.incidental_findings %}
+            <div class="section">
+                <span class="section-title">Incidental Findings:</span>
+                <div class="content-block">{{ report.incidental_findings }}</div>
+            </div>
+            {% endif %}
+
             {% if report.conclusion %}
             <div class="section">
                 <span class="section-title">Conclusion:</span>

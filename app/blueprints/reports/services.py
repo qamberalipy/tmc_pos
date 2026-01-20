@@ -266,14 +266,18 @@ def get_doctor_assigned_reports_service(branch_id=None, status=None, from_date=N
             AssignerUser.name.label("assign_by"),    
             DoctorReportingdetails.report_at.label("assigned_at"),
             DoctorReportingdetails.report_details_id,
-            DoctorReportingdetails.id.label("reported_id")
+            DoctorReportingdetails.id.label("reported_id"),
+            
+            # --- NEW: Fetch Due Amount ---
+            TestBooking.due_amount.label("booking_balance")
         ).join(
             Test_registration, DoctorReportingdetails.test_id == Test_registration.id
         ).join(
-            # 🔥 FIX: Cast String(doctor_id) to Integer so Postgres can compare it to User.id
+            # --- NEW: Join Booking Table to get Balance ---
+            TestBooking, TestBooking.id == cast(DoctorReportingdetails.booking_id, Integer)
+        ).join(
             DoctorUser, cast(DoctorReportingdetails.doctor_id, Integer) == DoctorUser.id
         ).outerjoin(
-            # Assigner is already Integer, so no cast needed here
             AssignerUser, DoctorReportingdetails.assign_by == AssignerUser.id
         )
 
@@ -304,19 +308,22 @@ def get_doctor_assigned_reports_service(branch_id=None, status=None, from_date=N
                 "assign_by": row.assign_by if row.assign_by else "System",
                 "assigned_at": row.assigned_at.strftime('%Y-%m-%d %H:%M:%S') if row.assigned_at else None,
                 "report_details_id": row.report_details_id,
-                "id": row.reported_id
+                "id": row.reported_id,
+                
+                # --- NEW: Pass Balance to Frontend ---
+                "balance": float(row.booking_balance or 0)
             })
 
         return response_data, 200
 
     except Exception as e:
         print(f"Error fetching assigned reports: {str(e)}")
-        # Return a simple dict for the route to handle, NOT a tuple here
         return {
             "status": "error",
             "message": str(e)
         }
-
+    
+    
 def get_doctor_pending_bookings(doctor_id):
     doctor_id_str = str(doctor_id)
     results = (
@@ -422,6 +429,9 @@ def validate_required(data, fields):
     if missing:
         raise BadRequest(f"Missing required fields: {', '.join(missing)}")
 
+# ... (imports)
+
+# 1. Update save_doctor_report
 def save_doctor_report(data, user_id):
 
     # Required fields
@@ -434,7 +444,6 @@ def save_doctor_report(data, user_id):
     booking_id = data["booking_id"]
     doctor_id = data["doctor_id"]
 
-    # Find active doctor reporting record
     dr_details = DoctorReportingdetails.query.filter(
         DoctorReportingdetails.booking_id == booking_id,
         DoctorReportingdetails.doctor_id == doctor_id,
@@ -446,7 +455,6 @@ def save_doctor_report(data, user_id):
 
     now = datetime.utcnow()
 
-    # Create report with updated fields
     report = DoctorReportData(
         patient_name=data["patient_name"],
         gender=data["gender"],
@@ -457,6 +465,7 @@ def save_doctor_report(data, user_id):
         clinical_info=data.get("clinical_info"),
         scanning_protocols=data.get("scanning_protocols"),
         findings=data.get("findings"),
+        incidental_findings=data.get("incidental_findings"), # <--- NEW
         conclusion=data.get("conclusion"),
         created_by=user_id,
         updated_by=user_id,
@@ -465,7 +474,7 @@ def save_doctor_report(data, user_id):
     )
 
     db.session.add(report)
-    db.session.flush()  # get report.id before commit
+    db.session.flush()
 
     # Update reporting details
     dr_details.status = "Reported"
@@ -480,24 +489,13 @@ def save_doctor_report(data, user_id):
         "report_id": report.id
     }
 
-
+# 2. Update get_doctor_report_by_id
 def get_doctor_report_by_id(report_id):
+    # ... (Keep query logic same as original) ...
     report = (
-        db.session.query(
-            DoctorReportData,
-            Test_registration.test_name,
-            DoctorReportingdetails.report_at,
-            User  # <--- 1. Select the User model to access signature
-        )
+        db.session.query(DoctorReportData, Test_registration.test_name, DoctorReportingdetails.report_at, User)
         .join(Test_registration, Test_registration.id == DoctorReportData.test_id)
-        .join(
-            DoctorReportingdetails,
-            and_(
-                DoctorReportingdetails.report_details_id == DoctorReportData.id,
-                DoctorReportingdetails.is_active.is_(True)
-            )
-        )
-        # 2. Join User table: Cast the string doctor_id to Integer to match User.id
+        .join(DoctorReportingdetails, and_(DoctorReportingdetails.report_details_id == DoctorReportData.id, DoctorReportingdetails.is_active.is_(True)))
         .join(User, User.id == cast(DoctorReportingdetails.doctor_id, Integer)) 
         .filter(DoctorReportData.id == report_id)
         .first()
@@ -523,6 +521,7 @@ def get_doctor_report_by_id(report_id):
         "clinical_info": report_obj.clinical_info,
         "scanning_protocols": report_obj.scanning_protocols,
         "findings": report_obj.findings,
+        "incidental_findings": report_obj.incidental_findings, # <--- NEW
         "conclusion": report_obj.conclusion,
 
         # Tracking fields
@@ -554,6 +553,7 @@ def update_doctor_report(report_id, data, user_id):
         "clinical_info",
         "scanning_protocols",
         "findings",
+        "incidental_findings"
         "conclusion"
     }
 
