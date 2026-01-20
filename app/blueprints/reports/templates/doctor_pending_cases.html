@@ -124,13 +124,24 @@
 
                     <div class="mb-3">
                         <label class="form-label fw-bold">Findings (Detailed Report) *</label>
-                        <textarea class="form-control" id="rep_findings" rows="10" placeholder="Type findings here..."></textarea>
+                        <textarea class="form-control" id="rep_findings" rows="8" placeholder="Type findings here..."></textarea>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Incidental Findings</label>
+                        <textarea class="form-control" id="rep_incidental" rows="2" placeholder="Any incidental findings..."></textarea>
                     </div>
 
                     <div class="mb-3">
                         <label class="form-label fw-bold">Conclusion / Impression</label>
                         <textarea class="form-control" id="rep_conclusion" rows="3"></textarea>
                     </div>
+
+                    <div class="alert alert-light border d-flex justify-content-between align-items-center" role="alert">
+                        <small class="text-muted"><i class="bi bi-info-circle"></i> To ensure the report fits on one page, keep total characters under 3,200.</small>
+                        <span id="charCountBadge" class="badge bg-success">0 / 3200</span>
+                    </div>
+
                 </form>
             </div>
             <div class="modal-footer">

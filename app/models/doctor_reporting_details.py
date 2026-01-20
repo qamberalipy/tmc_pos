@@ -28,6 +28,7 @@ class DoctorReportData(db.Model):
     clinical_info = db.Column(db.Text, nullable=True)
     scanning_protocols = db.Column(db.Text, nullable=True)
     findings = db.Column(db.Text, nullable=True)
+    incidental_findings = db.Column(db.Text, nullable=True) # <--- NEW FIELD
     conclusion = db.Column(db.Text, nullable=True)
     created_by = db.Column(db.Integer, nullable=True)
     updated_by = db.Column(db.Integer, nullable=True)

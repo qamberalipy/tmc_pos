@@ -429,6 +429,9 @@ def validate_required(data, fields):
     if missing:
         raise BadRequest(f"Missing required fields: {', '.join(missing)}")
 
+# ... (imports)
+
+# 1. Update save_doctor_report
 def save_doctor_report(data, user_id):
 
     # Required fields
@@ -441,7 +444,6 @@ def save_doctor_report(data, user_id):
     booking_id = data["booking_id"]
     doctor_id = data["doctor_id"]
 
-    # Find active doctor reporting record
     dr_details = DoctorReportingdetails.query.filter(
         DoctorReportingdetails.booking_id == booking_id,
         DoctorReportingdetails.doctor_id == doctor_id,
@@ -453,7 +455,6 @@ def save_doctor_report(data, user_id):
 
     now = datetime.utcnow()
 
-    # Create report with updated fields
     report = DoctorReportData(
         patient_name=data["patient_name"],
         gender=data["gender"],
@@ -464,6 +465,7 @@ def save_doctor_report(data, user_id):
         clinical_info=data.get("clinical_info"),
         scanning_protocols=data.get("scanning_protocols"),
         findings=data.get("findings"),
+        incidental_findings=data.get("incidental_findings"), # <--- NEW
         conclusion=data.get("conclusion"),
         created_by=user_id,
         updated_by=user_id,
@@ -472,7 +474,7 @@ def save_doctor_report(data, user_id):
     )
 
     db.session.add(report)
-    db.session.flush()  # get report.id before commit
+    db.session.flush()
 
     # Update reporting details
     dr_details.status = "Reported"
@@ -487,24 +489,13 @@ def save_doctor_report(data, user_id):
         "report_id": report.id
     }
 
-
+# 2. Update get_doctor_report_by_id
 def get_doctor_report_by_id(report_id):
+    # ... (Keep query logic same as original) ...
     report = (
-        db.session.query(
-            DoctorReportData,
-            Test_registration.test_name,
-            DoctorReportingdetails.report_at,
-            User  # <--- 1. Select the User model to access signature
-        )
+        db.session.query(DoctorReportData, Test_registration.test_name, DoctorReportingdetails.report_at, User)
         .join(Test_registration, Test_registration.id == DoctorReportData.test_id)
-        .join(
-            DoctorReportingdetails,
-            and_(
-                DoctorReportingdetails.report_details_id == DoctorReportData.id,
-                DoctorReportingdetails.is_active.is_(True)
-            )
-        )
-        # 2. Join User table: Cast the string doctor_id to Integer to match User.id
+        .join(DoctorReportingdetails, and_(DoctorReportingdetails.report_details_id == DoctorReportData.id, DoctorReportingdetails.is_active.is_(True)))
         .join(User, User.id == cast(DoctorReportingdetails.doctor_id, Integer)) 
         .filter(DoctorReportData.id == report_id)
         .first()
@@ -530,6 +521,7 @@ def get_doctor_report_by_id(report_id):
         "clinical_info": report_obj.clinical_info,
         "scanning_protocols": report_obj.scanning_protocols,
         "findings": report_obj.findings,
+        "incidental_findings": report_obj.incidental_findings, # <--- NEW
         "conclusion": report_obj.conclusion,
 
         # Tracking fields
@@ -561,6 +553,7 @@ def update_doctor_report(report_id, data, user_id):
         "clinical_info",
         "scanning_protocols",
         "findings",
+        "incidental_findings"
         "conclusion"
     }
 
