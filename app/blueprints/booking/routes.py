@@ -167,6 +167,22 @@ def clear_booking_due_api(booking_id):
 
     return jsonify(result), status
 
+# Add this route to your file
+@booking_bp.route("/receipt/due/<int:transaction_id>")
+@login_required
+def view_due_receipt(transaction_id):
+    try:
+        data, status = booking_services.get_due_receipt_details(transaction_id)
+
+        if status != 200:
+            return render_template("error_page.html", message=data.get("error", "Unknown error")), status
+        
+        return render_template("due_receipt.html", receipt=data)
+
+    except Exception as e:
+        print(f"Error in view_due_receipt: {str(e)}")
+        return redirect(url_for("main.error_page"))
+
 @booking_bp.route("/comments/<int:booking_id>", methods=["GET"])
 def get_booking_comments(booking_id):
     data, status = booking_services.get_booking_details(booking_id)  # unpack tuple
