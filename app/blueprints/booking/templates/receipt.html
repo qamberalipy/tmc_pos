@@ -264,7 +264,7 @@
           <tbody>
             {% for test in booking.tests %}
             <tr>
-              <td>{{ test.test_id }}</td> <!-- replace with test name if you join TestRegistration -->
+              <td>{{ test.test_name }}</td> <!-- replace with test name if you join TestRegistration -->
               <td>{{ test.reporting_date or '-' }}</td>
               <td>{{ test.sample_to_follow or 'In / Out' }}</td>
               <td>{{ "{:,.0f}".format(test.amount) }}</td>
