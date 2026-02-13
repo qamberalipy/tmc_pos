@@ -12,6 +12,7 @@ $(document).ready(function () {
     $("#to_date").val(toDate);
 
     window.selectedBookingIds = new Set();
+    window.bookingsMap = {}; // <--- NEW: Initialize Map
 
     // Load Data
     getAllTestBookings();
@@ -106,9 +107,30 @@ $(document).ready(function () {
     // ---------------------------------------------------------
     // 3. REFUND LOGIC (NEW)
     // ---------------------------------------------------------
+// ---------------------------------------------------------
+    // 3. REFUND LOGIC (UPDATED)
+    // ---------------------------------------------------------
     $(document).on("click", ".refund-booking", function() {
         let bookingId = $(this).data("id");
         
+        // --- NEW VALIDATION: Check for Issued Tests ---
+        let bookingData = window.bookingsMap[bookingId];
+        if (bookingData && bookingData.test_booking_details) {
+            // Check if ANY test in this booking is issued
+            let hasIssuedTests = bookingData.test_booking_details.some(t => t.film_issued === true);
+            
+            if (hasIssuedTests) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Cannot Refund',
+                    text: 'This booking contains ISSUED tests. Please revert the test status to "Pending" before refunding.',
+                    confirmButtonColor: "#d33"
+                });
+                return; // STOP here, do not show the refund dialog
+            }
+        }
+        // ----------------------------------------------
+
         Swal.fire({
             title: "Process Refund?",
             text: "This will DELETE the booking and creating a refund expense. This cannot be undone!",
@@ -192,21 +214,23 @@ $(document).ready(function () {
         let bookingDetails = [];
         let hasUnissuedSkipped = false;
 
+        // --- CHANGED LOGIC: Iterate Global Map Instead of DOM ---
         window.selectedBookingIds.forEach(function (bId) {
-            let $checkbox = $(`.chk-booking[value="${bId}"]`);
-            if ($checkbox.length > 0) {
-                // --- CHANGED HERE: Grab only ISSUED IDs ---
-                let issuedIdsString = $checkbox.closest('tr').find('.test-info-cell').data('issued-ids');
+            let bookingData = window.bookingsMap[bId];
+
+            if (bookingData && bookingData.test_booking_details) {
+                // Filter for issued tests directly from data object
+                let issuedTests = bookingData.test_booking_details.filter(t => t.film_issued === true);
                 
-                // If there are valid issued tests
-                if (issuedIdsString && issuedIdsString.toString().length > 0) {
-                    let idsArray = issuedIdsString.toString().split(',').map(Number);
+                if (issuedTests.length > 0) {
+                    let idsArray = issuedTests.map(t => t.id);
                     bookingDetails.push({ booking_id: bId, test_ids: idsArray });
                 } else {
                     hasUnissuedSkipped = true;
                 }
             }
         });
+        // -------------------------------------------------------
 
         if (bookingDetails.length === 0) {
             showToastMessage("warning", "None of the selected bookings have ISSUED tests.");
@@ -250,14 +274,18 @@ function getAllTestBookings() {
         dtable.clear();
         window.selectedBookingIds.clear();
         updateBulkButtonState();
+        
+        // --- NEW: Reset Map ---
+        window.bookingsMap = {}; 
 
         let rowsToAdd = [];
         $.each(res.data, function (i, t) {
+            // --- NEW: Store Data in Map ---
+            window.bookingsMap[t.booking_id] = t;
+
             let tests = t.test_booking_details || [];
             
-            // --- CHANGED: Separate All IDs vs Issued IDs ---
             let allTestIdsStr = tests.map(obj => obj.id).join(",");
-            let issuedTestIdsStr = tests.filter(obj => obj.film_issued === true).map(obj => obj.id).join(",");
 
             // 1. TESTS & STATUS RENDERING
             let testHtml = `<div class="d-flex flex-column gap-2 py-1">`;
@@ -276,15 +304,11 @@ function getAllTestBookings() {
                     </div>
                 </div>`;
             });
-            // Store both all IDs and ONLY issued IDs in data attributes
-            testHtml += `<div style="display:none;" class="test-info-cell" 
-                            data-ids="${allTestIdsStr}" 
-                            data-issued-ids="${issuedTestIdsStr}">
-                         </div></div>`;
+            testHtml += `</div>`; // Closed div
 
             let currentShareId = t.give_share_to || "";
 
-            // 3. ACTION BUTTONS (Added Refund Button)
+            // 3. ACTION BUTTONS
             let actions = `
             <div class="d-flex gap-1 justify-content-center">
                 <a href="${baseUrl}/booking/receipt/${t.booking_id}" target="_blank" class="btn btn-action text-success shadow-sm" title="Print Receipt"><i class="bi bi-printer"></i></a>
@@ -413,7 +437,15 @@ $(document).on("change", ".film-issue-toggle", function () {
     axios.post(baseUrl + "/booking/update-film-status", {
         booking_id: bookingId, test_id: testId, film_issued: isIssued
     })
-        .then(() => showToastMessage("success", "Film status updated"))
+        .then(() => {
+            showToastMessage("success", "Film status updated");
+            // Also update the local map so if user clicks Bulk Assign immediately, data is fresh
+            if(window.bookingsMap[bookingId]) {
+                 let tests = window.bookingsMap[bookingId].test_booking_details;
+                 let tObj = tests.find(x => x.id === testId);
+                 if(tObj) tObj.film_issued = isIssued;
+            }
+        })
         .catch(err => {
             $toggle.prop('checked', !isIssued);
             handleAxiosError(err);

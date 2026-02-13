@@ -1005,12 +1005,12 @@ def add_booking_comment(booking_id: int, data):
         booking.technician_comments = json.dumps(comments)
 
         db.session.add(booking)
-        db.session.commit()
+        db.session.commit() 
         db.session.refresh(booking)
 
         print("Saved:", booking.technician_comments)
 
-        return {"message": "Comment added successfully", "data": new_comment}, 21
+        return {"message": "Comment added successfully", "data": new_comment}, 201
 
     except SQLAlchemyError as e:
         db.session.rollback()
