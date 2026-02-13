@@ -1,6 +1,7 @@
 from venv import logger
 from app.extensions import db
 from app.models import Branch, Role,User,Department
+from sqlalchemy import cast, Integer # Add this import
 from sqlalchemy.exc import SQLAlchemyError
 
 def create_branch(data):
@@ -33,37 +34,34 @@ def update_branch(branch_id, data):
     return {"message": "Branch updated successfully"}
 
 # 3. Get All Branches
-def get_all_branches():
-    branches = (
-        db.session.query(
-            Branch.id,
-            Branch.branch_name,
-            Branch.contact_number,
-            Branch.additional_contact_number,
-            Branch.address,
-            Branch.description,
-            User.name.label("created_by_name"),
-            Branch.is_active,
-            Branch.created_at
-        )
-        .join(User, User.id == Branch.created_by)
-        .all()
-    )
 
-    return [
-        {
-            "id": b.id,
-            "branch_name": b.branch_name,
-            "contact_number": b.contact_number,
-            "additional_contact_number": b.additional_contact_number,
-            "address": b.address,
-            "description": b.description,
-            "created_by": b.created_by_name,
-            "is_active": b.is_active,
-            "created_at": b.created_at
-        }
-        for b in branches
-    ]
+def get_all_branches():
+    try:
+        # Cast branch.created_by to Integer to match user.id
+        results = db.session.query(
+            Branch, 
+            User.name.label('created_by_name')
+        ).join(
+            User, 
+            User.id == cast(Branch.created_by, Integer) # Use cast here
+        ).all()
+
+        return [
+            {
+                "id": b.Branch.id,
+                "branch_name": b.Branch.branch_name,
+                "contact_number": b.Branch.contact_number,
+                "additional_contact_number": b.Branch.additional_contact_number,
+                "address": b.Branch.address,
+                "description": b.Branch.description,
+                "created_by": b.created_by_name,
+                "is_active": b.Branch.is_active
+            }
+            for b in results
+        ]
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        raise e
 
 # 4. Get Branch by ID
 def get_branch_by_id(branch_id):
