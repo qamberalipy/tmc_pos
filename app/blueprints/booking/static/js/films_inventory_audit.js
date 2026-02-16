@@ -19,6 +19,38 @@ $(document).ready(function () {
     // --------------------------- 
     // Add Films
     // ---------------------------
+    // --------------------------- 
+    // Reset / Deduct Films (NEW)
+    // ---------------------------
+    $("#BtnResetFilms").on("click", function () {
+        var qty = $("#reset_films_qty").val();
+        var reason = $("#reset_reason").val() || "Manual Reset"; // Default reason if empty
+
+        if (!qty || qty <= 0) {
+            showToastMessage("error", "Please enter a valid number of films to reset.");
+            return;
+        }
+
+        myshowLoader();
+        axios.post(baseUrl + "/booking/inventory/", {
+            quantity: qty,
+            transaction_type: "OUT",  // "OUT" deducts from inventory
+            reason: reason            // Send the reason to backend
+        })
+            .then(res => {
+                showToastMessage("success", "Films reset successfully");
+                $("#reset_films_qty").val("");
+                $("#reset_reason").val("");
+                $("#resetFilmModal").modal("hide");
+                loadDashboardData(); // Refresh the numbers
+            })
+            .catch(err => {
+                showToastMessage("error", err.response?.data?.message || err.message);
+            })
+            .finally(() => myhideLoader());
+    });
+
+    
     $("#Addfilms").on("click", function () {
         var qty = $("#no_of_films").val();
         if (!qty || qty <= 0) {

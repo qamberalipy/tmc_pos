@@ -33,7 +33,6 @@ def create_test_booking(data):
     while attempt < max_retries:
         try:
             # --- 1. Generate MR No ---
-            # If not provided, generate it. 
             if not data.get("mr_no"):
                 data["mr_no"] = _generate_mr_no()
 
@@ -101,10 +100,11 @@ def create_test_booking(data):
             test_details_list = data.get('tests', [])
             details = []
             
-            # Pre-fetch reporting dates logic if needed, inside loop is fine for small N
+            # --- NEW: Track Total Films ---
+            total_initial_films = 0 
+            
             for idx, test in enumerate(test_details_list, start=1):
                 if not test.get("test_id"):
-                    # Rollback immediately if validation fails deep inside
                     db.session.rollback()
                     return {"error": f"Test #{idx} missing test_id"}, 400
                 
@@ -115,6 +115,10 @@ def create_test_booking(data):
                         reporting_date = datetime.strptime(val, "%Y-%m-%d").date() if isinstance(val, str) else val
                     except ValueError:
                         pass 
+
+                # --- NEW: Calculate Films ---
+                films_count = int(test.get("no_of_films") or 0)
+                total_initial_films += films_count
 
                 details.append(TestBookingDetails(
                     booking_id=booking.id,
@@ -128,26 +132,37 @@ def create_test_booking(data):
                 ))
 
             if details:
-                db.session.add_all(details) # Efficient for this size
+                db.session.add_all(details)
             
-            # --- 7. Final Commit ---
+            # --- 7. Film Usage & Inventory Transaction (NEW LOGIC) ---
+            if total_initial_films > 0:
+                # Calls the existing helper function to create Usage Record + Inventory Transaction
+                add_film_usage(
+                    booking_id=booking.id,
+                    films_used=total_initial_films,
+                    usage_type="Normal",
+                    used_by=data["create_by"],
+                    branch_id=data["branch_id"],
+                    reason="Initial Booking"
+                )
+            
+            # --- 8. Final Commit ---
             db.session.commit()
             
             return {
                 "message": "Booking created successfully",
                 "booking_id": booking.id,
-                "mr_no": booking.mr_no, # Return MR so frontend can see it
+                "mr_no": booking.mr_no, 
                 "total_tests": len(test_details_list)
             }, 201
 
         except IntegrityError:
             db.session.rollback()
-            # Race Condition detected on MR_NO unique constraint
             attempt += 1
             if attempt < max_retries:
                 print(f"MR No collision detected. Retrying... (Attempt {attempt})")
-                data["mr_no"] = None # Reset MR to force regeneration
-                continue # Restart loop
+                data["mr_no"] = None 
+                continue 
             else:
                 return {"error": "System busy (MR Generation collision). Please try again."}, 500
 
@@ -1005,12 +1020,12 @@ def add_booking_comment(booking_id: int, data):
         booking.technician_comments = json.dumps(comments)
 
         db.session.add(booking)
-        db.session.commit()
+        db.session.commit() 
         db.session.refresh(booking)
 
         print("Saved:", booking.technician_comments)
 
-        return {"message": "Comment added successfully", "data": new_comment}, 21
+        return {"message": "Comment added successfully", "data": new_comment}, 201
 
     except SQLAlchemyError as e:
         db.session.rollback()

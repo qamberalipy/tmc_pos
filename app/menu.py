@@ -10,7 +10,7 @@ MENU = {
             "label": "Department", 
             "icon": "bi-bank2", 
             "endpoint": None, 
-            "css_class": "nav-group-registration", # Blue (Standard)
+            "css_class": "nav-group-registration",
             "children": [
                 {"label": "User", "icon": "bi-person-fill-add", "endpoint": "users.view_user"},
                 {"label": "Branch", "icon": "bi-house-add-fill", "endpoint": "admin.view_branch"},
@@ -18,35 +18,64 @@ MENU = {
         },
         {
             "label": "Registration", 
-            "icon": "bi-bank2", 
+            "icon": "bi-clipboard-data", 
             "endpoint": None, 
-            "css_class": "nav-group-registration", # Blue (Standard)
+            "css_class": "nav-group-registration",
             "children": [
                 {"label": "Test Reg", "icon": "bi-bag-plus-fill", "endpoint": "registrations.test_registration"},
+                {"label": "View Test", "icon": "bi bi-eye-fill", "endpoint": "registrations.view_test_registration"},
                 {"label": "Referred Dr Reg", "icon": "bi-person-fill-add", "endpoint": "registrations.referred_registration"},
                 {"label": "Expense Head Reg", "icon": "bi-house-add-fill", "endpoint": "registrations.expense_registration"},
             ]
         },
+        # --- BOOKING (Added to Admin) ---
+        {
+            "label": "Booking", 
+            "icon": "bi-calendar2-check", 
+            "endpoint": None, 
+            "css_class": "nav-group-booking",
+            "children": [
+                {"label": "Test Booking", "icon": "bi-clipboard-plus", "endpoint": "booking.view_test_booking"},
+                {"label": "View Booking", "icon": "bi-list-check", "endpoint": "booking.view_view_booking"},
+                {"label": "Book Results", "icon": "bi-file-earmark-medical", "endpoint": "booking.view_booking_result"},
+                {"label": "View Dues", "icon": "bi-cash-stack", "endpoint": "booking.view_dues"}
+            ]
+        },
+        # --- FILMS (Added to Admin) ---
+        {
+            "label": "Films", 
+            "icon": "bi bi-file-medical", 
+            "endpoint": None, 
+            "css_class": "nav-group-registration",
+            "children": [
+                {"label": "Inventory Audit", "icon": "bi-file-earmark-post", "endpoint": "booking.view_films_inventory_audit"},
+                {"label": "Films Usage", "icon": "bi-file-earmark-text", "endpoint": "booking.view_films_usage"},
+            ]
+        },
+        # --- TRANSACTIONS (Expanded for Admin) ---
         {
             "label": "Transactions", 
             "icon": "bi-currency-exchange", 
             "endpoint": None, 
-            "css_class": "nav-group-transactions", # Amber (Finance)
+            "css_class": "nav-group-transactions",
             "children": [
                 {"label": "Payment", "icon": "bi-cash-stack", "endpoint": "#"},
                 {"label": "Expense", "icon": "bi-wallet2", "endpoint": "transactions.view_expenses"},
+                {"label": "Referral Share", "icon": "bi-cash-stack", "endpoint": "transactions.view_referral_share"}
             ]
         },
+        # --- REPORTS (Expanded for Admin) ---
         {
             "label": "Reports", 
             "icon": "bi-graph-up-arrow", 
             "endpoint": None, 
-            "css_class": "nav-group-reports", # Indigo (Data)
+            "css_class": "nav-group-reports",
             "children": [
                 {"label": "Daily Report", "icon": "bi-journal-text", "endpoint": "reports.view_daily_reports"},
                 {"label": "Test Wise Report", "icon": "bi-file-earmark-bar-graph", "endpoint": "#"},
                 {"label": "Doctor Wise Report", "icon": "bi-file-earmark-bar-graph", "endpoint": "#"},
                 {"label": "Expense Report", "icon": "bi-file-earmark-bar-graph", "endpoint": "#"},
+                {"label": "Radiologist Logs", "icon": "bi-file-earmark-bar-graph", "endpoint": "reports.view_radiologist_logs"}
             ]
         },
     ],
@@ -70,16 +99,15 @@ MENU = {
                 {"label": "Expense Head Reg", "icon": "bi-house-add-fill", "endpoint": "registrations.expense_registration"},
             ]
         },
-        # --- BOOKING (Green Highlight) ---
         {
             "label": "Booking", 
             "icon": "bi-calendar2-check", 
             "endpoint": None, 
-            "css_class": "nav-group-booking", # Green (Action)
+            "css_class": "nav-group-booking",
             "children": [
                 {"label": "Test Booking", "icon": "bi-clipboard-plus", "endpoint": "booking.view_test_booking"},
                 {"label": "View Booking", "icon": "bi-list-check", "endpoint": "booking.view_view_booking"},
-                {"label": "Book Results","icon": "bi-file-earmark-medical","endpoint": "booking.view_booking_result"},
+                {"label": "Book Results", "icon": "bi-file-earmark-medical", "endpoint": "booking.view_booking_result"},
                 {"label": "View Dues", "icon": "bi-cash-stack", "endpoint": "booking.view_dues"}
             ]
         },
@@ -97,7 +125,7 @@ MENU = {
             "label": "Transactions", 
             "icon": "bi-currency-exchange", 
             "endpoint": None, 
-            "css_class": "nav-group-transactions", # Amber (Finance)
+            "css_class": "nav-group-transactions",
             "children": [
                 {"label": "Expense", "icon": "bi-wallet2", "endpoint": "transactions.view_expenses"},
                 {"label": "Referral Share", "icon": "bi-cash-stack", "endpoint": "transactions.view_referral_share"}
@@ -107,7 +135,7 @@ MENU = {
             "label": "Reports", 
             "icon": "bi-graph-up-arrow", 
             "endpoint": None, 
-            "css_class": "nav-group-reports", # Indigo (Data)
+            "css_class": "nav-group-reports",
             "children": [
                 {"label": "Daily Report", "icon": "bi-journal-text", "endpoint": "reports.view_daily_reports"},
                 {"label": "Test Wise Report", "icon": "bi-file-earmark-bar-graph", "endpoint": "#"},
@@ -134,6 +162,6 @@ MENU = {
     ],
     
     "default": [
-        {"label": "Amazon", "icon": "bi-amazon", "endpoint": "#", "css_class": ""},
+        {"label": "Dashboard", "icon": "bi-house-door", "endpoint": "main.home", "css_class": ""},
     ]
 }

@@ -23,6 +23,23 @@ def view_admin_dashboard():
     except Exception as e:
         print(f"Error in dashboard: {str(e)}")
         return redirect(url_for('main.error_page'))
+    
+@admin_bp.route('/switch-branch', methods=['POST'])
+@login_required
+def switch_branch():
+    """Update the current session's branch context for Admin users."""
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Missing request body"}), 400
+        
+    new_branch_id = data.get('branch_id')
+    
+    if not new_branch_id:
+        return jsonify({"error": "Branch ID is required"}), 400
+    
+    # Update the session branch_id context
+    session['branch_id'] = new_branch_id
+    return jsonify({"message": f"Context switched to branch {new_branch_id}"}), 200
 
 @admin_bp.route('/create/branch', methods=['POST'])
 def create_branch():
