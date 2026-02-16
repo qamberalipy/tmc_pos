@@ -223,15 +223,19 @@ def edit_film_usage():
 @booking_bp.route("/inventory/", methods=["POST"])
 def create_inventory():
     data = request.get_json()
-    result= booking_services.inventory_transaction(
-        data.get("quantity"), 
-        data.get("transaction_type"),
-        session.get("user_id"), 
-        session.get("branch_id")
+    
+    # Update this call to include 'reason'
+    result = booking_services.inventory_transaction(
+        quantity=data.get("quantity"), 
+        transaction_type=data.get("transaction_type"),
+        handled_by=session.get("user_id"), 
+        branch_id=session.get("branch_id"),
+        reason=data.get("reason", "") # <--- Pass the reason here
     )
 
     if not result.id:
         return jsonify({"message": "Failed to create inventory transaction"}), 400
+        
     print("Inventory Adjustment Response:", result)
     db.session.commit()
     return jsonify({"message": "Inventory transaction created successfully"}), 201

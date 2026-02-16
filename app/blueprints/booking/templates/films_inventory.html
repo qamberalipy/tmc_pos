@@ -60,9 +60,15 @@
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h4 class="fw-bold text-dark m-0">Films Inventory Audit</h4>
 
-        <button class="btn btn-success px-4" data-bs-toggle="modal" data-bs-target="#addfilmModal">
-            <i class="bi bi-plus-circle"></i> Add Films
-        </button>
+        <div>
+            <button class="btn btn-danger px-4 me-2" data-bs-toggle="modal" data-bs-target="#resetFilmModal">
+                <i class="bi bi-dash-circle"></i> Reset Films
+            </button>
+            
+            <button class="btn btn-success px-4" data-bs-toggle="modal" data-bs-target="#addfilmModal">
+                <i class="bi bi-plus-circle"></i> Add Films
+            </button>
+        </div>
     </div>
 
     <!-- Quick Filters -->
@@ -145,6 +151,30 @@
             </div>
         </div>
 
+    </div>
+</div>
+<div class="modal fade" id="resetFilmModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">Reset / Deduct Film Inventory</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-danger fw-bold">Note: This will deduct films from the inventory.</p>
+                
+                <label for="reset_films_qty" class="">No of Films to Remove</label>
+                <input type="number" id="reset_films_qty" class="form-control mb-3" min="1" placeholder="Enter quantity (e.g., 5)">
+                
+                <label for="reset_reason" class="">Reason (Optional)</label>
+                <input type="text" id="reset_reason" class="form-control mb-3" placeholder="e.g., Damaged, Wastage, Correction">
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-danger" id="BtnResetFilms">Confirm Reset</button>
+            </div>
+        </div>
     </div>
 </div>
 <!-- Data Table For films Usage-->
