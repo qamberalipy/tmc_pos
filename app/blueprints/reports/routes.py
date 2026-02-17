@@ -3,16 +3,16 @@ from . import reports_bp
 from app.blueprints.reports import services as report_services
 from app.decorators import login_required
 import datetime
-
+from app.models.user import User  # <--- Import this
 
 @reports_bp.route('/view/test-report')
 @login_required
 def view_daily_reports():
-    # try:
-    return render_template('daily_report.html')
-    # except Exception as e:
-    #     print(f"Error in view_daily_reports: {str(e)}")
-    #     return redirect(url_for('main.error_page'))
+    # --- NEW: Fetch Staff for Filter ---
+    branch_id = session.get("branch_id")
+    staff_members = User.query.filter_by(branch_id=branch_id).all()
+    
+    return render_template('daily_report.html', staff_members=staff_members)
 
 
 def _parse_date(date_str):
@@ -28,6 +28,7 @@ def _parse_date(date_str):
 def api_expenses():
     branch_id = session.get("branch_id")
     date = _parse_date(request.args.get("date"))
+    user_id = request.args.get("user_id") # <--- Get User ID
 
     if not branch_id:
         return jsonify({"error": "branch_id is required"}), 400
@@ -35,53 +36,77 @@ def api_expenses():
         return jsonify({"error": "valid date (YYYY-MM-DD) is required"}), 400
 
     try:
-        result = report_services.get_expenses_report(branch_id=branch_id, date=date)
-        print("Expenses Report Result:", result)
+        # Pass user_id to service
+        result = report_services.get_expenses_report(branch_id=branch_id, date=date, user_id=user_id)
         return jsonify(result), 200
-    except ValueError as ve:
-        return jsonify({"error": str(ve)}), 400
     except Exception as e:
-        print(f"Error in api_expenses: {str(e)}")
-        return jsonify({"error": "Internal server error", "detail": str(e)}), 500
+        return jsonify({"error": str(e)}), 500
 
 
 @reports_bp.route("/daily-report/films", methods=["GET"])
-def api_films():
+def api_films_report():
     branch_id = session.get("branch_id")
     date = _parse_date(request.args.get("date"))
+    user_id = request.args.get("user_id") # <--- Get User ID
 
-    if not branch_id:
-        return jsonify({"error": "branch_id is required"}), 400
-    if not date:
-        return jsonify({"error": "valid date (YYYY-MM-DD) is required"}), 400
+    if not branch_id or not date:
+        return jsonify({"error": "Missing params"}), 400
 
     try:
-        result = report_services.get_films_report(branch_id=branch_id, date=date)
-        print("Films Report Result:", result)
+        # Pass user_id to service
+        result = report_services.get_daily_films_report(branch_id, date, user_id=user_id)
         return jsonify(result), 200
     except Exception as e:
-        print(f"Error in api_films: {str(e)}")
-        return jsonify({"error": "Internal server error", "detail": str(e)}), 500
+        return jsonify({"error": str(e)}), 500
 
+@reports_bp.route("/daily-report/dues", methods=["GET"])
+def api_dues_report():
+    branch_id = session.get("branch_id")
+    date = _parse_date(request.args.get("date"))
+    user_id = request.args.get("user_id") # <--- Get User ID
+
+    if not branch_id or not date:
+        return jsonify({"error": "Missing params"}), 400
+
+    try:
+        result = report_services.get_due_clearance_report(branch_id, date, user_id=user_id)
+        return jsonify(result), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    
+# ... (existing routes)
+
+@reports_bp.route("/daily-report/summary", methods=["GET"])
+def api_daily_summary():
+    branch_id = session.get("branch_id")
+    date = _parse_date(request.args.get("date"))
+    user_id = request.args.get("user_id")
+
+    if not branch_id or not date:
+        return jsonify({"error": "Missing params"}), 400
+
+    try:
+        result = report_services.get_daily_summary(branch_id, date, user_id=user_id)
+        return jsonify(result), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @reports_bp.route("/daily-report/test-report", methods=["GET"])
-def api_test_report():
+def test_report_api():
     branch_id = session.get("branch_id")
     date = _parse_date(request.args.get("date"))
+    user_id = request.args.get("user_id") # <--- Get User ID
 
-    if not branch_id:
-        return jsonify({"error": "branch_id is required"}), 400
-    if not date:
-        return jsonify({"error": "valid date (YYYY-MM-DD) is required"}), 400
-
+    if not branch_id or not date:
+        return jsonify({"error": "Missing params"}), 400
+    
     try:
-        
-        result = report_services.get_test_report(branch_id=branch_id, date=date)
-        print("Test Report Result:", result)
-        return jsonify(result), 200
+        # Pass user_id to service
+        data = report_services.get_daily_test_report(branch_id, date, user_id=user_id)
+        return jsonify(data), 200
     except Exception as e:
-        print(f"Error in api_test_report: {str(e)}")
-        return jsonify({"error": "Internal server error", "detail": str(e)}), 500
+        return jsonify({"error": str(e)}), 500
+
 @reports_bp.route("/pending_cases", methods=["POST", "GET"])
 @login_required
 def view_pending_cases():

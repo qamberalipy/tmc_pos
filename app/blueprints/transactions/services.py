@@ -1,4 +1,4 @@
-import datetime
+import datetime,time 
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import cast, String
 from app.extensions import db
@@ -164,6 +164,31 @@ def toggle_expense_deleted(expense_id, is_deleted):
 
 def get_all_expenses(branch_id_str=None, from_date=None, to_date=None):
     try:
+        # 1. Date Validation & Setup
+        start_dt = None
+        end_dt = None
+
+        if from_date and to_date:
+            try:
+                # Parse strings to date objects
+                from_date_obj = datetime.datetime.strptime(from_date, "%Y-%m-%d").date()
+                to_date_obj   = datetime.datetime.strptime(to_date, "%Y-%m-%d").date()
+            except ValueError:
+                # Start/End date must be YYYY-MM-DD
+                return {"error": "Date format must be YYYY-MM-DD."}, 400
+
+            if from_date_obj > to_date_obj:
+                return {"error": "from_date cannot be greater than to_date."}, 400
+
+            # Create timestamps: Start of Day (00:00:00) -> End of Day (23:59:59)
+            start_dt = datetime.datetime.combine(from_date_obj, datetime.time.min)
+            end_dt   = datetime.datetime.combine(to_date_obj, datetime.time.max)
+
+        elif from_date or to_date:
+            # If only one date is provided, raise error
+            return {"error": "Both from_date and to_date are required for date filtering."}, 400
+
+        # 2. Base Query
         query = (
             db.session.query(
                 Expenses,
@@ -177,25 +202,17 @@ def get_all_expenses(branch_id_str=None, from_date=None, to_date=None):
             .filter(Expenses.is_deleted == False)
         )
 
-        # Filter by Branch
+        # 3. Apply Filters
         if branch_id_str:
             query = query.filter(Expenses.branch_id == int(branch_id_str))
 
-        # --- NEW: Date Filters ---
-        if from_date:
-            # from_date string 'YYYY-MM-DD' works directly with >= for datetime in most DBs (defaults to 00:00:00)
-            query = query.filter(Expenses.created_at >= from_date)
+        if start_dt and end_dt:
+            query = query.filter(
+                Expenses.created_at >= start_dt, 
+                Expenses.created_at <= end_dt
+            )
 
-        if to_date:
-            try:
-                # Convert string 'YYYY-MM-DD' to datetime end-of-day
-                date_obj = datetime.datetime.strptime(to_date, '%Y-%m-%d')
-                end_of_day = date_obj.replace(hour=23, minute=59, second=59)
-                query = query.filter(Expenses.created_at <= end_of_day)
-            except ValueError:
-                # Fallback if format is weird, though frontend sends YYYY-MM-DD
-                query = query.filter(Expenses.created_at <= to_date)
-
+        # 4. Execute & Format
         results = query.order_by(Expenses.created_at.desc()).all()
 
         return [
@@ -205,8 +222,11 @@ def get_all_expenses(branch_id_str=None, from_date=None, to_date=None):
 
     except SQLAlchemyError as e:
         db.session.rollback()
-        print({"error": str(e.__dict__.get("orig", e))})
+        print(f"Database Error: {str(e)}")
         return {"error": str(e.__dict__.get("orig", e))}, 500
+    except Exception as e:
+        print(f"General Error: {str(e)}")
+        return {"error": str(e)}, 500
 # Get One by ID (joined)
 def get_expense_by_id(expense_id):
     try:

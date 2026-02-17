@@ -32,11 +32,23 @@
     </div>
 
     <div class="row">
-        <div class="col-md-4">
-            <label class="form-label fw-semibold">Select Date *</label>
-            <div class="d-flex">
-                <input type="date" class="form-control shadow-sm" id="report_date">
-                <button class="btn btn-dark ms-2" id="searchBtn">
+        <div class="col-md-6">
+            <label class="form-label fw-semibold">Select Date & Staff *</label>
+            <div class="d-flex gap-2">
+                <input type="date" class="form-control shadow-sm" id="report_date" style="max-width: 180px;">
+
+                <select class="form-select shadow-sm" id="staff_selector" style="max-width: 200px;">
+                    {% if session_user_role|lower == 'admin' %}
+                        <option value="">-- All Staff --</option>
+                        {% for user in staff_members %}
+                            <option value="{{ user.id }}">{{ user.name }}</option>
+                        {% endfor %}
+                    {% else %}
+                        <option value="{{ session_user_id }}" selected>{{ session_user_name }}</option>
+                    {% endif %}
+                </select>
+
+                <button class="btn btn-dark" id="searchBtn">
                     <i class="bi bi-search"></i>
                 </button>
             </div>
@@ -57,7 +69,115 @@
         </button>
     </div>
 
-    <div id="daily-report-area"></div>
+    <div id="daily-report-area">
+        
+        <div class="row mb-4">
+            <div class="col-md-4">
+                <div class="card border-success border-2 shadow-sm">
+                    <div class="card-body text-center">
+                        <h6 class="text-success fw-bold text-uppercase">Total Income (Cash In)</h6>
+                        <h3 class="fw-bold text-dark" id="summary_income">0.00</h3>
+                    </div>
+                </div>
+            </div>
+    
+            <div class="col-md-4">
+                <div class="card border-danger border-2 shadow-sm">
+                    <div class="card-body text-center">
+                        <h6 class="text-danger fw-bold text-uppercase">Total Expense (Cash Out)</h6>
+                        <h3 class="fw-bold text-dark" id="summary_expense">0.00</h3>
+                    </div>
+                </div>
+            </div>
+    
+            <div class="col-md-4">
+                <div class="card border-primary border-2 shadow-sm">
+                    <div class="card-body text-center">
+                        <h6 class="text-primary fw-bold text-uppercase">Net Cash in Hand</h6>
+                        <h3 class="fw-bold text-dark" id="summary_net">0.00</h3>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section-header text-primary d-flex justify-content-between">
+            <span><i class="bi bi-card-checklist"></i> Tests Summary</span>
+            <span id="total_test_amount" class="badge bg-primary">0</span>
+        </div>
+        <div class="table-responsive mb-4">
+            <table class="table table-bordered table-sm table-striped report-table" id="testReportTable">
+                <thead class="table-light">
+                    <tr>
+                        <th>Test Name</th>
+                        <th class="text-center">Count</th>
+                        <th class="text-end" style="text-align: right !important;">Total Amount</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+
+        <div class="section-header text-primary">
+            <span><i class="bi bi-film"></i> Films Inventory</span>
+        </div>
+        
+        <div class="row mb-4">
+            <div class="col-md-4">
+                <div class="border rounded p-3 text-center bg-light">
+                    <small class="text-muted fw-bold text-uppercase">Opening Stock</small>
+                    <h4 class="fw-bold text-dark mt-1" id="film_start">0</h4>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="border rounded p-3 text-center bg-light">
+                    <small class="text-muted fw-bold text-uppercase">Used Today</small>
+                    <h4 class="fw-bold text-danger mt-1" id="film_use">0</h4>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="border rounded p-3 text-center bg-light">
+                    <small class="text-muted fw-bold text-uppercase">Closing Stock</small>
+                    <h4 class="fw-bold text-success mt-1" id="film_closing">0</h4>
+                </div>
+            </div>
+        </div>
+        <div class="section-header text-primary d-flex justify-content-between">
+            <span><i class="bi bi-cash-coin"></i> Due Clearance (Recoveries)</span>
+            <span id="total_dues_collected" class="badge bg-primary">0</span>
+        </div>
+        <div class="table-responsive mb-4">
+            <table class="table table-bordered table-sm table-striped report-table" id="dueReportTable">
+                <thead class="table-light">
+                    <tr>
+                        <th>Time</th>
+                        <th>Patient</th>
+                        <th>MR No</th>
+                        <th>Collected By</th>
+                        <th>Mode</th>
+                        <th class="text-end" style="text-align: right !important;">Amount</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+
+        <div class="section-header text-danger d-flex justify-content-between">
+            <span><i class="bi bi-dash-circle"></i> Expenses</span>
+            <span id="total_expense_amount" class="badge bg-danger">0</span>
+        </div>
+        <div class="table-responsive mb-4">
+            <table class="table table-bordered table-sm table-striped report-table" id="expenseReportTable">
+                <thead class="table-light">
+                    <tr>
+                        <th>Expense Head</th>
+                        <th style="text-align: right !important;">Amount</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+
+    </div>
 </div>
 
 {% endblock %}
@@ -67,7 +187,6 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
 <script src="{{ url_for('reports.static', filename='js/daily_reports.js') }}"></script>
 {% endblock %}
