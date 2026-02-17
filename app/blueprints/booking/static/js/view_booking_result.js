@@ -34,80 +34,94 @@ function getAssignedReports() {
         .then(res => {
             let data = res.data;
             
+            // Check for API error response
+            if(data.status === "error") {
+                showToastMessage("error", data.message);
+                return;
+            }
+
             // Initialize/Destroy DataTable
             let dtable = $("#assignedReportsTable").DataTable({
                 destroy: true,
                 responsive: true,
-                pageLength: 10,
-                ordering: false, // Turn off auto-sorting to respect backend sort
-                language: { emptyTable: "No assigned reports found." }
+                order: [[0, 'desc']] // Sort by Booking ID descending
             });
 
-            dtable.clear().draw();
+            dtable.clear();
             let rowsToAdd = [];
 
-            $.each(data, function (i, item) {
-                // --- A. Booking ID ---
-                let bookingIdHtml = `<span class="fw-bold text-primary">${item.booking_id}</span>`;
-
-                // --- B. Test Name ---
-                let testHtml = `<span class="fw-bold">${item.test_name}</span>`;
-
-                // --- C. Status Badge ---
-                let badgeClass = "bg-secondary";
-                if(item.status === "Reported") badgeClass = "bg-success";
-                if(item.status === "Pending") badgeClass = "bg-warning text-dark";
-                if(item.status === "Declined") badgeClass = "bg-danger";
+            data.forEach(item => {
                 
-                let statusHtml = `<span class="badge ${badgeClass}">${item.status}</span>`;
+                // --- 1. Patient Info (Name + Age/Gender) ---
+                let patientInfoHtml = `
+                    <div class="d-flex flex-column">
+                        <span class="fw-bold text-dark">${item.patient_name || '-'}</span>
+                        <small class="text-muted" style="font-size:0.85em;">
+                            ${item.age || '-'} / ${item.gender || '-'}
+                        </small>
+                    </div>
+                `;
 
-                // --- D. Assignments ---
-                let assignToHtml = `<small>${item.assign_to}</small>`;
-                let assignByHtml = `<small class="text-muted">${item.assign_by}</small>`;
+                // --- 2. Contact Column ---
+                let contactHtml = `<span class="text-secondary">${item.contact_no || 'N/A'}</span>`;
 
-                // --- E. Date ---
-                let assignedAt = item.assigned_at || "-";
+                // --- 3. Status Badge ---
+                let statusClass = "bg-warning text-dark";
+                if(item.status === 'Reported') statusClass = "bg-success";
+                else if(item.status === 'Declined') statusClass = "bg-danger";
+                
+                let statusHtml = `<span class="badge ${statusClass}">${item.status}</span>`;
 
-                // --- F. Action Buttons (LOGIC UPDATED) ---
+                // --- 4. Booking ID & Test ---
+                let bookingIdHtml = `<span class="fw-bold text-primary">#${item.booking_id}</span>`;
+                let testHtml = `<span class="fw-semibold">${item.test_name}</span>`;
+                
+                // --- 5. Assign Info ---
+                let assignToHtml = `<span class="fw-bold text-dark">${item.assign_to}</span>`;
+                let assignByHtml = `
+                    <div class="d-flex flex-column">
+                        <span class="text-dark small fw-bold">${item.assign_by}</span>
+                        <small class="text-muted" style="font-size: 0.75rem;">${item.assigned_at || ''}</small>
+                    </div>
+                `;
+
+                // --- 6. Action Buttons ---
                 let printBtn = "";
-                let balance = parseFloat(item.balance || 0);
+                
+                // Only show View/Print button if Reported or Pending (Pending might view details)
+                if (item.report_details_id) {
+                    printBtn = `
+                        <button class="btn btn-sm btn-info text-white me-1" 
+                            onclick="viewReport('${item.report_details_id}', ${item.balance})" 
+                            title="View Report">
+                            <i class="bi bi-eye"></i>
+                        </button>`;
+                } else {
+                    // Placeholder for pending
+                    printBtn = `
+                        <button class="btn btn-sm btn-secondary me-1" disabled title="Report not ready">
+                            <i class="bi bi-eye-slash"></i>
+                        </button>`;
+                }
 
-                // Priority 1: Check Dues
-                if (balance > 0) {
-                    printBtn = `
-                        <button class="btn btn-sm btn-outline-danger disabled" 
-                                style="cursor: not-allowed; opacity: 0.7;" 
-                                title="Cannot Print: Dues Pending (${balance})">
-                            <i class="bi bi-exclamation-circle"></i> Due
-                        </button>`;
-                }
-                // Priority 2: Check if Report Exists
-                else if (item.report_details_id) {
-                    printBtn = `
-                        <button class="btn btn-sm btn-dark" 
-                                onclick="viewReport(${item.report_details_id}, ${balance})" 
-                                title="Print Report">
-                            <i class="bi bi-printer-fill"></i> Print
-                        </button>`;
-                } 
-                // Priority 3: Pending/Declined
-                else {
-                    printBtn = `
-                        <button class="btn btn-sm btn-light text-muted border" 
-                                disabled 
-                                title="Not Reported Yet">
-                            <i class="bi bi-printer"></i> Print
-                        </button>`;
-                }
+                // Delete Button (New)
+                let deleteBtn = `
+                    <button class="btn btn-sm btn-danger" 
+                        onclick="deleteAssignment('${item.id}')" 
+                        title="Delete Assignment Request">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                `;
 
                 rowsToAdd.push([
                     bookingIdHtml,
+                    patientInfoHtml, // New
+                    contactHtml,     // New
                     testHtml,
                     statusHtml,
                     assignToHtml,
-                    assignByHtml,
-                    assignedAt,
-                    printBtn
+                    assignByHtml,    // Combined By + At
+                    `<div class="d-flex">${printBtn} ${deleteBtn}</div>`
                 ]);
             });
 
@@ -143,4 +157,36 @@ function viewReport(reportDetailsId, dueAmount) {
     // Open route in new tab
     let url = baseUrl + "/reports/view-patient-report/" + reportDetailsId;
     window.open(url, '_blank');
+}
+
+// =======================================================
+// 🔥 DELETE ASSIGNMENT (NEW)
+// =======================================================
+function deleteAssignment(id) {
+    if (!confirm("Are you sure you want to delete this assignment? The doctor will no longer see this request.")) {
+        return;
+    }
+
+    if (typeof myshowLoader === 'function') myshowLoader();
+
+    axios.delete(baseUrl + `/reports/assigned-reports/delete/${id}`)
+        .then(res => {
+            if (typeof showToastMessage === 'function') {
+                showToastMessage("success", "Request deleted successfully");
+            } else {
+                alert("Request deleted successfully");
+            }
+            getAssignedReports(); // Refresh table
+        })
+        .catch(err => {
+            let msg = err.response?.data?.error || "Failed to delete assignment";
+            if (typeof showToastMessage === 'function') {
+                showToastMessage("error", msg);
+            } else {
+                alert(msg);
+            }
+        })
+        .finally(() => {
+            if (typeof myhideLoader === 'function') myhideLoader();
+        });
 }

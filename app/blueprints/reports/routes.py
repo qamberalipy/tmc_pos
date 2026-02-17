@@ -287,6 +287,14 @@ def get_doctor_assigned_reports():
 
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+
+@reports_bp.route('/assigned-reports/delete/<int:id>', methods=['DELETE'])
+def delete_assignment_route(id):
+    try:
+        result, status_code = report_services.delete_doctor_assignment(id)
+        return jsonify(result), status_code
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
     
 @reports_bp.route('/radiologist-logs', methods=['GET'])
 def view_radiologist_logs():
