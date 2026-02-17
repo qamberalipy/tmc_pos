@@ -25,57 +25,52 @@
 
 {% block user_page %}
 <div class="main-div">
-    <div class="jumbotron jumbotron-fluid rounded bg-white border-0 shadow-sm border-left py-3 px-4">
-        
-        <div class="justify-content-between mb-3 row align-items-center">
-            <div class="col-6 col-md-6">
-                <h5 class="text-pos">Assigned Reports</h5>
+    <div class="container-fluid mt-3">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-file-earmark-medical"></i> Doctor Assigned Reports</h5>
             </div>
-        </div>
+            <div class="card-body">
+                
+                <div class="row g-3 align-items-end mb-4">
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold">From Date</label>
+                        <input type="date" id="from_date" class="form-control">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold">To Date</label>
+                        <input type="date" id="to_date" class="form-control">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold">Status</label>
+                        <select id="status_filter" class="form-control select2-filter" multiple="multiple">
+                            <option value="Pending">Pending</option>
+                            <option value="Reported">Reported</option>
+                            <option value="Declined">Declined</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3 d-flex gap-2">
+                        <button class="btn btn-primary flex-grow-1" id="searchBtn">
+                            <i class="bi bi-search"></i> Search
+                        </button>
+                    </div>
+                </div>
 
-        <div class="row g-3 mb-4 align-items-end">
-            <div class="col-md-3">
-                <label class="form-label fw-semibold">From Date</label>
-                <input type="date" class="form-control shadow-sm" id="from_date">
-            </div>
-
-            <div class="col-md-3">
-                <label class="form-label fw-semibold">To Date</label>
-                <input type="date" class="form-control shadow-sm" id="to_date">
-            </div>
-
-            <div class="col-md-4">
-                <label class="form-label fw-semibold">Status</label>
-                <select class="select2-filter shadow-sm w-100" id="status_filter" multiple="multiple">
-                    <option value="Pending" selected>Pending</option>
-                    <option value="Reported">Reported</option>
-                    <option value="Declined">Declined</option>
-                </select>
-            </div>
-
-            <div class="col-md-2">
-                <button class="btn btn-dark w-100 shadow-sm" id="searchBtn">
-                    <i class="bi bi-search"></i> Search
-                </button>
-            </div>
-        </div>
-
-        <div class="text-dark">
-            <div class="table-responsive">
-                <table id="assignedReportsTable" class="table table-bordered table-hover dataTable no-footer" style="width:100%">
-                    <thead>
-                        <tr>
-                            <th>Booking ID</th>
-                            <th>Test Name</th>
-                            <th>Status</th>
-                            <th>Assign To</th>
-                            <th>Assign By</th>
-                            <th>Assigned At</th>
-                            <th>Action</th>
-                        </tr>
-                    </thead>
-                    <tbody id="table_body"></tbody>
-                </table>
+                <div class="table-responsive">
+                    <table id="assignedReportsTable" class="table table-bordered table-hover dataTable no-footer" style="width:100%">
+                        <thead class="bg-light">
+                            <tr>
+                                <th>Booking ID</th>
+                                <th>Patient Info</th> <th>Contact</th>      <th>Test Name</th>
+                                <th>Status</th>
+                                <th>Assign To</th>
+                                <th>Assign By</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table_body"></tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
@@ -96,7 +91,7 @@
         $('.select2-filter').select2({
             placeholder: "Select Status",
             allowClear: true,
-            width: '100%' // Ensures it fills the column
+            width: '100%' // Ensures it fills the container
         });
     });
 </script>

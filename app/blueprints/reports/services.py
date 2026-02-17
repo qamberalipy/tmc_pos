@@ -351,12 +351,15 @@ def get_doctor_assigned_reports_service(branch_id=None, status=None, from_date=N
             DoctorReportingdetails.report_details_id,
             DoctorReportingdetails.id.label("reported_id"),
             
-            # --- NEW: Fetch Due Amount ---
-            TestBooking.due_amount.label("booking_balance")
+            # --- NEW: Fetch Patient Details ---
+            TestBooking.due_amount.label("booking_balance"),
+            TestBooking.patient_name,
+            TestBooking.age,
+            TestBooking.gender,
+            TestBooking.contact_no
         ).join(
             Test_registration, DoctorReportingdetails.test_id == Test_registration.id
         ).join(
-            # --- NEW: Join Booking Table to get Balance ---
             TestBooking, TestBooking.id == cast(DoctorReportingdetails.booking_id, Integer)
         ).join(
             DoctorUser, cast(DoctorReportingdetails.doctor_id, Integer) == DoctorUser.id
@@ -393,8 +396,12 @@ def get_doctor_assigned_reports_service(branch_id=None, status=None, from_date=N
                 "report_details_id": row.report_details_id,
                 "id": row.reported_id,
                 
-                # --- NEW: Pass Balance to Frontend ---
-                "balance": float(row.booking_balance or 0)
+                # --- Pass New Data to Frontend ---
+                "balance": float(row.booking_balance or 0),
+                "patient_name": row.patient_name,
+                "age": row.age,
+                "gender": row.gender,
+                "contact_no": row.contact_no
             })
 
         return response_data, 200
@@ -405,8 +412,24 @@ def get_doctor_assigned_reports_service(branch_id=None, status=None, from_date=N
             "status": "error",
             "message": str(e)
         }
-    
-    
+
+# --- NEW FUNCTION TO DELETE ASSIGNMENT ---
+def delete_doctor_assignment(assignment_id):
+    try:
+        record = DoctorReportingdetails.query.get(assignment_id)
+        if not record:
+            return {"error": "Assignment not found"}, 404
+        
+        # Optional: Prevent deleting if already reported (Uncomment if needed)
+        # if record.status == 'Reported':
+        #     return {"error": "Cannot delete a reported assignment"}, 400
+
+        db.session.delete(record)
+        db.session.commit()
+        return {"message": "Assignment request deleted successfully"}, 200
+    except Exception as e:
+        db.session.rollback()
+        return {"error": str(e)}, 500    
 def get_doctor_pending_bookings(doctor_id):
     doctor_id_str = str(doctor_id)
     results = (
