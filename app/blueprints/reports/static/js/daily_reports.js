@@ -1,6 +1,6 @@
 $(document).ready(function () {
 
-    // Auto-fill today's date
+    // Auto-fill today's date if empty
     if (!$("#report_date").val()) {
         let today = new Date();
         $("#report_date").val(today.toISOString().split("T")[0]);
@@ -12,233 +12,265 @@ $(document).ready(function () {
         loadDailyReport();
     });
 
+    // =============================================================
     // MAIN LOADER FUNCTION
+    // =============================================================
     async function loadDailyReport() {
 
         let date = $("#report_date").val();
+        let userId = $("#staff_selector").val(); // Get Staff ID if selector exists
 
         if (!date) {
             showToastMessage("error", "Please select a date");
             return;
         }
 
-        $("#daily-report-area").html(`
-            <div class="text-center py-4">Loading report...</div>
-        `);
+        // 1. Show Loading State
+        // Tables
+        $("#testReportTable tbody").html('<tr><td colspan="3" class="text-center">Loading...</td></tr>');
+        $("#dueReportTable tbody").html('<tr><td colspan="6" class="text-center">Loading...</td></tr>');
+        $("#expenseReportTable tbody").html('<tr><td colspan="2" class="text-center">Loading...</td></tr>');
+        
+        // Cards (Reset to 0)
+        $("#summary_income, #summary_expense, #summary_net").text("0.00");
+        $("#film_start, #film_use, #film_closing").text("0");
 
         try {
             myshowLoader();
 
-            const [testRes, filmsRes, expRes] = await Promise.all([
-                axios.get(`/reports/daily-report/test-report`, { params: { date } }),
-                axios.get(`/reports/daily-report/films`, { params: { date } }),
-                axios.get(`/reports/daily-report/expenses`, { params: { date } })
+            // 2. Prepare API Parameters
+            const params = { date: date };
+            if (userId) {
+                params.user_id = userId;
+            }
+
+            // 3. Fetch All Reports in Parallel
+            const [testRes, filmsRes, expRes, duesRes, summaryRes] = await Promise.all([
+                axios.get(`/reports/daily-report/test-report`, { params }),
+                axios.get(`/reports/daily-report/films`, { params }),
+                axios.get(`/reports/daily-report/expenses`, { params }),
+                axios.get(`/reports/daily-report/dues`, { params }),
+                axios.get(`/reports/daily-report/summary`, { params }) 
             ]);
 
-            renderDailyReport(testRes.data, filmsRes.data, expRes.data, date);
+            // 4. Render Data
+            renderDailyReport(testRes.data, filmsRes.data, expRes.data, duesRes.data, summaryRes.data, date);
 
         } catch (err) {
-            console.log(err);
-            $("#daily-report-area").html(
-                `<div class="alert alert-danger text-center">Error loading report</div>`
-            );
+            console.error(err);
+            showToastMessage("error", "Failed to load report data");
+            
+            // Clear loading state on error
+            $("#testReportTable tbody").html('<tr><td colspan="3" class="text-center text-danger">Error loading data</td></tr>');
         } finally {
             myhideLoader();
         }
     }
 
-    // RENDER REPORT HTML
-    function renderDailyReport(test, films, expenses, date) {
 
-        let totalIncome = test.total_income || 0;
-        let totalExpense = expenses.total_expenses || 0;
-        let remainingCash = totalIncome - totalExpense;
+    function renderDailyReport(testData, filmsData, expData, duesData, summaryData, dateStr) {
 
-        let html = `
-        <div id="reportExportBox" style="width: 100%; max-width: 800px; margin: auto;">
-            
-            <h5 class="text-center mb-3 report-title">TMC – Civil Branch Daily Report</h5>
+        // --- 1. FINANCIAL SUMMARY CARDS ---
+        if(summaryData) {
+            $("#summary_income").text(formatCurrency(summaryData.total_income));
+            $("#summary_expense").text(formatCurrency(summaryData.total_expense));
+            $("#summary_net").text(formatCurrency(summaryData.net_cash));
+        }
 
-            <div class="section-header">Basic Information</div>
-            <table class="table table-bordered report-table">
-                <tr><td><b>Date & Day:</b></td><td>${date}</td></tr>
-                <tr><td><b>Total Income:</b></td><td>Rs. ${totalIncome.toFixed(2)}</td></tr>
-            </table>
+        // --- 2. FILMS INVENTORY CARDS (UPDATED) ---
+        // filmsData is now { film_start: X, film_closing: Y, film_use: Z }
+        $("#film_start").text(filmsData.film_start || 0);
+        $("#film_use").text(filmsData.film_use || 0);
+        $("#film_closing").text(filmsData.film_closing || 0);
 
-            <div class="section-header">Expenses Head</div>
-            <table class="table table-bordered report-table">
-                <thead><tr><th>Item</th><th>Amount</th></tr></thead>
-                <tbody>
-        `;
 
-        expenses.items.forEach((item, index) => {
-            html += `
-                <tr>
-                    <td>${index + 1}. ${item.name}</td>
-                    <td>Rs. ${item.amount}</td>
-                </tr>
-            `;
-        });
+        // --- 3. TEST REPORT TABLE ---
+        let testBody = "";
+        let totalTestAmt = 0;
 
-        html += `
-                </tbody>
-            </table>
+        if (!testData || testData.length === 0) {
+            testBody = `<tr><td colspan="3" class="text-center text-muted">No tests found</td></tr>`;
+        } else {
+            testData.forEach(row => {
+                totalTestAmt += parseFloat(row.amount || 0);
+                testBody += `
+                    <tr>
+                        <td>${row.test_name}</td>
+                        <td class="text-center">${row.count}</td>
+                        <td class="text-end fw-bold">${formatCurrency(row.amount)}</td>
+                    </tr>
+                `;
+            });
+        }
+        $("#testReportTable tbody").html(testBody);
+        $("#total_test_amount").text(formatCurrency(totalTestAmt));
 
-            <table class="table table-bordered report-table">
-                <tr><td><b>Total Expense:</b></td><td>Rs. ${totalExpense.toFixed(2)}</td></tr>
-                <tr><td><b>Remaining Balance Cash:</b></td><td>Rs. ${remainingCash.toFixed(2)}</td></tr>
-            </table>
 
-            <div class="section-header">Daily Films Report</div>
-            <table class="table table-bordered report-table">
-                <tr><td>Film Start</td><td>${films.film_start}</td></tr>
-                <tr><td>Film Closing</td><td>${films.film_closing}</td></tr>
-                <tr><td>Film Use</td><td>${films.film_use}</td></tr>
-            </table>
+        // --- 4. DUE CLEARANCE TABLE ---
+        let dueBody = "";
+        let totalDues = 0;
 
-            <div class="section-header">Daily Test Report</div>
-            <table class="table table-bordered report-table" id="testReportTable">
-                <thead>
-                    <tr><th>ID</th><th>Test Name</th><th>Frequency</th></tr>
-                </thead>
-                <tbody>
-        `;
+        if (!duesData || duesData.length === 0) {
+            dueBody = `<tr><td colspan="6" class="text-center text-muted">No dues cleared today</td></tr>`;
+        } else {
+            duesData.forEach(row => {
+                totalDues += parseFloat(row.amount || 0);
+                dueBody += `
+                    <tr>
+                        <td>${row.time}</td>
+                        <td>${row.patient_name}</td>
+                        <td>${row.mr_no}</td>
+                        <td>${row.collected_by}</td>
+                        <td>${row.type}</td>
+                        <td class="text-end fw-bold">${formatCurrency(row.amount)}</td>
+                    </tr>
+                `;
+            });
+        }
+        $("#dueReportTable tbody").html(dueBody);
+        $("#total_dues_collected").text(formatCurrency(totalDues));
 
-        test.tests.forEach((t, index) => {
-            html += `
-                <tr>
-                    <td>${index + 1}</td>
-                    <td>${t.test_name}</td>
-                    <td>${t.frequency}</td>
-                </tr>
-            `;
-        });
 
-        html += `
-                </tbody>
-            </table>
-        </div>
-        `;
+        // --- 5. EXPENSES TABLE ---
+        let expBody = "";
+        let totalExp = 0;
 
-        $("#daily-report-area").html(html);
+        if (!expData || expData.length === 0) {
+            expBody = `<tr><td colspan="2" class="text-center text-muted">No expenses found</td></tr>`;
+        } else {
+            expData.forEach(row => {
+                totalExp += parseFloat(row.total_amount || 0);
+                expBody += `
+                    <tr>
+                        <td>${row.head_name}</td>
+                        <td class="text-end fw-bold">${formatCurrency(row.total_amount)}</td>
+                    </tr>
+                `;
+            });
+        }
+        $("#expenseReportTable tbody").html(expBody);
+        $("#total_expense_amount").text(formatCurrency(totalExp));
+
     }
 
-    // EXPORT TO EXCEL
+
+    // Helper: Format Currency
+    function formatCurrency(val) {
+        return parseFloat(val || 0).toLocaleString('en-US', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        });
+    }
+
+    // =============================================================
+    // EXPORT PDF FUNCTION
+    // =============================================================
+    $("#exportPDF").on("click", function () {
+        const { jsPDF } = window.jspdf;
+        let doc = new jsPDF();
+        let y = 15;
+        let date = $("#report_date").val();
+
+        // Title
+        doc.setFontSize(16);
+        doc.text(`Daily Closing Report - ${date}`, 14, y);
+        y += 10;
+
+        // 1. Financial Summary Section
+        let income = $("#summary_income").text();
+        let expense = $("#summary_expense").text();
+        let net = $("#summary_net").text();
+
+        doc.setFontSize(10);
+        doc.setFont(undefined, 'bold');
+        doc.text("Financial Summary:", 14, y);
+        doc.setFont(undefined, 'normal');
+        y += 6;
+        doc.text(`Income: ${income}   |   Expense: ${expense}   |   Net Cash: ${net}`, 14, y);
+        y += 12;
+
+        // 2. Films Inventory Section (Text Only, no table)
+        let fStart = $("#film_start").text();
+        let fUse = $("#film_use").text();
+        let fClose = $("#film_closing").text();
+
+        doc.setFont(undefined, 'bold');
+        doc.text("Films Inventory:", 14, y);
+        doc.setFont(undefined, 'normal');
+        y += 6;
+        doc.text(`Opening Stock: ${fStart}   |   Used Today: ${fUse}   |   Closing Stock: ${fClose}`, 14, y);
+        y += 12;
+
+        // Helper Function for Tables
+        function addTable(title, tableId, themeColor) {
+            doc.setFontSize(12);
+            doc.setFont(undefined, 'bold');
+            doc.text(title, 14, y);
+            y += 5;
+
+            doc.autoTable({
+                html: tableId,
+                startY: y,
+                theme: 'grid',
+                headStyles: { fillColor: themeColor },
+                styles: { fontSize: 9 },
+                didDrawPage: function (data) {
+                    y = data.cursor.y; 
+                }
+            });
+            y = doc.lastAutoTable.finalY + 10; // Spacing after table
+        }
+
+        // 3. Tests Table
+        addTable("Tests Summary", "#testReportTable", [13, 110, 253]); // Blue
+        
+        // 4. Dues Table
+        addTable("Due Clearance", "#dueReportTable", [25, 135, 84]); // Green
+        
+        // 5. Expenses Table
+        addTable("Expenses", "#expenseReportTable", [220, 53, 69]); // Red
+
+        doc.save(`Daily_Report_${date}.pdf`);
+    });
+
+    // =============================================================
+    // EXPORT EXCEL FUNCTION
+    // =============================================================
     $("#exportExcel").on("click", function () {
-        let element = document.getElementById("reportExportBox");
-        let wb = XLSX.utils.table_to_book(element, { sheet: "Daily Report" });
-        XLSX.writeFile(wb, "Daily_Report.xlsx");
+        let wb = XLSX.utils.book_new();
+
+        // 1. Create a "Summary" Sheet with Financials + Films
+        let summaryData = [
+            ["Daily Closing Report", $("#report_date").val()],
+            [],
+            ["FINANCIAL SUMMARY", ""],
+            ["Total Income", $("#summary_income").text()],
+            ["Total Expense", $("#summary_expense").text()],
+            ["Net Cash", $("#summary_net").text()],
+            [],
+            ["FILMS INVENTORY", ""],
+            ["Opening Stock", $("#film_start").text()],
+            ["Used Today", $("#film_use").text()],
+            ["Closing Stock", $("#film_closing").text()]
+        ];
+
+        let wsSummary = XLSX.utils.aoa_to_sheet(summaryData);
+        XLSX.utils.book_append_sheet(wb, wsSummary, "Summary");
+
+        // 2. Append other tables as separate sheets
+        function appendSheet(tableId, sheetName) {
+            let table = document.getElementById(tableId.replace("#", ""));
+            if (table) {
+                let ws = XLSX.utils.table_to_sheet(table);
+                XLSX.utils.book_append_sheet(wb, ws, sheetName);
+            }
+        }
+
+        appendSheet("#testReportTable", "Tests");
+        appendSheet("#dueReportTable", "Due Clearance");
+        appendSheet("#expenseReportTable", "Expenses");
+
+        XLSX.writeFile(wb, `Daily_Report_${$("#report_date").val()}.xlsx`);
     });
-
-    // EXPORT TO PDF (A4 + auto pages)
-// ================================
-// EXPORT CLEAN PDF (NO BLANK PAGES)
-// ================================
-$("#exportPDF").on("click", function () {
-
-    const { jsPDF } = window.jspdf;
-
-    let doc = new jsPDF("p", "pt", "a4");
-
-    let pageWidth = doc.internal.pageSize.getWidth();
-
-    // ------- PAGE TITLE ---------
-    doc.setFontSize(16);
-    doc.text("TMC – Civil Branch Daily Report", pageWidth / 2, 40, { align: "center" });
-
-    let y = 70;
-
-    // ============ SECTION 1: BASIC INFO ============
-    doc.setFontSize(12);
-    doc.setTextColor(0);
-
-    doc.autoTable({
-        startY: y,
-        theme: "grid",
-        headStyles: { fillColor: [230, 230, 230] },
-        styles: { fontSize: 10, halign: "left" },
-        body: [
-            ["Date", $("#report_date").val()],
-            ["Total Income", $("#reportExportBox").find("td:contains('Total Income')").next().text()],
-            ["Total Expense", $("#reportExportBox").find("td:contains('Total Expense')").next().text()],
-            ["Remaining Cash", $("#reportExportBox").find("td:contains('Remaining Cash')").next().text()],
-        ],
-    });
-
-    y = doc.lastAutoTable.finalY + 20;
-
-    // ============ SECTION 2: EXPENSE TABLE ============
-    doc.setFontSize(12);
-    doc.text("Expenses Head", 40, y);
-    y += 10;
-
-    let expRows = [];
-    $("#reportExportBox table:eq(1) tbody tr").each(function () {
-        expRows.push([
-            $(this).find("td:eq(0)").text(),
-            $(this).find("td:eq(1)").text()
-        ]);
-    });
-
-    doc.autoTable({
-        startY: y,
-        theme: "grid",
-        head: [["Item", "Amount"]],
-        headStyles: { fillColor: [200, 220, 255] },
-        styles: { fontSize: 10 },
-        body: expRows
-    });
-
-    y = doc.lastAutoTable.finalY + 20;
-
-    // ============ SECTION 3: FILMS REPORT ============
-    doc.setFontSize(12);
-    doc.text("Daily Films Report", 40, y);
-    y += 10;
-
-    let filmRows = [];
-    $("#reportExportBox table:eq(2) tr").each(function () {
-        filmRows.push([
-            $(this).find("td:eq(0)").text(),
-            $(this).find("td:eq(1)").text()
-        ]);
-    });
-
-    doc.autoTable({
-        startY: y,
-        theme: "grid",
-        headStyles: { fillColor: [255, 240, 200] },
-        styles: { fontSize: 10 },
-        body: filmRows
-    });
-
-    y = doc.lastAutoTable.finalY + 20;
-
-    // ============ SECTION 4: TEST REPORT ============
-    doc.setFontSize(12);
-    doc.text("Daily Test Report", 40, y);
-    y += 10;
-
-    let testRows = [];
-    $("#testReportTable tbody tr").each(function () {
-        testRows.push([
-            $(this).find("td:eq(0)").text(),
-            $(this).find("td:eq(1)").text(),
-            $(this).find("td:eq(2)").text(),
-        ]);
-    });
-
-    doc.autoTable({
-        startY: y,
-        theme: "grid",
-        head: [["ID", "Test Name", "Frequency"]],
-        headStyles: { fillColor: [220, 255, 220] },
-        styles: { fontSize: 10 },
-        body: testRows
-    });
-
-    doc.save("Daily_Report.pdf");
-});
-
 
 });
