@@ -1,5 +1,5 @@
 from app.extensions import db
-from datetime import datetime
+from datetime import datetime, timezone
 
 class Expenses(db.Model):
     __tablename__ = "expenses"
@@ -18,9 +18,9 @@ class Expenses(db.Model):
     )
     paid_to = db.Column(db.String(225))
 
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     created_by = db.Column(db.Integer)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     updated_by = db.Column(db.Integer)
 
 class PaymentTransaction(db.Model):

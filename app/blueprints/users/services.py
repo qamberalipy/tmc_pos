@@ -1,6 +1,8 @@
 from flask import json, session
 from app.extensions import db
 from app.models import Role, Branch, User   
+from app.models.shift import ShiftSession
+from datetime import datetime, timezone
 from werkzeug.security import generate_password_hash
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -216,3 +218,42 @@ def update_user_password(user_id, new_password):
     except SQLAlchemyError as e:
         db.session.rollback()
         return {"error": str(e.__dict__.get('orig', e))}, 500
+
+def start_user_shift(user_id, branch_id):
+    """Starts a new shift if one isn't already open."""
+    # Check for an existing open shift for this user in this branch
+    active_shift = ShiftSession.query.filter_by(
+        user_id=user_id, 
+        branch_id=branch_id, 
+        status='Open'
+    ).first()
+    
+    if active_shift:
+        return active_shift
+
+    # Use timezone-aware UTC now
+    new_shift = ShiftSession(
+        user_id=user_id,
+        branch_id=branch_id,
+        start_time=datetime.now(timezone.utc),
+        status='Open'
+    )
+    db.session.add(new_shift)
+    db.session.commit()
+    return new_shift
+
+
+def end_user_shift(user_id):
+    """Closes the currently active shift for the user."""
+    active_shift = ShiftSession.query.filter_by(
+        user_id=user_id, 
+        status='Open'
+    ).first()
+    
+    if not active_shift:
+        raise ValueError("No active shift found to end.")
+
+    active_shift.end_time = datetime.now(timezone.utc)
+    active_shift.status = 'Closed'
+    db.session.commit()
+    return active_shift

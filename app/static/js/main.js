@@ -124,3 +124,132 @@ $(document).ready(function () {
         });
     }
 });
+
+
+/**
+ * =============================================================
+ * STAFF SHIFT MANAGEMENT LOGIC
+ * =============================================================
+ */
+$(document).ready(function () {
+    
+    // Shift Logic - Only execute if user role is defined and is NOT an admin
+    if (typeof userRole !== 'undefined' && userRole !== 'admin') {
+        initLiveClock();
+        fetchShiftStatus();
+    }
+
+    let shiftTimerInterval = null;
+
+    // 1. Live Current Time Clock
+    function initLiveClock() {
+        setInterval(() => {
+            const now = new Date();
+            $('#liveClock').text(now.toLocaleTimeString('en-US', { hour12: true, hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+            $('#liveDate').text(now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }));
+        }, 1000);
+    }
+
+    // 2. Fetch True Shift Status from Server
+    function fetchShiftStatus() {
+        axios.get(`${baseUrl}/users/shift/status`)
+            .then(res => {
+                $('#shiftLoader').addClass('d-none');
+                if (res.data.is_active) {
+                    renderActiveShift(res.data.start_time);
+                } else {
+                    renderInactiveShift();
+                }
+            })
+            .catch(err => {
+                console.error("Error loading shift status", err);
+                $('#shiftLoader').html('<span class="text-danger small fw-bold">Sync Error</span>');
+            });
+    }
+
+    // 3. UI State: Shift Active
+    function renderActiveShift(startTimeUtcStr) {
+        $('#btnStartShift').addClass('d-none');
+        $('#btnEndShift').removeClass('d-none');
+        $('#shiftTimerBadge').removeClass('d-none').addClass('d-flex');
+
+        // Automatically converts UTC DB string to User's Local Browser Time
+        const startTime = new Date(startTimeUtcStr);
+
+        clearInterval(shiftTimerInterval);
+        shiftTimerInterval = setInterval(() => {
+            const now = new Date();
+            const diffMs = now - startTime;
+            
+            if (diffMs < 0) return; // Guard clause for clock sync differences
+
+            const h = String(Math.floor(diffMs / 3600000)).padStart(2, '0');
+            const m = String(Math.floor((diffMs % 3600000) / 60000)).padStart(2, '0');
+            const s = String(Math.floor((diffMs % 60000) / 1000)).padStart(2, '0');
+
+            $('#shiftTimer').text(`${h}:${m}:${s}`);
+        }, 1000);
+    }
+
+    // 4. UI State: Shift Inactive
+    function renderInactiveShift() {
+        clearInterval(shiftTimerInterval);
+        $('#shiftTimerBadge').removeClass('d-flex').addClass('d-none');
+        $('#btnEndShift').addClass('d-none');
+        $('#btnStartShift').removeClass('d-none');
+    }
+
+    // 5. Start Shift Action
+    $('#btnStartShift').on('click', function () {
+        Swal.fire({
+            title: 'Start your shift?',
+            text: "Your transactions will now be tracked under a new active session.",
+            icon: 'info',
+            showCancelButton: true,
+            confirmButtonColor: '#0d6efd',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: '<i class="bi bi-play-circle"></i> Yes, Start Shift'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                myshowLoader();
+                axios.post(`${baseUrl}/users/shift/start`)
+                    .then(res => {
+                        myhideLoader();
+                        showToastMessage('success', 'Shift started successfully.');
+                        renderActiveShift(res.data.start_time);
+                    })
+                    .catch(err => {
+                        myhideLoader();
+                        showToastMessage('error', err.response?.data?.error || 'Failed to start shift.');
+                    });
+            }
+        });
+    });
+
+    // 6. End Shift Action
+    $('#btnEndShift').on('click', function () {
+        Swal.fire({
+            title: 'End your shift?',
+            text: "This will close your current session and stop the timer. You cannot undo this action.",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#dc3545',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: '<i class="bi bi-stop-circle"></i> Yes, End Shift'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                myshowLoader();
+                axios.post(`${baseUrl}/users/shift/end`)
+                    .then(res => {
+                        myhideLoader();
+                        showToastMessage('success', 'Shift ended successfully.');
+                        renderInactiveShift();
+                    })
+                    .catch(err => {
+                        myhideLoader();
+                        showToastMessage('error', err.response?.data?.error || 'Failed to end shift.');
+                    });
+            }
+        });
+    });
+});

@@ -1,4 +1,4 @@
-import datetime,time 
+import datetime,time
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import cast, String
 from app.extensions import db
@@ -70,7 +70,7 @@ def create_expense(data):
                 payment_type=payment_method,
                 transaction_type="Expense",
                 created_by=exp.created_by,
-                payment_date=datetime.datetime.utcnow()
+                payment_date=datetime.datetime.now(datetime.timezone.utc)
             )
             db.session.add(transaction)
 
@@ -149,7 +149,7 @@ def toggle_expense_deleted(expense_id, is_deleted):
                 payment_type=exp.payment_method,
                 transaction_type="Expense",
                 created_by=exp.updated_by or exp.created_by,
-                payment_date=datetime.datetime.utcnow()
+                payment_date=datetime.datetime.now(datetime.timezone.utc)
             )
             db.session.add(restored_trans)
         

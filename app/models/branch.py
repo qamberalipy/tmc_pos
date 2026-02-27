@@ -1,5 +1,5 @@
 from app.extensions import db
-from datetime import datetime
+from datetime import datetime,timezone
 
 class Branch(db.Model):
     __tablename__ = "branch"
@@ -12,7 +12,9 @@ class Branch(db.Model):
     description = db.Column(db.String(225))
     is_active = db.Column(db.Boolean, default=True)
 
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
     created_by = db.Column(db.String(225))
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     updated_by = db.Column(db.String(225))
+    created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    timezone = db.Column(db.String(50), default='Asia/Karachi', nullable=False)

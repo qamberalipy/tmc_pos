@@ -3,7 +3,7 @@ from sqlalchemy import func, cast, Date, desc, Integer, and_,String
 from app.extensions import db
 from app.models import TestBookingDetails
 from decimal import Decimal
-from datetime import datetime, date,time
+from datetime import datetime, date,time,timezone
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import aliased
 from app.models.test_booking import TestFilmUsage, TestBooking, FilmInventoryTransaction
@@ -559,7 +559,7 @@ def save_doctor_report(data, user_id):
     if not dr_details:
         raise NotFound("No active doctor reporting record found.")
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
 
     report = DoctorReportData(
         patient_name=data["patient_name"],
@@ -668,7 +668,7 @@ def update_doctor_report(report_id, data, user_id):
         if field in data:
             setattr(report, field, data[field])
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     report.updated_by = user_id
     report.updated_at = now
 
