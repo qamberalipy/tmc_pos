@@ -1,4 +1,107 @@
 $(document).ready(function () {
+    
+    // Initialize Select2 on the Shift Dropdown
+    $('#shift_selector').select2({
+        theme: 'bootstrap-5',
+        placeholder: "Click to view & select shifts...",
+        allowClear: true,
+        width: '100%',
+        closeOnSelect: false 
+    });
+
+    // Auto-fill today's date if empty (Lab Day bounds)
+    if (!$("#report_date").val()) {
+        let today = new Date(); 
+        
+        if (today.getHours() < 8) {
+            today.setDate(today.getDate() - 1);
+        }
+        
+        let year = today.getFullYear();
+        let month = String(today.getMonth() + 1).padStart(2, '0');
+        let day = String(today.getDate()).padStart(2, '0');
+        
+        $("#report_date").val(`${year}-${month}-${day}`);
+    }
+
+    // Load initial data
+    if ($("#staff_selector").val()) {
+        fetchStaffShifts();
+    } else {
+        loadDailyReport(null); 
+    }
+
+    // --- Dynamic Shift Fetching with Loader ---
+    function fetchStaffShifts() {
+        let userId = $("#staff_selector").val();
+        let dateStr = $("#report_date").val();
+        
+        let $shiftContainer = $("#shift_selector_container");
+        let $shiftSelector = $("#shift_selector");
+        let $spinner = $("#shift_spinner"); // The new spinner
+        
+        if (!userId) {
+            $shiftContainer.hide();
+            $shiftSelector.empty().trigger('change'); 
+            return;
+        }
+
+        // Show container, show spinner, disable select dropdown
+        $shiftContainer.fadeIn();
+        $spinner.removeClass("d-none");
+        $shiftSelector.prop("disabled", true);
+
+        axios.get(`/users/user-shifts/${userId}?date=${dateStr}`)
+            .then(res => {
+                $shiftSelector.empty(); 
+                
+                if(res.data && res.data.length > 0) {
+                    res.data.forEach(shift => {
+                        $shiftSelector.append(new Option(shift.label, shift.id, false, false));
+                    });
+                } else {
+                    $shiftSelector.append(new Option("No shifts recorded for this day", "", false, false));
+                }
+                
+                $shiftSelector.trigger('change');
+            })
+            .catch(err => {
+                console.error("Shift Fetch Error:", err);
+                showToastMessage('error', 'Could not load shifts.');
+            })
+            .finally(() => {
+                // Hide spinner, enable select dropdown
+                $spinner.addClass("d-none");
+                $shiftSelector.prop("disabled", false);
+            });
+    }
+
+    // Trigger shift refresh on Staff or Date change
+    $("#staff_selector, #report_date").on("change", function () {
+        fetchStaffShifts();
+    });
+
+    // --- Action Buttons ---
+    $("#searchBtn").on("click", function () {
+        let shiftIds = $("#shift_selector").val(); 
+        
+        if ($("#staff_selector").val() && (!shiftIds || shiftIds.length === 0)) {
+            showToastMessage('warning', 'Please select at least one shift, or use "All-Day Report".');
+            return;
+        }
+        
+        loadDailyReport(shiftIds ? shiftIds.join(',') : null);
+    });
+
+    $("#allDayBtn").on("click", function() {
+        $("#staff_selector").val('');
+        $("#shift_selector_container").hide();
+        $("#shift_selector").val(null).trigger('change');
+        
+        loadDailyReport(null);
+    });
+
+    // ... (Keep the rest of your loadDailyReport, renderDailyReport, and Export functions exactly the same) ...$(document).ready(function () {
 
     // Auto-fill today's date if empty
     if (!$("#report_date").val()) {
@@ -6,19 +109,80 @@ $(document).ready(function () {
         $("#report_date").val(today.toISOString().split("T")[0]);
     }
 
-    loadDailyReport();
+    // Load initial shifts if staff is pre-selected (e.g., non-admin)
+    if ($("#staff_selector").val()) {
+        fetchStaffShifts();
+    } else {
+        loadDailyReport(null); // Load all-day by default for admin
+    }
 
-    $("#searchBtn").on("click", function () {
-        loadDailyReport();
+    // --- Dynamic Shift Fetching ---
+    function fetchStaffShifts() {
+        let userId = $("#staff_selector").val();
+        let dateStr = $("#report_date").val();
+        
+        let $shiftContainer = $("#shift_selector_container");
+        let $shiftSelector = $("#shift_selector");
+        
+        if (!userId) {
+            $shiftContainer.hide();
+            $shiftSelector.empty();
+            return;
+        }
+
+        axios.get(`/users/user-shifts/${userId}?date=${dateStr}`)
+            .then(res => {
+                $shiftSelector.empty();
+                if(res.data && res.data.length > 0) {
+                    res.data.forEach(shift => {
+                        $shiftSelector.append(new Option(shift.label, shift.id));
+                    });
+                    $shiftContainer.fadeIn();
+                } else {
+                    $shiftSelector.append(new Option("No shifts found", "", false, false));
+                    $shiftContainer.fadeIn();
+                }
+            })
+            .catch(err => {
+                console.error("Shift Fetch Error:", err);
+                showToastMessage('error', 'Could not load shifts.');
+            });
+    }
+
+    // Trigger shift refresh on Staff or Date change
+    $("#staff_selector, #report_date").on("change", function () {
+        fetchStaffShifts();
     });
+
+    // --- Action Buttons ---
+    $("#searchBtn").on("click", function () {
+        let shiftIds = $("#shift_selector").val(); 
+        
+        if ($("#staff_selector").val() && (!shiftIds || shiftIds.length === 0)) {
+            showToastMessage('warning', 'Please select at least one shift, or use "All-Day Report".');
+            return;
+        }
+        
+        loadDailyReport(shiftIds ? shiftIds.join(',') : null);
+    });
+
+    $("#allDayBtn").on("click", function() {
+        // Clear specific selections to enforce a full branch day query
+        $("#staff_selector").val('');
+        $("#shift_selector_container").hide();
+        $("#shift_selector").empty();
+        
+        loadDailyReport(null);
+    });
+
 
     // =============================================================
     // MAIN LOADER FUNCTION
     // =============================================================
-    async function loadDailyReport() {
+    async function loadDailyReport(shiftIdsStr = null) {
 
         let date = $("#report_date").val();
-        let userId = $("#staff_selector").val(); // Get Staff ID if selector exists
+        let userId = $("#staff_selector").val(); 
 
         if (!date) {
             showToastMessage("error", "Please select a date");
@@ -26,12 +190,10 @@ $(document).ready(function () {
         }
 
         // 1. Show Loading State
-        // Tables
-        $("#testReportTable tbody").html('<tr><td colspan="3" class="text-center">Loading...</td></tr>');
-        $("#dueReportTable tbody").html('<tr><td colspan="6" class="text-center">Loading...</td></tr>');
-        $("#expenseReportTable tbody").html('<tr><td colspan="2" class="text-center">Loading...</td></tr>');
+        $("#testReportTable tbody").html('<tr><td colspan="3" class="text-center py-4"><div class="spinner-border spinner-border-sm text-primary" role="status"></div> Loading...</td></tr>');
+        $("#dueReportTable tbody").html('<tr><td colspan="6" class="text-center py-4"><div class="spinner-border spinner-border-sm text-primary" role="status"></div> Loading...</td></tr>');
+        $("#expenseReportTable tbody").html('<tr><td colspan="2" class="text-center py-4"><div class="spinner-border spinner-border-sm text-primary" role="status"></div> Loading...</td></tr>');
         
-        // Cards (Reset to 0)
         $("#summary_income, #summary_expense, #summary_net").text("0.00");
         $("#film_start, #film_use, #film_closing").text("0");
 
@@ -40,9 +202,8 @@ $(document).ready(function () {
 
             // 2. Prepare API Parameters
             const params = { date: date };
-            if (userId) {
-                params.user_id = userId;
-            }
+            if (userId) params.user_id = userId;
+            if (shiftIdsStr) params.shift_ids = shiftIdsStr; 
 
             // 3. Fetch All Reports in Parallel
             const [testRes, filmsRes, expRes, duesRes, summaryRes] = await Promise.all([
@@ -59,8 +220,6 @@ $(document).ready(function () {
         } catch (err) {
             console.error(err);
             showToastMessage("error", "Failed to load report data");
-            
-            // Clear loading state on error
             $("#testReportTable tbody").html('<tr><td colspan="3" class="text-center text-danger">Error loading data</td></tr>');
         } finally {
             myhideLoader();
@@ -77,12 +236,10 @@ $(document).ready(function () {
             $("#summary_net").text(formatCurrency(summaryData.net_cash));
         }
 
-        // --- 2. FILMS INVENTORY CARDS (UPDATED) ---
-        // filmsData is now { film_start: X, film_closing: Y, film_use: Z }
+        // --- 2. FILMS INVENTORY CARDS ---
         $("#film_start").text(filmsData.film_start || 0);
         $("#film_use").text(filmsData.film_use || 0);
         $("#film_closing").text(filmsData.film_closing || 0);
-
 
         // --- 3. TEST REPORT TABLE ---
         let testBody = "";
@@ -111,7 +268,7 @@ $(document).ready(function () {
         let totalDues = 0;
 
         if (!duesData || duesData.length === 0) {
-            dueBody = `<tr><td colspan="6" class="text-center text-muted">No dues cleared today</td></tr>`;
+            dueBody = `<tr><td colspan="6" class="text-center text-muted">No dues cleared</td></tr>`;
         } else {
             duesData.forEach(row => {
                 totalDues += parseFloat(row.amount || 0);
@@ -153,7 +310,6 @@ $(document).ready(function () {
 
     }
 
-
     // Helper: Format Currency
     function formatCurrency(val) {
         return parseFloat(val || 0).toLocaleString('en-US', {
@@ -189,7 +345,7 @@ $(document).ready(function () {
         doc.text(`Income: ${income}   |   Expense: ${expense}   |   Net Cash: ${net}`, 14, y);
         y += 12;
 
-        // 2. Films Inventory Section (Text Only, no table)
+        // 2. Films Inventory Section
         let fStart = $("#film_start").text();
         let fUse = $("#film_use").text();
         let fClose = $("#film_closing").text();
@@ -201,7 +357,6 @@ $(document).ready(function () {
         doc.text(`Opening Stock: ${fStart}   |   Used Today: ${fUse}   |   Closing Stock: ${fClose}`, 14, y);
         y += 12;
 
-        // Helper Function for Tables
         function addTable(title, tableId, themeColor) {
             doc.setFontSize(12);
             doc.setFont(undefined, 'bold');
@@ -218,17 +373,12 @@ $(document).ready(function () {
                     y = data.cursor.y; 
                 }
             });
-            y = doc.lastAutoTable.finalY + 10; // Spacing after table
+            y = doc.lastAutoTable.finalY + 10; 
         }
 
-        // 3. Tests Table
-        addTable("Tests Summary", "#testReportTable", [13, 110, 253]); // Blue
-        
-        // 4. Dues Table
-        addTable("Due Clearance", "#dueReportTable", [25, 135, 84]); // Green
-        
-        // 5. Expenses Table
-        addTable("Expenses", "#expenseReportTable", [220, 53, 69]); // Red
+        addTable("Tests Summary", "#testReportTable", [13, 110, 253]); 
+        addTable("Due Clearance", "#dueReportTable", [25, 135, 84]); 
+        addTable("Expenses", "#expenseReportTable", [220, 53, 69]); 
 
         doc.save(`Daily_Report_${date}.pdf`);
     });
@@ -239,7 +389,6 @@ $(document).ready(function () {
     $("#exportExcel").on("click", function () {
         let wb = XLSX.utils.book_new();
 
-        // 1. Create a "Summary" Sheet with Financials + Films
         let summaryData = [
             ["Daily Closing Report", $("#report_date").val()],
             [],
@@ -257,7 +406,6 @@ $(document).ready(function () {
         let wsSummary = XLSX.utils.aoa_to_sheet(summaryData);
         XLSX.utils.book_append_sheet(wb, wsSummary, "Summary");
 
-        // 2. Append other tables as separate sheets
         function appendSheet(tableId, sheetName) {
             let table = document.getElementById(tableId.replace("#", ""));
             if (table) {

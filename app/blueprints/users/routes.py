@@ -188,12 +188,15 @@ def get_user_shifts(user_id):
     try:
         local_tz = ZoneInfo(tz_string)
     except Exception:
-        local_tz = timezone.utc # Fallback to UTC if string is invalid
+        local_tz = timezone.utc
 
-    # 2. Create localized start and end boundaries for the target date
+    # 2. CREATE LAB-DAY BOUNDARIES (8:00 AM to 4:00 AM Next Day)
     target_date = datetime.strptime(date_str, "%Y-%m-%d")
-    start_of_day_local = target_date.replace(hour=0, minute=0, second=0, tzinfo=local_tz)
-    end_of_day_local = start_of_day_local + timedelta(days=1)
+    
+    # Start at 8:00 AM Local Time
+    start_of_day_local = target_date.replace(hour=8, minute=0, second=0, tzinfo=local_tz)
+    # End at 4:00 AM Local Time Next Day (20 hours later)
+    end_of_day_local = start_of_day_local + timedelta(hours=20)
 
     # 3. Convert these local boundaries to exact UTC timestamps
     start_utc = start_of_day_local.astimezone(timezone.utc)
@@ -206,7 +209,7 @@ def get_user_shifts(user_id):
         ShiftSession.start_time < end_utc
     ).all()
     
-    # 5. Format DB output back to the Branch's Local Time for frontend display
+    # 5. Format DB output back to Local Time for frontend display
     response_data = []
     for s in shifts:
         local_start = s.start_time.astimezone(local_tz)

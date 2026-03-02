@@ -2,42 +2,74 @@ from flask import redirect, render_template, request, jsonify, session, url_for
 from . import reports_bp
 from app.blueprints.reports import services as report_services
 from app.decorators import login_required
-import datetime
-from app.models.user import User  # <--- Import this
+from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
+from app.models.user import User
+from app.models.branch import Branch
+from app.models.shift import ShiftSession
 
 @reports_bp.route('/view/test-report')
 @login_required
 def view_daily_reports():
-    # --- NEW: Fetch Staff for Filter ---
     branch_id = session.get("branch_id")
     staff_members = User.query.filter_by(branch_id=branch_id).all()
-    
     return render_template('daily_report.html', staff_members=staff_members)
 
-
-def _parse_date(date_str):
-    if not date_str:
-        return None
+# --- NEW HELPERS FOR TIME BOUNDS ---
+def get_lab_day_bounds(date_str, branch_id):
+    """Calculates the 8:00 AM to 4:00 AM bounds based on the Branch Timezone"""
+    branch = Branch.query.get(branch_id)
+    tz_string = branch.timezone if branch and branch.timezone else 'Asia/Karachi'
+    
     try:
-        return datetime.datetime.strptime(date_str, "%Y-%m-%d").date()
+        local_tz = ZoneInfo(tz_string)
     except Exception:
-        return None
+        local_tz = ZoneInfo('Asia/Karachi') # Fallback
 
+    base_date = datetime.strptime(date_str, "%Y-%m-%d")
+    
+    # 8:00 AM Local Time
+    start_local = base_date.replace(hour=8, minute=0, second=0, tzinfo=local_tz)
+    # 4:00 AM Local Time (Next Day)
+    end_local = start_local + timedelta(hours=20)
+    
+    return start_local.astimezone(timezone.utc), end_local.astimezone(timezone.utc)
+
+def get_shift_time_ranges(shift_ids_str):
+    """Returns a list of (start_utc, end_utc) tuples for selected shifts"""
+    if not shift_ids_str:
+        return []
+    
+    shift_ids = [int(sid) for sid in shift_ids_str.split(',') if sid.strip()]
+    shifts = ShiftSession.query.filter(ShiftSession.id.in_(shift_ids)).all()
+    
+    ranges = []
+    for s in shifts:
+        # If shift is currently open, end boundary is current UTC time
+        end_time = s.end_time if s.end_time else datetime.now(timezone.utc)
+        ranges.append((s.start_time, end_time))
+    return ranges
+
+
+# --- UPDATED 5 APIs ---
 
 @reports_bp.route("/daily-report/expenses", methods=["GET"])
 def api_expenses():
     branch_id = session.get("branch_id")
-    date = _parse_date(request.args.get("date"))
-    user_id = request.args.get("user_id") # <--- Get User ID
+    date_str = request.args.get("date")
+    shift_ids_str = request.args.get("shift_ids") 
+    user_id = request.args.get("user_id")
 
-    if not branch_id:
-        return jsonify({"error": "branch_id is required"}), 400
-    if not date:
-        return jsonify({"error": "valid date (YYYY-MM-DD) is required"}), 400
+    if not branch_id or not date_str:
+        return jsonify({"error": "Missing params"}), 400
 
     try:
-        # Pass user_id to service
-        result = report_services.get_expenses_report(branch_id=branch_id, date=date, user_id=user_id)
+        start_utc, end_utc = get_lab_day_bounds(date_str, branch_id)
+        shift_ranges = get_shift_time_ranges(shift_ids_str)
+        
+        result = report_services.get_expenses_report(
+            branch_id, start_utc, end_utc, shift_ranges, user_id
+        )
         return jsonify(result), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -46,63 +78,86 @@ def api_expenses():
 @reports_bp.route("/daily-report/films", methods=["GET"])
 def api_films_report():
     branch_id = session.get("branch_id")
-    date = _parse_date(request.args.get("date"))
-    user_id = request.args.get("user_id") # <--- Get User ID
+    date_str = request.args.get("date")
+    shift_ids_str = request.args.get("shift_ids") 
+    user_id = request.args.get("user_id")
 
-    if not branch_id or not date:
+    if not branch_id or not date_str:
         return jsonify({"error": "Missing params"}), 400
 
     try:
-        # Pass user_id to service
-        result = report_services.get_daily_films_report(branch_id, date, user_id=user_id)
+        start_utc, end_utc = get_lab_day_bounds(date_str, branch_id)
+        shift_ranges = get_shift_time_ranges(shift_ids_str)
+        
+        result = report_services.get_daily_films_report(
+            branch_id, start_utc, end_utc, shift_ranges, user_id
+        )
         return jsonify(result), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
 
 @reports_bp.route("/daily-report/dues", methods=["GET"])
 def api_dues_report():
     branch_id = session.get("branch_id")
-    date = _parse_date(request.args.get("date"))
-    user_id = request.args.get("user_id") # <--- Get User ID
+    date_str = request.args.get("date")
+    shift_ids_str = request.args.get("shift_ids") 
+    user_id = request.args.get("user_id")
 
-    if not branch_id or not date:
+    if not branch_id or not date_str:
         return jsonify({"error": "Missing params"}), 400
 
     try:
-        result = report_services.get_due_clearance_report(branch_id, date, user_id=user_id)
+        start_utc, end_utc = get_lab_day_bounds(date_str, branch_id)
+        shift_ranges = get_shift_time_ranges(shift_ids_str)
+        
+        result = report_services.get_due_clearance_report(
+            branch_id, start_utc, end_utc, shift_ranges, user_id
+        )
         return jsonify(result), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-    
-# ... (existing routes)
+
 
 @reports_bp.route("/daily-report/summary", methods=["GET"])
 def api_daily_summary():
     branch_id = session.get("branch_id")
-    date = _parse_date(request.args.get("date"))
+    date_str = request.args.get("date")
+    shift_ids_str = request.args.get("shift_ids") 
     user_id = request.args.get("user_id")
 
-    if not branch_id or not date:
+    if not branch_id or not date_str:
         return jsonify({"error": "Missing params"}), 400
 
     try:
-        result = report_services.get_daily_summary(branch_id, date, user_id=user_id)
+        start_utc, end_utc = get_lab_day_bounds(date_str, branch_id)
+        shift_ranges = get_shift_time_ranges(shift_ids_str)
+        
+        result = report_services.get_daily_summary(
+            branch_id, start_utc, end_utc, shift_ranges, user_id
+        )
         return jsonify(result), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+
 @reports_bp.route("/daily-report/test-report", methods=["GET"])
 def test_report_api():
     branch_id = session.get("branch_id")
-    date = _parse_date(request.args.get("date"))
-    user_id = request.args.get("user_id") # <--- Get User ID
+    date_str = request.args.get("date")
+    shift_ids_str = request.args.get("shift_ids") 
+    user_id = request.args.get("user_id")
 
-    if not branch_id or not date:
+    if not branch_id or not date_str:
         return jsonify({"error": "Missing params"}), 400
     
     try:
-        # Pass user_id to service
-        data = report_services.get_daily_test_report(branch_id, date, user_id=user_id)
+        start_utc, end_utc = get_lab_day_bounds(date_str, branch_id)
+        shift_ranges = get_shift_time_ranges(shift_ids_str)
+        
+        data = report_services.get_daily_test_report(
+            branch_id, start_utc, end_utc, shift_ranges, user_id
+        )
         return jsonify(data), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
