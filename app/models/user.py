@@ -1,5 +1,5 @@
 from app.extensions import db
-from datetime import datetime
+from datetime import datetime, timezone
 import json
 
 class User(db.Model):
@@ -13,7 +13,7 @@ class User(db.Model):
     branch_id = db.Column(db.Integer)
     role_id = db.Column(db.Integer)
     is_active = db.Column(db.Boolean, default=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     # Store data as a JSON string: '{"name": "...", "degrees": "...", "title": "..."}'
     _signature_data = db.Column("doctor_signature", db.Text, nullable=True) 
 
@@ -32,3 +32,4 @@ class User(db.Model):
     def signature_data(self, data):
         """Takes a python dict and saves it as JSON string"""
         self._signature_data = json.dumps(data)
+

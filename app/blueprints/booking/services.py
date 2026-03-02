@@ -7,7 +7,7 @@ from app.models import TestBookingDetails,User,Branch,Referred
 from werkzeug.security import generate_password_hash
 from sqlalchemy.exc import SQLAlchemyError,IntegrityError
 from decimal import Decimal, InvalidOperation
-from datetime import datetime, date, time
+from datetime import datetime, date, time,timezone
 from werkzeug.exceptions import BadRequest
 from app.helper import convert_to_utc
 from sqlalchemy.ext.mutable import MutableDict, MutableList
@@ -92,7 +92,7 @@ def create_test_booking(data):
                     payment_type=booking.payment_type,
                     transaction_type="Initial",
                     created_by=data["create_by"],
-                    payment_date=datetime.utcnow()
+                    payment_date=datetime.now(timezone.utc)
                 )
                 db.session.add(transaction)
 
@@ -176,7 +176,7 @@ def create_test_booking(data):
             return {"error": str(e)}, 400
 
 def _generate_mr_no():
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     prefix = now.strftime("%y%m") 
     last_booking = (
         db.session.query(TestBooking.mr_no) # Fetch ONLY the column we need (Performance)
@@ -242,7 +242,7 @@ def update_booking_share_provider(booking_id, new_referred_id, user_id):
 
         # Metadata updates
         booking.update_by = user_id
-        booking.update_at = datetime.utcnow()
+        booking.update_at = datetime.now(timezone.utc)
         db.session.add(booking)
 
         # 4. Sync ReferralShare Table
@@ -296,7 +296,7 @@ def clear_booking_due(booking_id, amount_to_pay, payment_type, user_id):
         # Update Booking Balance
         booking.paid_amount += pay_amt
         booking.due_amount -= pay_amt
-        booking.update_at = datetime.utcnow()
+        booking.update_at = datetime.now(timezone.utc)
         booking.update_by = user_id
         
         db.session.add(booking)
@@ -310,7 +310,7 @@ def clear_booking_due(booking_id, amount_to_pay, payment_type, user_id):
             payment_type=payment_type,
             transaction_type="DueClearance",
             created_by=user_id,
-            payment_date=datetime.utcnow()
+            payment_date=datetime.now(timezone.utc)
         )
         db.session.add(transaction)
 
@@ -716,11 +716,11 @@ def edit_film_usage_by_booking(booking_id, test_id, films_under_test,total_new_f
 
         # ---- UPDATE GLOBAL FILM USAGE RECORD ----
         usage.last_edited_old_value = old_value
-        usage.last_edited_at = datetime.utcnow()
+        usage.last_edited_at = datetime.now(timezone.utc)
         usage.last_edited_by = edited_by
         usage.usage_type = usage_type
         usage.used_by = edited_by
-        usage.used_at = datetime.utcnow()
+        usage.used_at = datetime.now(timezone.utc)
         usage.films_used = total_new_films_used
         usage.reason = reason
         db.session.add(usage)
@@ -874,7 +874,7 @@ def get_booking_details(booking_id: int):
                 "balance": float(booking.due_amount or 0),
             },
             "tests": test_list,
-            "printed_at": datetime.utcnow().strftime("%d-%b-%Y %I:%M %p"),
+            "printed_at": datetime.now(timezone.utc).strftime("%d-%b-%Y %I:%M %p"),
             "current_user": session.get("user_name"),
         }, 200
 
@@ -1011,7 +1011,7 @@ def add_booking_comment(booking_id: int, data):
             "user_name": session.get("user_name"),
             "role": session.get("user_role"),
             "comment": comment_text,
-            "datetime": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
+            "datetime": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
         }
 
         comments["comments"].append(new_comment)
@@ -1222,7 +1222,7 @@ def toggle_share_payment_service(share_id, user_id, branch_id, custom_descriptio
 
             # 3. Update Share Status
             share.is_paid = True
-            share.paid_at = datetime.utcnow()
+            share.paid_at = datetime.now(timezone.utc)
             share.expense_id = new_expense.id
             
             msg = "Marked as Paid"
@@ -1354,7 +1354,7 @@ def process_refund_service(booking_id, user_id, branch_id, refund_reason=""):
                 direction="OUT",
                 transaction_type="Expense",
                 created_by=user_id,
-                payment_date=datetime.utcnow()
+                payment_date=datetime.now(timezone.utc)
             )
             db.session.add(exp_trans)
 

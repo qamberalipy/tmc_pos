@@ -1,5 +1,5 @@
 from app.extensions import db
-from datetime import datetime
+from datetime import datetime, timezone
 
 class Department(db.Model):
     __tablename__ = "department"
@@ -9,7 +9,7 @@ class Department(db.Model):
     description = db.Column(db.String(225))
     is_active = db.Column(db.Boolean, default=True)
 
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     created_by = db.Column(db.String(225))
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     updated_by = db.Column(db.String(225))

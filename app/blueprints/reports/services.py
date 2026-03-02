@@ -1,9 +1,9 @@
 from flask import session
-from sqlalchemy import func, cast, Date, desc, Integer, and_,String
+from sqlalchemy import func, cast, Date, desc, Integer, and_, String, or_
 from app.extensions import db
 from app.models import TestBookingDetails
 from decimal import Decimal
-from datetime import datetime, date,time
+from datetime import datetime, date, time, timezone
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import aliased
 from app.models.test_booking import TestFilmUsage, TestBooking, FilmInventoryTransaction
@@ -28,10 +28,7 @@ def _to_float(value):
     except Exception:
         return 0.0
 
-def get_expenses_report(branch_id: int, date, user_id=None):
-    if not branch_id or not date:
-        raise ValueError("branch_id and date are required")
-
+def get_expenses_report(branch_id: int, start_utc, end_utc, shift_ranges=None, user_id=None):
     try:
         q = (
             db.session.query(
@@ -42,14 +39,17 @@ def get_expenses_report(branch_id: int, date, user_id=None):
             .join(Expense_head, Expenses.expense_head_id == Expense_head.id)
             .filter(
                 Expenses.branch_id == branch_id,
-                Expenses.is_deleted == False,
-                func.date(Expenses.created_at) == date
+                Expenses.is_deleted == False
             )
         )
 
-        # --- NEW: Filter by User ---
-        if user_id:
-            q = q.filter(Expenses.created_by == user_id)
+        if shift_ranges:
+            shift_conditions = [and_(Expenses.created_at >= s, Expenses.created_at <= e) for s, e in shift_ranges]
+            q = q.filter(or_(*shift_conditions))
+            if user_id:
+                q = q.filter(Expenses.created_by == user_id)
+        else:
+            q = q.filter(Expenses.created_at >= start_utc, Expenses.created_at <= end_utc)
 
         rows = q.group_by(Expenses.expense_head_id, Expense_head.name).all()
 
@@ -64,82 +64,74 @@ def get_expenses_report(branch_id: int, date, user_id=None):
     except SQLAlchemyError as e:
         raise e
 
-# ... (imports remain same)
 
-def get_daily_films_report(branch_id: int, date_obj, user_id=None):
+def get_daily_films_report(branch_id: int, start_utc, end_utc, shift_ranges=None, user_id=None):
     try:
-        target_date = date_obj
-
-        # ---------------------------------------------------------
-        # 1. Calculate Opening Stock (All transactions BEFORE today)
-        # ---------------------------------------------------------
+        # 1. Opening Stock (Before bounds)
+        period_start = min([r[0] for r in shift_ranges]) if shift_ranges else start_utc
+        
         before_query = (
             db.session.query(
                 FilmInventoryTransaction.transaction_type,
                 func.sum(FilmInventoryTransaction.quantity)
             )
-            .filter(cast(FilmInventoryTransaction.transaction_date, Date) < target_date)
+            .filter(FilmInventoryTransaction.transaction_date < period_start)
             .filter(FilmInventoryTransaction.branch_id == branch_id)
             .group_by(FilmInventoryTransaction.transaction_type)
         )
-        
-        # Note: Inventory Balance is branch-wide, we typically don't filter Opening Stock by User
         before_data = before_query.all()
-
         total_in_before = sum(q for t, q in before_data if t == "IN") or 0
         total_out_before = sum(q for t, q in before_data if t == "OUT") or 0
-        
         film_start = total_in_before - total_out_before
 
-        # ---------------------------------------------------------
-        # 2. Calculate Today's Activity (IN / OUT)
-        # ---------------------------------------------------------
-        day_query = (
-            db.session.query(
-                FilmInventoryTransaction.transaction_type,
-                func.sum(FilmInventoryTransaction.quantity)
-            )
-            .filter(cast(FilmInventoryTransaction.transaction_date, Date) == target_date)
-            .filter(FilmInventoryTransaction.branch_id == branch_id)
-        )
-        
-        day_data_branch = day_query.group_by(FilmInventoryTransaction.transaction_type).all()
+        # 2. Today's Activity queries
+        day_query = db.session.query(
+            FilmInventoryTransaction.transaction_type,
+            func.sum(FilmInventoryTransaction.quantity)
+        ).filter(FilmInventoryTransaction.branch_id == branch_id)
 
+        user_usage_query = db.session.query(func.sum(FilmInventoryTransaction.quantity)).filter(
+            FilmInventoryTransaction.branch_id == branch_id,
+            FilmInventoryTransaction.transaction_type == "OUT"
+        )
+
+        # Apply Time Bounds
+        if shift_ranges:
+            shift_conditions = [and_(FilmInventoryTransaction.transaction_date >= s, FilmInventoryTransaction.transaction_date <= e) for s, e in shift_ranges]
+            day_query = day_query.filter(or_(*shift_conditions))
+            user_usage_query = user_usage_query.filter(or_(*shift_conditions))
+            if user_id:
+                user_usage_query = user_usage_query.filter(FilmInventoryTransaction.handled_by == user_id)
+        else:
+            day_query = day_query.filter(FilmInventoryTransaction.transaction_date >= start_utc, FilmInventoryTransaction.transaction_date <= end_utc)
+            user_usage_query = user_usage_query.filter(FilmInventoryTransaction.transaction_date >= start_utc, FilmInventoryTransaction.transaction_date <= end_utc)
+
+        # Get results
+        day_data_branch = day_query.group_by(FilmInventoryTransaction.transaction_type).all()
         in_today_branch = sum(q for t, q in day_data_branch if t == "IN") or 0
         out_today_branch = sum(q for t, q in day_data_branch if t == "OUT") or 0
         
-        # Branch Closing
         film_closing = film_start + in_today_branch - out_today_branch
 
-        # ---------------------------------------------------------
-        # 3. Determine "Usage" to display
-        # ---------------------------------------------------------
+        # User Usage Display
         displayed_usage = out_today_branch
-        
-        if user_id:
-            # If a specific user is selected, calculate specifically their usage
-            user_usage = (
-                db.session.query(func.sum(FilmInventoryTransaction.quantity))
-                .filter(cast(FilmInventoryTransaction.transaction_date, Date) == target_date)
-                .filter(FilmInventoryTransaction.branch_id == branch_id)
-                .filter(FilmInventoryTransaction.handled_by == user_id)
-                .filter(FilmInventoryTransaction.transaction_type == "OUT")
-                .scalar()
-            ) or 0
+        if user_id and shift_ranges:
+            user_usage = user_usage_query.scalar() or 0
             displayed_usage = user_usage
 
         return {
             "film_start": int(film_start),
             "film_closing": int(film_closing),
             "film_use": int(displayed_usage),
-            "film_added": int(in_today_branch) # Added bonus info if you want it
+            "film_added": int(in_today_branch) 
         }
 
     except Exception as e:
         print(f"Error in films report: {str(e)}")
         raise e
     
-def get_daily_test_report(branch_id, date_obj, user_id=None):
+
+def get_daily_test_report(branch_id, start_utc, end_utc, shift_ranges=None, user_id=None):
     try:
         query = (
             db.session.query(
@@ -149,15 +141,16 @@ def get_daily_test_report(branch_id, date_obj, user_id=None):
             )
             .join(TestBooking, TestBookingDetails.booking_id == TestBooking.id)
             .join(Test_registration, TestBookingDetails.test_id == Test_registration.id)
-            .filter(
-                TestBooking.branch_id == branch_id,
-                func.date(TestBooking.create_at) == date_obj
-            )
+            .filter(TestBooking.branch_id == branch_id)
         )
 
-        # --- NEW: Filter by User ---
-        if user_id:
-            query = query.filter(TestBooking.create_by == user_id)
+        if shift_ranges:
+            shift_conditions = [and_(TestBooking.create_at >= s, TestBooking.create_at <= e) for s, e in shift_ranges]
+            query = query.filter(or_(*shift_conditions))
+            if user_id:
+                query = query.filter(TestBooking.create_by == user_id)
+        else:
+            query = query.filter(TestBooking.create_at >= start_utc, TestBooking.create_at <= end_utc)
 
         rows = query.group_by(Test_registration.test_name).all()
 
@@ -169,38 +162,29 @@ def get_daily_test_report(branch_id, date_obj, user_id=None):
             }
             for r in rows
         ]
-
     except Exception as e:
         print(f"Error in daily test report: {str(e)}")
         raise e
-# ... (existing imports)
 
-def get_daily_summary(branch_id, date_obj, user_id=None):
-    """
-    Calculates Total Cash IN and Total Cash OUT from PaymentTransactions.
-    IN = Initial Booking Payments + Due Clearance
-    OUT = Expenses + Refunds
-    """
+
+def get_daily_summary(branch_id, start_utc, end_utc, shift_ranges=None, user_id=None):
     try:
         query = db.session.query(
             PaymentTransaction.direction,
             func.sum(PaymentTransaction.amount).label("total")
-        ).filter(
-            PaymentTransaction.branch_id == branch_id,
-            func.date(PaymentTransaction.payment_date) == date_obj
-        )
+        ).filter(PaymentTransaction.branch_id == branch_id)
 
-        # Apply Staff Filter
-        if user_id:
-            query = query.filter(PaymentTransaction.created_by == user_id)
+        if shift_ranges:
+            shift_conditions = [and_(PaymentTransaction.payment_date >= s, PaymentTransaction.payment_date <= e) for s, e in shift_ranges]
+            query = query.filter(or_(*shift_conditions))
+            if user_id:
+                query = query.filter(PaymentTransaction.created_by == user_id)
+        else:
+            query = query.filter(PaymentTransaction.payment_date >= start_utc, PaymentTransaction.payment_date <= end_utc)
 
         results = query.group_by(PaymentTransaction.direction).all()
         
-        summary = {
-            "total_income": 0.0, 
-            "total_expense": 0.0,
-            "net_cash": 0.0
-        }
+        summary = {"total_income": 0.0, "total_expense": 0.0, "net_cash": 0.0}
 
         for direction, total in results:
             val = _to_float(total)
@@ -211,19 +195,18 @@ def get_daily_summary(branch_id, date_obj, user_id=None):
                 
         summary["net_cash"] = summary["total_income"] - summary["total_expense"]
         return summary
-
     except Exception as e:
         print(f"Error in daily summary: {str(e)}")
         raise e
 
-def get_due_clearance_report(branch_id, date_obj, user_id=None):
+
+def get_due_clearance_report(branch_id, start_utc, end_utc, shift_ranges=None, user_id=None):
     try:
-        # 1. Query PaymentTransaction table
         query = (
             db.session.query(
                 PaymentTransaction.amount,
                 PaymentTransaction.payment_type,
-                PaymentTransaction.payment_date,  # <--- FIXED: Was created_at
+                PaymentTransaction.payment_date,  
                 TestBooking.patient_name,
                 TestBooking.mr_no,
                 User.name.label("collected_by")
@@ -232,16 +215,20 @@ def get_due_clearance_report(branch_id, date_obj, user_id=None):
             .join(User, PaymentTransaction.created_by == User.id)
             .filter(
                 PaymentTransaction.branch_id == branch_id,
-                # Filter specifically for Due Clearance
-                PaymentTransaction.transaction_type == 'DueClearance', 
-                func.date(PaymentTransaction.payment_date) == date_obj
+                PaymentTransaction.transaction_type == 'DueClearance'
             )
         )
 
-        # 2. Apply User Filter if selected
-        if user_id:
-            query = query.filter(PaymentTransaction.created_by == user_id)
+        if shift_ranges:
+            shift_conditions = [and_(PaymentTransaction.payment_date >= s, PaymentTransaction.payment_date <= e) for s, e in shift_ranges]
+            query = query.filter(or_(*shift_conditions))
+            if user_id:
+                query = query.filter(PaymentTransaction.created_by == user_id)
+        else:
+            query = query.filter(PaymentTransaction.payment_date >= start_utc, PaymentTransaction.payment_date <= end_utc)
 
+        # Get user's local timezone for display mapping (assuming frontend wants to see PKT format on receipt display)
+        # Note: Frontend handles UTC to Local mapping best, but we'll leave strftime formatted here
         rows = query.all()
 
         return [
@@ -250,16 +237,15 @@ def get_due_clearance_report(branch_id, date_obj, user_id=None):
                 "mr_no": r.mr_no,
                 "amount": _to_float(r.amount),
                 "type": r.payment_type,
-                "time": r.payment_date.strftime("%I:%M %p"), # <--- FIXED: Was created_at
+                "time": r.payment_date.strftime("%Y-%m-%d %I:%M %p"), # Sending full UTC timestamp string for frontend format
                 "collected_by": r.collected_by
             }
             for r in rows
         ]
-
     except Exception as e:
         print(f"Error in due clearance report: {str(e)}")
         raise e
-    
+  
 def assign_bookings_to_doctor(bookings_payload, doctor_id, assigned_by, branch_id):
   
     doctor_id_str = str(doctor_id)
@@ -559,7 +545,7 @@ def save_doctor_report(data, user_id):
     if not dr_details:
         raise NotFound("No active doctor reporting record found.")
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
 
     report = DoctorReportData(
         patient_name=data["patient_name"],
@@ -668,7 +654,7 @@ def update_doctor_report(report_id, data, user_id):
         if field in data:
             setattr(report, field, data[field])
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     report.updated_by = user_id
     report.updated_at = now
 

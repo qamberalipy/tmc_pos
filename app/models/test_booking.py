@@ -1,5 +1,5 @@
 from app.extensions import db
-from datetime import datetime
+from datetime import datetime, timezone
 
 class TestBooking(db.Model):
     __tablename__ = "test_booking"
@@ -69,4 +69,4 @@ class FilmInventoryTransaction(db.Model):
     reason = db.Column(db.String(255))
     handled_by = db.Column(db.Integer, nullable=False)
     branch_id = db.Column(db.Integer, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))

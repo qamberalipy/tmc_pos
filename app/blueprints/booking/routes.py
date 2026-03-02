@@ -3,7 +3,7 @@ from . import booking_bp
 from app.blueprints.booking import services as booking_services
 from app.decorators import login_required
 from app.extensions import db
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta,timezone
 
 @booking_bp.route('/view/test-booking')
 @login_required
@@ -94,7 +94,7 @@ def get_all_test_bookings():
     to_date = request.args.get("to_date")
     if role != 'admin':
         # Calculate date 40 days ago
-        limit_date_obj = datetime.utcnow() - timedelta(days=40)
+        limit_date_obj = datetime.now(timezone.utc) - timedelta(days=40)
         limit_date_str = limit_date_obj.strftime('%Y-%m-%d')
 
         # If User requests a date older than limit, or no date provided, force the limit

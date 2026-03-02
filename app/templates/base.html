@@ -50,6 +50,36 @@
           </div>
         </li>
         {% endif %}
+
+        {% if session.get('user_role') == 'staff' %}
+        <li class="nav-item d-flex align-items-center me-4">
+          
+          <div class="me-3 text-end d-none d-md-block border-end pe-3">
+            <div id="liveClock" class="fw-bold text-dark" style="font-size: 0.9rem; line-height: 1;">--:--:--</div>
+            <div id="liveDate" class="text-muted mt-1" style="font-size: 0.75rem; line-height: 1;">---</div>
+          </div>
+
+          <div id="shiftUIContainer" class="d-flex align-items-center bg-light p-1 rounded border">
+            <div id="shiftLoader" class="px-2 text-primary">
+                <span class="spinner-border spinner-border-sm" role="status"></span>
+            </div>
+            
+            <div id="shiftTimerBadge" class="d-none align-items-center bg-success bg-opacity-10 border border-success rounded px-2 py-1 me-2" title="Shift Active">
+              <span class="spinner-grow spinner-grow-sm text-success me-2" style="width: 0.6rem; height: 0.6rem;" role="status"></span>
+              <span class="fw-bold text-success me-2" style="font-size: 0.75rem;">ACTIVE SHIFT:</span>
+              <span id="shiftTimer" class="fw-bold text-success font-monospace" style="font-size: 0.85rem;">00:00:00</span>
+            </div>
+
+            <button id="btnStartShift" class="btn btn-sm btn-primary fw-bold d-none shadow-sm px-3">
+              <i class="bi bi-play-circle me-1"></i> Start Shift
+            </button>
+            <button id="btnEndShift" class="btn btn-sm btn-danger fw-bold d-none shadow-sm px-3">
+              <i class="bi bi-stop-circle me-1"></i> End Shift
+            </button>
+          </div>
+
+        </li>
+        {% endif %}
         <li class="nav-item dropdown pe-3">
           <a class="nav-link nav-profile d-flex align-items-center pe-0" href="#" data-bs-toggle="dropdown">
             <img src="https://dummyimage.com/400x400/444444/d3d3d3.png" alt="avatar" class="rounded-circle">
