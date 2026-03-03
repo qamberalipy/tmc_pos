@@ -12,6 +12,30 @@ function myhideLoader() {
     $("#loader").hide();
 }
 
+/**
+ * Global UI Helper Functions
+ */
+
+// --- NEW GLOBAL LAB DATE HELPER ---
+function getGlobalLabDate(offsetDays = 0) {
+    let targetDate = new Date();
+    
+    // Apply Lab Day Rule: If it's before 8:00 AM, it counts as yesterday
+    if (targetDate.getHours() < 8) {
+        targetDate.setDate(targetDate.getDate() - 1);
+    }
+    
+    // Apply offset for historical default dates (e.g., "30 days ago")
+    if (offsetDays !== 0) {
+        targetDate.setDate(targetDate.getDate() + offsetDays);
+    }
+    
+    let year = targetDate.getFullYear();
+    let month = String(targetDate.getMonth() + 1).padStart(2, '0');
+    let day = String(targetDate.getDate()).padStart(2, '0');
+    
+    return `${year}-${month}-${day}`;
+}
 function showToastMessage(type, text) {
     switch (type) {
         case 'success':

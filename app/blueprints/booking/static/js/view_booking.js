@@ -207,33 +207,33 @@ $(document).ready(function () {
             .catch(err => handleAxiosError(err));
     });
 
-    $("#btnConfirmAssignment").on("click", function () {
+   $("#btnConfirmAssignment").on("click", function () {
         const doctorId = $("#doctorSelectDropdown").val();
         if (!doctorId) return showToastMessage("error", "Please select a doctor.");
 
         let bookingDetails = [];
-        let hasUnissuedSkipped = false;
+        let hasIssuedSkipped = false; // Changed flag to track skipped 'Issued' tests
 
         // --- CHANGED LOGIC: Iterate Global Map Instead of DOM ---
         window.selectedBookingIds.forEach(function (bId) {
             let bookingData = window.bookingsMap[bId];
 
             if (bookingData && bookingData.test_booking_details) {
-                // Filter for issued tests directly from data object
-                let issuedTests = bookingData.test_booking_details.filter(t => t.film_issued === true);
+                // Filter for PENDING (unissued) tests directly from data object
+                let pendingTests = bookingData.test_booking_details.filter(t => t.film_issued === false || !t.film_issued);
                 
-                if (issuedTests.length > 0) {
-                    let idsArray = issuedTests.map(t => t.id);
+                if (pendingTests.length > 0) {
+                    let idsArray = pendingTests.map(t => t.id);
                     bookingDetails.push({ booking_id: bId, test_ids: idsArray });
                 } else {
-                    hasUnissuedSkipped = true;
+                    hasIssuedSkipped = true; // All tests in this booking are issued, so we skip it
                 }
             }
         });
         // -------------------------------------------------------
 
         if (bookingDetails.length === 0) {
-            showToastMessage("warning", "None of the selected bookings have ISSUED tests.");
+            showToastMessage("warning", "None of the selected bookings have PENDING tests to assign.");
             return;
         }
 
@@ -241,7 +241,7 @@ $(document).ready(function () {
         axios.post(baseUrl + "/reports/assign-bookings", { doctor_id: doctorId, bookings: bookingDetails })
             .then(res => {
                 let msg = "Bookings assigned successfully!";
-                if(hasUnissuedSkipped) msg += " (Unissued tests were skipped)";
+                if(hasIssuedSkipped) msg += " (Issued tests were skipped)";
                 showToastMessage("success", msg);
                 
                 $("#assignDoctorModal").modal("hide");

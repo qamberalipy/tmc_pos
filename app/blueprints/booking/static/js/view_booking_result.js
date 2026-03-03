@@ -1,4 +1,12 @@
 $(document).ready(function () {
+    
+    // --- NEW: Default One Month Filter using Global Lab Date (from main.js) ---
+    if (!$("#from_date").val() || !$("#to_date").val()) {
+        $("#from_date").val(getGlobalLabDate(-30)); // 30 days ago (Lab Date)
+        $("#to_date").val(getGlobalLabDate(0));     // Today (Lab Date)
+    }
+    // -------------------------------------------------------------------------
+
     // 1. Load data on page load
     getAssignedReports();
 

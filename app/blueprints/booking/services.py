@@ -10,6 +10,7 @@ from decimal import Decimal, InvalidOperation
 from datetime import datetime, date, time,timezone
 from werkzeug.exceptions import BadRequest
 from app.helper import convert_to_utc
+from app.helper import get_lab_date_bounds # <-- Add this import at the top
 from sqlalchemy.ext.mutable import MutableDict, MutableList
 from app.models.test_booking import TestFilmUsage, TestBooking,FilmInventoryTransaction
 from app.models.test_registration import Test_registration
@@ -373,34 +374,24 @@ def get_due_receipt_details(transaction_id):
         return {"error": "Failed to generate receipt"}, 500
 
 # ... (Keep existing imports)
-
 def get_dues_list(branch_id, from_date=None, to_date=None, status=None):
     try:
-        # 1. Validation and Date Setup
+        # 1. Validation Setup
         if not from_date or not to_date:
             raise BadRequest("Both from_date and to_date are required.")
-
-        try:
-            from_date_obj = datetime.strptime(from_date, "%Y-%m-%d").date()
-            to_date_obj   = datetime.strptime(to_date, "%Y-%m-%d").date()
-        except ValueError:
-            raise BadRequest("Date format must be YYYY-MM-DD.")
-
-        if from_date_obj > to_date_obj:
-            raise BadRequest("from_date cannot be greater than to_date.")
-
-        # Create full timestamps (Start of day to End of day)
-        start_dt = datetime.combine(from_date_obj, time.min)
-        end_dt   = datetime.combine(to_date_obj, time.max)
 
         if not branch_id:
             return {"error": "branch_id is required"}, 400
 
+        # --- NEW: Use Global Lab Date Bounds ---
+        # This automatically handles the "8 AM Lab Shift" rule and UTC conversion
+        start_utc, end_utc = get_lab_date_bounds(from_date, to_date, branch_id)
+
         # 2. Base Query
         query = db.session.query(TestBooking).filter(
             TestBooking.branch_id == int(branch_id),
-            TestBooking.create_at >= start_dt,
-            TestBooking.create_at <= end_dt
+            TestBooking.create_at >= start_utc,
+            TestBooking.create_at <= end_utc
         )
 
         # 3. Apply Status Filter
@@ -416,7 +407,7 @@ def get_dues_list(branch_id, from_date=None, to_date=None, status=None):
         total_due_amount = 0
 
         for b in bookings:
-            # --- NEW: Fetch the last transaction ID for this booking ---
+            # --- Fetch the last transaction ID for this booking ---
             # We use this to generate the receipt for the payment that likely cleared the due
             last_txn = (db.session.query(PaymentTransaction.id)
                         .filter(PaymentTransaction.booking_id == b.id)
@@ -448,11 +439,13 @@ def get_dues_list(branch_id, from_date=None, to_date=None, status=None):
             "count": len(dues_list)
         }, 200
 
+    except BadRequest as e:
+        # Catch the BadRequest thrown by get_lab_date_bounds and return cleanly
+        return {"error": str(e.description)}, 400
     except SQLAlchemyError as e:
         return {"error": str(e.__dict__.get("orig", e))}, 500
     except Exception as e:
-        return {"error": str(e)}, 500
-    
+        return {"error": str(e)}, 500 
 def update_booking_total_films(booking_id):
     total = db.session.query(
         db.func.sum(TestFilmUsage.films_used)
@@ -911,27 +904,17 @@ def _format_test_booking(row):
     }
 
 
+
 def get_all_test_bookings(branch_id=None, from_date=None, to_date=None):
     try:
-        start_dt = None
-        end_dt = None
+        start_utc = None
+        end_utc = None
 
         if from_date and to_date:
-            try:
-                from_date_obj = datetime.strptime(from_date, "%Y-%m-%d").date()
-                to_date_obj   = datetime.strptime(to_date, "%Y-%m-%d").date()
-            except ValueError:
-                raise BadRequest("Date format must be YYYY-MM-DD.")
-
-            if from_date_obj > to_date_obj:
-                raise BadRequest("from_date cannot be greater than to_date.")
-
-            start_dt = datetime.combine(from_date_obj, time.min)
-            end_dt   = datetime.combine(to_date_obj, time.max)
-
+            # --- NEW GLOBAL LOGIC ---
+            start_utc, end_utc = get_lab_date_bounds(from_date, to_date, branch_id)
         elif from_date or to_date:
             raise BadRequest("Both from_date and to_date are required for date filtering.")
-
 
         query = (
             db.session.query(
@@ -950,7 +933,6 @@ def get_all_test_bookings(branch_id=None, from_date=None, to_date=None):
                 Branch.branch_name.label("branch_name"),
                 User.name.label("created_by_name"),
                 TestBooking.give_share_to,
-                # --- Aggregating Test Details into a JSON List ---
                 func.json_agg(
                     func.json_build_object(
                         'id', Test_registration.id,
@@ -971,15 +953,16 @@ def get_all_test_bookings(branch_id=None, from_date=None, to_date=None):
                 Referred.name
             )
         )
+        
         if branch_id:
             query = query.filter(TestBooking.branch_id == branch_id)
 
-
-        if start_dt and end_dt:
+        # --- APPLY UTC BOUNDS ---
+        if start_utc and end_utc:
             query = query.filter(
                 and_(
-                    TestBooking.create_at >= start_dt,
-                    TestBooking.create_at <= end_dt
+                    TestBooking.create_at >= start_utc,
+                    TestBooking.create_at <= end_utc
                 )
             )
 
@@ -989,9 +972,7 @@ def get_all_test_bookings(branch_id=None, from_date=None, to_date=None):
         return [_format_test_booking(r) for r in rows], 200
 
     except SQLAlchemyError as e:
-        # It is good practice to log 'e' here before returning
-        return {"error": str(e.__dict__.get("orig", e))}, 500
-    
+        return {"error": str(e.__dict__.get("orig", e))}, 500    
 def add_booking_comment(booking_id: int, data):
     try:
         comment_text = data.get("comment", "").strip()
