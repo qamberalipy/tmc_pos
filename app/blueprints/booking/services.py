@@ -12,7 +12,7 @@ from werkzeug.exceptions import BadRequest
 from app.helper import convert_to_utc
 from app.helper import get_lab_date_bounds # <-- Add this import at the top
 from sqlalchemy.ext.mutable import MutableDict, MutableList
-from app.models.test_booking import TestFilmUsage, TestBooking,FilmInventoryTransaction
+from app.models.test_booking import TestFilmUsage, TestBooking,FilmInventoryTransaction,BookingTransferLog
 from app.models.test_registration import Test_registration
 from app.models.doctor_reporting_details import DoctorReportingdetails
 from app.models.expenses import Expenses
@@ -888,8 +888,7 @@ def _format_test_booking(row):
         "referred_dr": row.referred_dr,
         "give_share_to": row.give_share_to,
         # This contains: [{"id": 12, "test_name": "xyz", "film_issued": False}, ...]
-        "test_booking_details": row.test_booking_details, 
-        
+        "test_booking_details": row.test_booking_details,  
         "technician_comments": row.technician_comments,
         "total_amount": float(row.net_receivable or 0),
         "total_films": row.total_no_of_films_used,
@@ -898,6 +897,7 @@ def _format_test_booking(row):
         "received": float(row.paid_amount or 0),
         "balance": float(row.due_amount or 0),
         "branch": row.branch_name,
+        "is_transferred_in": row.is_transferred_in,
         "created_by": row.created_by_name,
         "created_at": row.create_at.isoformat() if row.create_at else None,
         "updated_at": row.update_at.isoformat() if row.update_at else None
@@ -1379,4 +1379,155 @@ def process_refund_service(booking_id, user_id, branch_id, refund_reason=""):
     except Exception as e:
         db.session.rollback()
         print(f"Error processing refund: {str(e)}")
+        return {"error": str(e)}, 500
+    
+def transfer_and_rebook_service(old_booking_id, target_branch_id, new_tests, due_amount, reason, user_id, current_branch_id):
+    try:
+        old_booking = TestBooking.query.get(old_booking_id)
+        if not old_booking:
+            return {"error": "Original booking not found"}, 404
+
+        if str(old_booking.branch_id) == str(target_branch_id):
+            return {"error": "Booking is already at the selected branch"}, 400
+
+        # Save metadata and cash state before executing delete
+        held_cash = old_booking.paid_amount
+        mr_no = old_booking.mr_no
+        patient_name = old_booking.patient_name
+        gender = old_booking.gender
+        age = old_booking.age
+        contact_no = old_booking.contact_no
+        payment_type = old_booking.payment_type
+
+        # Extract old comments to migrate them safely
+        old_comments_dict = {"comments": []}
+        if old_booking.technician_comments:
+            try:
+                if isinstance(old_booking.technician_comments, str):
+                    old_comments_dict = json.loads(old_booking.technician_comments)
+                else:
+                    old_comments_dict = old_booking.technician_comments
+            except Exception:
+                pass
+
+        # 1. Refund Films to Origin Branch
+        film_usages = TestFilmUsage.query.filter_by(booking_id=old_booking_id).all()
+        for usage in film_usages:
+            refund = FilmInventoryTransaction(
+                quantity=usage.films_used,
+                transaction_type="IN",
+                transaction_date=datetime.now(timezone.utc),
+                handled_by=user_id,
+                branch_id=current_branch_id,
+                reason=f"Refund: Transferred to Branch {target_branch_id}"
+            )
+            db.session.add(refund)
+            db.session.delete(usage)
+
+        # FIX 1: Detach old inventory logs to prevent ghost references
+        old_inventory_logs = FilmInventoryTransaction.query.filter_by(booking_id=old_booking_id).all()
+        for inv in old_inventory_logs:
+            inv.booking_id = None
+            db.session.add(inv)
+
+        # 2. Detach Payments (Transforms it to TransferOut_Held)
+        payments = PaymentTransaction.query.filter_by(booking_id=old_booking_id).all()
+        for p in payments:
+            p.booking_id = None
+            p.transaction_type = "TransferOut_Held" 
+            p.description = f"Transferred-Out Cash Held (MR: {mr_no}) - Reason: {reason}"
+            db.session.add(p)
+
+        # FIX 2: Prevent Foreign Key Crash from Referral Shares
+        ReferralShare.query.filter_by(booking_id=old_booking_id).delete()
+
+        # 3. Clean up old linked entities
+        DoctorReportingdetails.query.filter_by(booking_id=str(old_booking_id)).delete()
+        TestBookingDetails.query.filter_by(booking_id=old_booking_id).delete()
+
+        # 4. Delete the Old Booking
+        db.session.delete(old_booking)
+        db.session.flush() # Immediately frees up the MR NO unique constraint
+
+        # 5. Create Native Booking at Target Branch
+        new_total = sum(Decimal(str(t.get('price', 0))) for t in new_tests)
+        
+        system_comment = {
+            "user_id": user_id,
+            "user_name": "System", 
+            "role": "Auto", 
+            "datetime": datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S'), 
+            "comment": f"Transferred from Branch {current_branch_id}. Reason: {reason}"
+        }
+        old_comments_dict["comments"].insert(0, system_comment)
+
+        new_booking = TestBooking(
+            mr_no=mr_no,
+            patient_name=patient_name,
+            gender=gender,
+            age=age,
+            contact_no=contact_no,
+            branch_id=target_branch_id,
+            create_by=user_id, 
+            net_receivable=new_total,
+            paid_amount=held_cash, 
+            due_amount=Decimal(str(due_amount)),
+            payment_type=payment_type,
+            is_transferred_in=True, 
+            technician_comments=json.dumps(old_comments_dict) 
+        )
+        db.session.add(new_booking)
+        db.session.flush()
+
+        # 6. Add Target Branch's Native Tests & Track Films
+        total_new_films = 0
+        for t in new_tests:
+            films_count = int(t.get("no_of_films") or 0)
+            total_new_films += films_count
+            
+            detail = TestBookingDetails(
+                booking_id=new_booking.id,
+                test_id=t['test_id'],
+                amount=Decimal(str(t['price'])),
+                quantity=t.get('quantity', 1),
+                no_of_films=films_count
+            )
+            db.session.add(detail)
+
+        # 7. Execute Film Usage at Branch B
+        if total_new_films > 0:
+            add_film_usage(
+                booking_id=new_booking.id,
+                films_used=total_new_films,
+                usage_type="Normal",
+                used_by=user_id,
+                branch_id=target_branch_id,
+                reason="Transferred In Booking"
+            )
+
+        # 8. Write to Audit Log
+        try:
+            transfer_log = BookingTransferLog(
+                new_booking_id=new_booking.id,
+                old_booking_id=old_booking_id,
+                from_branch_id=current_branch_id,
+                to_branch_id=target_branch_id,
+                transferred_by_user_id=user_id,
+                patient_name=patient_name,
+                mr_no=mr_no,
+                transferred_cash_held=held_cash,
+                reason=reason
+            )
+            db.session.add(transfer_log)
+        except ImportError:
+            pass 
+
+        db.session.commit()
+        return {"message": "Booking transferred successfully", "new_booking_id": new_booking.id}, 200
+
+    except IntegrityError as e:
+        db.session.rollback()
+        return {"error": "Database integrity error. Check MR_NO constraints."}, 500
+    except Exception as e:
+        db.session.rollback()
         return {"error": str(e)}, 500

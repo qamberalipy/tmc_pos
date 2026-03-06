@@ -169,8 +169,10 @@ def get_daily_test_report(branch_id, start_utc, end_utc, shift_ranges=None, user
 
 def get_daily_summary(branch_id, start_utc, end_utc, shift_ranges=None, user_id=None):
     try:
+        # 1. Update query to group by BOTH direction and transaction_type
         query = db.session.query(
             PaymentTransaction.direction,
+            PaymentTransaction.transaction_type,
             func.sum(PaymentTransaction.amount).label("total")
         ).filter(PaymentTransaction.branch_id == branch_id)
 
@@ -182,18 +184,32 @@ def get_daily_summary(branch_id, start_utc, end_utc, shift_ranges=None, user_id=
         else:
             query = query.filter(PaymentTransaction.payment_date >= start_utc, PaymentTransaction.payment_date <= end_utc)
 
-        results = query.group_by(PaymentTransaction.direction).all()
+        results = query.group_by(PaymentTransaction.direction, PaymentTransaction.transaction_type).all()
         
-        summary = {"total_income": 0.0, "total_expense": 0.0, "net_cash": 0.0}
+        # 2. Add new granular keys for the frontend
+        summary = {
+            "regular_income": 0.0,          # Money from native tests & dues
+            "transferred_held_cash": 0.0,   # Money kept from Transferred-Out cases
+            "total_income": 0.0,            # Combined Total IN cash
+            "total_expense": 0.0,           # Combined Total OUT cash
+            "net_cash": 0.0                 # Exact Physical Drawer Balance
+        }
 
-        for direction, total in results:
+        # 3. Safely map the cash buckets
+        for direction, trans_type, total in results:
             val = _to_float(total)
             if direction == 'IN':
-                summary["total_income"] = val
+                if trans_type == 'TransferOut_Held':
+                    summary["transferred_held_cash"] += val
+                else:
+                    summary["regular_income"] += val
+                    
+                summary["total_income"] += val
             elif direction == 'OUT':
-                summary["total_expense"] = val
+                summary["total_expense"] += val
                 
         summary["net_cash"] = summary["total_income"] - summary["total_expense"]
+        
         return summary
     except Exception as e:
         print(f"Error in daily summary: {str(e)}")

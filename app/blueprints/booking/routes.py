@@ -400,3 +400,25 @@ def refund_booking_route(booking_id):
         booking_id, user_id, branch_id, reason
     )
     return jsonify(result), status
+
+@booking_bp.route("/transfer-rebook", methods=["POST"])
+@login_required
+def transfer_booking_rebook_route():
+    data = request.get_json()
+    
+    old_booking_id = data.get("booking_id")
+    target_branch_id = data.get("target_branch_id")
+    new_tests = data.get("new_tests", []) # Expected: [{"test_id": 5, "price": 1000}, ...]
+    due_amount = data.get("due_amount", 0)
+    reason = data.get("reason", "")
+    
+    user_id = session.get("user_id")
+    current_branch_id = session.get("branch_id")
+
+    if not all([old_booking_id, target_branch_id, new_tests]):
+        return jsonify({"error": "Missing required transfer fields"}), 400
+
+    result, status = booking_services.transfer_and_rebook_service(
+        old_booking_id, target_branch_id, new_tests, due_amount, reason, user_id, current_branch_id
+    )
+    return jsonify(result), status
