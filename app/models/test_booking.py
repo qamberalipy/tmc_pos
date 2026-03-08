@@ -35,7 +35,7 @@ class TestBooking(db.Model):
     paid_amount = db.Column(db.Numeric(10, 2), default=0)
     due_date = db.Column(db.Date)
     due_amount = db.Column(db.Numeric(10, 2), default=0)
-
+    is_transferred_in = db.Column(db.Boolean, default=False)
     create_by = db.Column(db.Integer, nullable=False)
     create_at = db.Column(db.DateTime, default=datetime.utcnow)
     update_by = db.Column(db.Integer)
@@ -70,3 +70,21 @@ class FilmInventoryTransaction(db.Model):
     handled_by = db.Column(db.Integer, nullable=False)
     branch_id = db.Column(db.Integer, nullable=False)
     created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+class BookingTransferLog(db.Model):
+    __tablename__ = "booking_transfer_logs"
+
+    id = db.Column(db.Integer, primary_key=True)
+    new_booking_id = db.Column(db.Integer, nullable=True) # ID of new booking at Branch B
+    old_booking_id = db.Column(db.Integer) # Kept as integer since original record is deleted
+    
+    from_branch_id = db.Column(db.Integer, db.ForeignKey('branch.id'), nullable=False)
+    to_branch_id = db.Column(db.Integer, db.ForeignKey('branch.id'), nullable=False)
+    
+    transferred_by_user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    transferred_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    
+    patient_name = db.Column(db.String(225))
+    mr_no = db.Column(db.String(225))
+    transferred_cash_held = db.Column(db.Numeric(10,2), default=0.0)
+    reason = db.Column(db.Text, nullable=True)

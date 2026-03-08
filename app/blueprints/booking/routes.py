@@ -54,6 +54,15 @@ def views_receipt():
 
     return render_template('receipt.html')
     
+@booking_bp.route('/transfer/<int:booking_id>')
+@login_required
+def transfer_booking_page(booking_id):
+    try:
+        # We pass the booking_id to the template so JS can use it to fetch data
+        return render_template('transfer_booking.html', booking_id=booking_id)
+    except Exception as e:
+        print(f"Error in transfer_booking_page: {str(e)}")
+        return redirect(url_for('main.error_page'))
 
 @booking_bp.route('/create/', methods=['POST'])
 def create_booking():
@@ -399,4 +408,32 @@ def refund_booking_route(booking_id):
     result, status = booking_services.process_refund_service(
         booking_id, user_id, branch_id, reason
     )
+    return jsonify(result), status
+
+@booking_bp.route("/transfer-rebook", methods=["POST"])
+@login_required
+def transfer_booking_rebook_route():
+    data = request.get_json()
+    
+    old_booking_id = data.get("booking_id")
+    target_branch_id = data.get("target_branch_id")
+    new_tests = data.get("new_tests", []) # Expected: [{"test_id": 5, "price": 1000}, ...]
+    due_amount = data.get("due_amount", 0)
+    reason = data.get("reason", "")
+    
+    user_id = session.get("user_id")
+    current_branch_id = session.get("branch_id")
+
+    if not all([old_booking_id, target_branch_id, new_tests]):
+        return jsonify({"error": "Missing required transfer fields"}), 400
+
+    result, status = booking_services.transfer_and_rebook_service(
+        old_booking_id, target_branch_id, new_tests, due_amount, reason, user_id, current_branch_id
+    )
+    return jsonify(result), status
+
+@booking_bp.route("/details/<int:booking_id>", methods=["GET"])
+@login_required
+def get_booking_details_api(booking_id):
+    result, status = booking_services.get_single_booking_details(booking_id)
     return jsonify(result), status

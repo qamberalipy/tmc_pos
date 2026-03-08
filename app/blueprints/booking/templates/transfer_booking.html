@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+
+{% block stylesheets %}
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" />
+<link rel="stylesheet" href="{{ url_for('booking.static', filename='css/style.css') }}">
+<style>
+    .readonly-bg { background-color: #f8f9fa !important; border: 1px dashed #ced4da; }
+    .transfer-summary-card { border-left: 4px solid #0d6efd; background-color: #f0f7ff; }
+</style>
+{% endblock %}
+
+{% block user_page %}
+<div class="container-fluid py-3">
+    
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h4 class="fw-bold mb-0 text-dark"><i class="bi bi-arrow-left-right text-primary me-2"></i> Transfer Patient Booking</h4>
+        <a href="{{ url_for('booking.view_view_booking') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> Back to Bookings</a>
+    </div>
+
+    <input type="hidden" id="original_booking_id" value="{{ booking_id }}">
+
+    <div class="row g-4">
+        <div class="col-lg-8">
+            
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white border-bottom py-3">
+                    <h6 class="fw-bold mb-0 text-secondary"><i class="bi bi-person-badge"></i> 1. Origin Booking Details</h6>
+                </div>
+                <div class="card-body p-4 readonly-bg">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="small text-muted fw-bold text-uppercase">Patient Name</label>
+                            <div class="fw-bold text-dark fs-5" id="lbl_patient_name">--</div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="small text-muted fw-bold text-uppercase">MR Number</label>
+                            <div class="fw-bold text-dark fs-5" id="lbl_mr_no">--</div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="small text-muted fw-bold text-uppercase">Origin Branch</label>
+                            <div class="fw-bold text-danger fs-5" id="lbl_origin_branch">--</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white border-bottom py-3">
+                    <h6 class="fw-bold mb-0 text-primary"><i class="bi bi-building"></i> 2. Target Branch Configuration</h6>
+                </div>
+                <div class="card-body p-4">
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold text-muted small text-uppercase mb-1">Target Branch *</label>
+                            <select class="form-select shadow-none" id="target_branch_id">
+                                <option value="">-- Choose Branch --</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold text-muted small text-uppercase mb-1">Target Provider / Doctor</label>
+                            <select class="form-select shadow-none" id="target_assignee" disabled>
+                                <option value="">-- Select Branch First --</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold text-muted small text-uppercase mb-1">Select Replacement Tests *</label>
+                            <select class="form-select shadow-none" id="target_tests" disabled>
+                                <option value="">-- Select Branch First --</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-sm" id="selectedTestsTable">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Test Name</th>
+                                    <th class="text-center" style="width: 100px;">Price</th>
+                                    <th class="text-center" style="width: 100px;">Films</th>
+                                    <th class="text-center" style="width: 60px;">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="testListBody">
+                                <tr><td colspan="4" class="text-center text-muted small py-3">No tests added yet.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="mt-3">
+                        <label class="form-label fw-bold text-muted small text-uppercase mb-1">Transfer Reason / Remarks *</label>
+                        <textarea class="form-control shadow-none" id="transfer_reason" rows="2" placeholder="e.g. MRI Machine down at origin branch..."></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card border-0 shadow-sm transfer-summary-card sticky-top" style="top: 20px;">
+                <div class="card-header bg-transparent border-bottom py-3">
+                    <h6 class="fw-bold mb-0 text-primary"><i class="bi bi-calculator"></i> Financial Handoff</h6>
+                </div>
+                <div class="card-body p-4">
+                    
+                    <div class="d-flex justify-content-between mb-3 border-bottom pb-2">
+                        <span class="text-muted fw-bold">Pre-Paid at Origin:</span>
+                        <span class="fw-bold text-success" id="summary_held_cash">Rs. 0.00</span>
+                    </div>
+
+                    <div class="d-flex justify-content-between mb-3 border-bottom pb-2">
+                        <span class="text-muted fw-bold">New Target Total:</span>
+                        <span class="fw-bold text-dark" id="summary_new_total">Rs. 0.00</span>
+                    </div>
+
+                    <div class="d-flex justify-content-between mb-4 bg-light p-2 rounded border">
+                        <span class="text-danger fw-bold text-uppercase">Branch B Due:</span>
+                        <span class="fw-bold text-danger fs-5" id="summary_due_amount">Rs. 0.00</span>
+                    </div>
+
+                    <div class="alert alert-warning small py-2 mb-4">
+                        <i class="bi bi-exclamation-triangle"></i> Original payment will be retained at the Origin Branch. Only the new Due Amount should be collected from the patient.
+                    </div>
+
+                    <button class="btn btn-primary w-100 fw-bold py-2 shadow-sm" id="btnExecuteTransfer">
+                        <i class="bi bi-check-circle me-1"></i> Execute Transfer
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block javascript %}
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script src="{{ url_for('booking.static', filename='js/transfer_booking.js') }}"></script>
+{% endblock %}

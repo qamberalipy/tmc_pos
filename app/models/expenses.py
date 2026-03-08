@@ -34,5 +34,5 @@ class PaymentTransaction(db.Model):
     direction = db.Column(db.Enum("IN", "OUT", name="direction_enum"), nullable=False) #
     payment_date = db.Column(db.DateTime, default=datetime.utcnow, index=True) #
     payment_type = db.Column(db.Enum("Cash", "Card", "Online", "Other", name="payment_enum")) # 
-    transaction_type = db.Column(db.Enum("Initial", "DueClearance", "Expense", name="trans_type")) #
+    transaction_type = db.Column(db.Enum("Initial", "DueClearance", "Expense","TransferOut_Held", name="trans_type")) #
     created_by = db.Column(db.Integer) #

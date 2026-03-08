@@ -14,7 +14,7 @@ from app.models.expenses import Expenses
 from app.models.branch import Branch
 from collections import defaultdict
 from app.models.expense_head import Expense_head
-from app.helper import convert_to_utc
+from app.helper import get_lab_date_bounds
 from werkzeug.exceptions import BadRequest, NotFound
 from app.models.expenses import PaymentTransaction
 
@@ -169,8 +169,10 @@ def get_daily_test_report(branch_id, start_utc, end_utc, shift_ranges=None, user
 
 def get_daily_summary(branch_id, start_utc, end_utc, shift_ranges=None, user_id=None):
     try:
+        # 1. Update query to group by BOTH direction and transaction_type
         query = db.session.query(
             PaymentTransaction.direction,
+            PaymentTransaction.transaction_type,
             func.sum(PaymentTransaction.amount).label("total")
         ).filter(PaymentTransaction.branch_id == branch_id)
 
@@ -182,18 +184,32 @@ def get_daily_summary(branch_id, start_utc, end_utc, shift_ranges=None, user_id=
         else:
             query = query.filter(PaymentTransaction.payment_date >= start_utc, PaymentTransaction.payment_date <= end_utc)
 
-        results = query.group_by(PaymentTransaction.direction).all()
+        results = query.group_by(PaymentTransaction.direction, PaymentTransaction.transaction_type).all()
         
-        summary = {"total_income": 0.0, "total_expense": 0.0, "net_cash": 0.0}
+        # 2. Add new granular keys for the frontend
+        summary = {
+            "regular_income": 0.0,          # Money from native tests & dues
+            "transferred_held_cash": 0.0,   # Money kept from Transferred-Out cases
+            "total_income": 0.0,            # Combined Total IN cash
+            "total_expense": 0.0,           # Combined Total OUT cash
+            "net_cash": 0.0                 # Exact Physical Drawer Balance
+        }
 
-        for direction, total in results:
+        # 3. Safely map the cash buckets
+        for direction, trans_type, total in results:
             val = _to_float(total)
             if direction == 'IN':
-                summary["total_income"] = val
+                if trans_type == 'TransferOut_Held':
+                    summary["transferred_held_cash"] += val
+                else:
+                    summary["regular_income"] += val
+                    
+                summary["total_income"] += val
             elif direction == 'OUT':
-                summary["total_expense"] = val
+                summary["total_expense"] += val
                 
         summary["net_cash"] = summary["total_income"] - summary["total_expense"]
+        
         return summary
     except Exception as e:
         print(f"Error in daily summary: {str(e)}")
@@ -304,22 +320,15 @@ def assign_bookings_to_doctor(bookings_payload, doctor_id, assigned_by, branch_i
 
 def get_doctor_assigned_reports_service(branch_id=None, status=None, from_date=None, to_date=None):
     try:
-        # --- 1. Date Filtering Logic ---
-        start_dt = None
-        end_dt = None
+        # --- 1. NEW LOGIC: Use Shift Bounds ---
+        start_utc = None
+        end_utc = None
 
         if from_date and to_date:
-            try:
-                from_date_obj = datetime.strptime(from_date, "%Y-%m-%d").date()
-                to_date_obj   = datetime.strptime(to_date, "%Y-%m-%d").date()
-            except ValueError:
-                return {"status": "error", "message": "Date format must be YYYY-MM-DD."}
-
-            if from_date_obj > to_date_obj:
-                return {"status": "error", "message": "from_date cannot be greater than to_date."}
-
-            start_dt = datetime.combine(from_date_obj, time.min)
-            end_dt   = datetime.combine(to_date_obj, time.max)
+            # Use the helper function to get precise UTC bounds for the 8 AM - 4 AM shift
+            start_utc, end_utc = get_lab_date_bounds(from_date, to_date, branch_id)
+        elif from_date or to_date:
+            return {"status": "error", "message": "Both from_date and to_date are required for date filtering."}
 
         # --- 2. Setup Aliases ---
         DoctorUser = aliased(User)   # Alias for "Assign To"
@@ -337,7 +346,7 @@ def get_doctor_assigned_reports_service(branch_id=None, status=None, from_date=N
             DoctorReportingdetails.report_details_id,
             DoctorReportingdetails.id.label("reported_id"),
             
-            # --- NEW: Fetch Patient Details ---
+            # Patient Details
             TestBooking.due_amount.label("booking_balance"),
             TestBooking.patient_name,
             TestBooking.age,
@@ -363,8 +372,10 @@ def get_doctor_assigned_reports_service(branch_id=None, status=None, from_date=N
             else:
                 query = query.filter(DoctorReportingdetails.status == status)
 
-        if start_dt and end_dt:
-            query = query.filter(DoctorReportingdetails.report_at.between(start_dt, end_dt))
+        # --- APPLY UTC BOUNDS HERE ---
+        if start_utc and end_utc:
+            # Note: Verify if your model uses report_at or created_at. I'm using report_at based on your previous code.
+            query = query.filter(DoctorReportingdetails.report_at.between(start_utc, end_utc))
 
         # --- 5. Execute ---
         results = query.order_by(DoctorReportingdetails.report_at.desc()).all()
@@ -378,11 +389,11 @@ def get_doctor_assigned_reports_service(branch_id=None, status=None, from_date=N
                 "status": row.status,
                 "assign_to": row.doctor_name,
                 "assign_by": row.assign_by if row.assign_by else "System",
-                "assigned_at": row.assigned_at.strftime('%Y-%m-%d %H:%M:%S') if row.assigned_at else None,
+                "assigned_at": row.assigned_at.strftime('%Y-%m-%d %I:%M %p') if row.assigned_at else None,
                 "report_details_id": row.report_details_id,
                 "id": row.reported_id,
                 
-                # --- Pass New Data to Frontend ---
+                # Pass Data to Frontend
                 "balance": float(row.booking_balance or 0),
                 "patient_name": row.patient_name,
                 "age": row.age,
@@ -398,7 +409,6 @@ def get_doctor_assigned_reports_service(branch_id=None, status=None, from_date=N
             "status": "error",
             "message": str(e)
         }
-
 # --- NEW FUNCTION TO DELETE ASSIGNMENT ---
 def delete_doctor_assignment(assignment_id):
     try:

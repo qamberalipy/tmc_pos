@@ -38,7 +38,7 @@ $(document).ready(function () {
         
         let $shiftContainer = $("#shift_selector_container");
         let $shiftSelector = $("#shift_selector");
-        let $spinner = $("#shift_spinner"); // The new spinner
+        let $spinner = $("#shift_spinner"); 
         
         if (!userId) {
             $shiftContainer.hide();
@@ -46,7 +46,6 @@ $(document).ready(function () {
             return;
         }
 
-        // Show container, show spinner, disable select dropdown
         $shiftContainer.fadeIn();
         $spinner.removeClass("d-none");
         $shiftSelector.prop("disabled", true);
@@ -70,13 +69,11 @@ $(document).ready(function () {
                 showToastMessage('error', 'Could not load shifts.');
             })
             .finally(() => {
-                // Hide spinner, enable select dropdown
                 $spinner.addClass("d-none");
                 $shiftSelector.prop("disabled", false);
             });
     }
 
-    // Trigger shift refresh on Staff or Date change
     $("#staff_selector, #report_date").on("change", function () {
         fetchStaffShifts();
     });
@@ -194,7 +191,8 @@ $(document).ready(function () {
         $("#dueReportTable tbody").html('<tr><td colspan="6" class="text-center py-4"><div class="spinner-border spinner-border-sm text-primary" role="status"></div> Loading...</td></tr>');
         $("#expenseReportTable tbody").html('<tr><td colspan="2" class="text-center py-4"><div class="spinner-border spinner-border-sm text-primary" role="status"></div> Loading...</td></tr>');
         
-        $("#summary_income, #summary_expense, #summary_net").text("0.00");
+        // Resetting all 4 cards
+        $("#summary_regular_income, #summary_held_cash, #summary_expense, #summary_net").text("0.00");
         $("#film_start, #film_use, #film_closing").text("0");
 
         try {
@@ -231,7 +229,8 @@ $(document).ready(function () {
 
         // --- 1. FINANCIAL SUMMARY CARDS ---
         if(summaryData) {
-            $("#summary_income").text(formatCurrency(summaryData.total_income));
+            $("#summary_regular_income").text(formatCurrency(summaryData.regular_income));
+            $("#summary_held_cash").text(formatCurrency(summaryData.transferred_held_cash));
             $("#summary_expense").text(formatCurrency(summaryData.total_expense));
             $("#summary_net").text(formatCurrency(summaryData.net_cash));
         }
@@ -333,7 +332,8 @@ $(document).ready(function () {
         y += 10;
 
         // 1. Financial Summary Section
-        let income = $("#summary_income").text();
+        let rIncome = $("#summary_regular_income").text();
+        let heldCash = $("#summary_held_cash").text();
         let expense = $("#summary_expense").text();
         let net = $("#summary_net").text();
 
@@ -342,7 +342,7 @@ $(document).ready(function () {
         doc.text("Financial Summary:", 14, y);
         doc.setFont(undefined, 'normal');
         y += 6;
-        doc.text(`Income: ${income}   |   Expense: ${expense}   |   Net Cash: ${net}`, 14, y);
+        doc.text(`Regular: ${rIncome} | Held (Transfers): ${heldCash} | Expense: ${expense} | Net Cash: ${net}`, 14, y);
         y += 12;
 
         // 2. Films Inventory Section
@@ -393,7 +393,8 @@ $(document).ready(function () {
             ["Daily Closing Report", $("#report_date").val()],
             [],
             ["FINANCIAL SUMMARY", ""],
-            ["Total Income", $("#summary_income").text()],
+            ["Regular Income", $("#summary_regular_income").text()],
+            ["Held Cash (Transfers)", $("#summary_held_cash").text()],
             ["Total Expense", $("#summary_expense").text()],
             ["Net Cash", $("#summary_net").text()],
             [],
