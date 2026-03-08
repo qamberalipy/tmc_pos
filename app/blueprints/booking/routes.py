@@ -54,6 +54,15 @@ def views_receipt():
 
     return render_template('receipt.html')
     
+@booking_bp.route('/transfer/<int:booking_id>')
+@login_required
+def transfer_booking_page(booking_id):
+    try:
+        # We pass the booking_id to the template so JS can use it to fetch data
+        return render_template('transfer_booking.html', booking_id=booking_id)
+    except Exception as e:
+        print(f"Error in transfer_booking_page: {str(e)}")
+        return redirect(url_for('main.error_page'))
 
 @booking_bp.route('/create/', methods=['POST'])
 def create_booking():
@@ -421,4 +430,10 @@ def transfer_booking_rebook_route():
     result, status = booking_services.transfer_and_rebook_service(
         old_booking_id, target_branch_id, new_tests, due_amount, reason, user_id, current_branch_id
     )
+    return jsonify(result), status
+
+@booking_bp.route("/details/<int:booking_id>", methods=["GET"])
+@login_required
+def get_booking_details_api(booking_id):
+    result, status = booking_services.get_single_booking_details(booking_id)
     return jsonify(result), status

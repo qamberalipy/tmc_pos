@@ -391,13 +391,19 @@ def get_test_registration_by_id(test_id):
         return {"error": str(e.__dict__.get("orig", e))}, 500
 def get_all_test_list(branch_id):
     try:
-        tests = Test_registration.query.filter(Test_registration.is_active == True, Test_registration.branch_id == branch_id).all()
+        tests = Test_registration.query.filter(
+            Test_registration.is_active == True, 
+            Test_registration.branch_id == branch_id
+        ).all()
+        
         return [
             {
-                "id": tests.id,
-                "test_name": tests.test_name
+                "id": t.id,
+                "test_name": t.test_name,
+                "price": float(t.charges) if t.charges else 0.0,
+                "no_of_films": t.no_of_films if t.no_of_films else 0
             }
-            for tests in tests
+            for t in tests
         ]
     except SQLAlchemyError as e:
         print(f"Database error while fetching test registrations: {str(e)}")

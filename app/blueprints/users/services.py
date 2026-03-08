@@ -103,6 +103,27 @@ def get_all_users():
     except SQLAlchemyError as e:
         return {"error": str(e.__dict__.get('orig', e))}, 500
 
+def get_all_staff_users(branch_id=None):
+    try:
+        query = (
+            db.session.query(User, Role.role.label("role_name"), Branch.branch_name.label("branch_name"))
+            .outerjoin(Role, User.role_id == Role.id)
+            .outerjoin(Branch, User.branch_id == Branch.id)
+        )
+        
+        # --- FIXED FILTER SYNTAX ---
+        if branch_id:
+            query = query.filter(User.role_id == 2, User.branch_id == branch_id)
+        else:
+            query = query.filter(User.role_id == 2)
+
+        results = query.all()
+        
+        return [_format_user(u, role_name, branch_name) for u, role_name, branch_name in results], 200
+        
+    except SQLAlchemyError as e:
+        return {"error": str(e.__dict__.get('orig', e))}, 500
+    
 def update_doctor_signature_service(user_id, sig_name, sig_degrees, sig_title):
     try:
         user = User.query.get(user_id)

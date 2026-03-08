@@ -71,6 +71,11 @@ def get_all_users():
     result, status = users_services.get_all_users()
     return jsonify(result), status
 
+@users_bp.route("/user/staff/<int:branch_id>", methods=["GET"])
+def get_all_staff_users(branch_id):
+    result, status = users_services.get_all_staff_users(branch_id)
+    return jsonify(result), status
+
 # Get User by ID
 @users_bp.route("/user/<int:user_id>", methods=["GET"])
 def get_user_by_id(user_id):

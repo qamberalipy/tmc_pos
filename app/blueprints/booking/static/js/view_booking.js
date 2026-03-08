@@ -258,7 +258,7 @@ $(document).ready(function () {
 let grandTotalFilms = 0;
 
 // ---------------------------------------------------------
-// 4. MAIN TABLE RENDERER (UPDATED)
+// 4. MAIN TABLE RENDERER (UPDATED FOR TRANSFER BOOKING)
 // ---------------------------------------------------------
 function getAllTestBookings() {
     myshowLoader();
@@ -308,7 +308,26 @@ function getAllTestBookings() {
 
             let currentShareId = t.give_share_to || "";
 
-            // 3. ACTION BUTTONS
+            // --- 2. NEW: Visual Badge for Transferred-In Bookings ---
+            let transferBadge = t.is_transferred_in 
+                ? `<span class="badge bg-warning text-dark ms-1" style="font-size:0.65rem;"><i class="bi bi-box-arrow-in-right"></i> Transferred In</span>` 
+                : ``;
+
+            // --- 3. UPDATE: Add Transfer Button & Apply Security Locks ---
+            // We disable/hide certain buttons if the booking was transferred in from another branch
+            let transferBtnHtml = !t.is_transferred_in 
+                ? `<a href="${baseUrl}/booking/transfer/${t.booking_id}" class="btn btn-action text-info shadow-sm" title="Transfer to Another Branch"><i class="bi bi-arrow-left-right"></i></a>` 
+                : ``;
+
+            let refundBtnHtml = !t.is_transferred_in
+                ? `<button class="btn btn-action text-danger shadow-sm refund-booking" data-id="${t.booking_id}" title="Refund & Delete"><i class="bi bi-arrow-counterclockwise"></i></button>`
+                : ``;
+
+            let shareBtnHtml = !t.is_transferred_in
+                ? `<button class="btn btn-action text-warning shadow-sm edit-share" data-id="${t.booking_id}" data-share="${currentShareId}" title="Update Share"><i class="bi bi-person-gear"></i></button>`
+                : ``;
+
+            // 4. ASSEMBLE ACTIONS
             let actions = `
             <div class="d-flex gap-1 justify-content-center">
                 <a href="${baseUrl}/booking/receipt/${t.booking_id}" target="_blank" class="btn btn-action text-success shadow-sm" title="Print Receipt"><i class="bi bi-printer"></i></a>
@@ -317,19 +336,16 @@ function getAllTestBookings() {
                 
                 <button class="btn btn-action text-dark shadow-sm edit-films" data-id="${t.booking_id}" data-test-ids="${allTestIdsStr}" title="Edit Films"><i class="bi bi-plus-square"></i></button>
                 
-                <button class="btn btn-action text-warning shadow-sm edit-share" data-id="${t.booking_id}" data-share="${currentShareId}" title="Update Share"><i class="bi bi-person-gear"></i></button>
-                
-                <button class="btn btn-action text-danger shadow-sm refund-booking" 
-                        data-id="${t.booking_id}" 
-                        title="Refund & Delete">
-                    <i class="bi bi-arrow-counterclockwise"></i>
-                </button>
+                ${shareBtnHtml}
+                ${transferBtnHtml}
+                ${refundBtnHtml}
             </div>`;
 
+            // 5. PUSH TO TABLE ROWS
             rowsToAdd.push([
                 `<input type="checkbox" class="chk-booking custom-chk" value="${t.booking_id}">`,
                 `<div><div class="fw-bold">#${t.booking_id}</div><div class="text-muted text-xs">${t.date}</div></div>`,
-                `<div><div class="fw-bold text-primary">${t.patient_name}</div><div class="text-muted text-xs">MR: ${t.mr_no || 'N/A'}</div></div>`,
+                `<div><div class="fw-bold text-primary">${t.patient_name} ${transferBadge}</div><div class="text-muted text-xs">MR: ${t.mr_no || 'N/A'}</div></div>`,
                 testHtml,
                 `<div class="text-xs fw-medium">${t.referred_dr || 'Self'}</div>`,
                 `<div class="text-end text-muted text-xs">${t.total_amount}</div>`,

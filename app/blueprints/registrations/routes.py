@@ -188,3 +188,12 @@ def get_all_tests_list():
     except Exception as e:
         print(f"Error in get_all_tests_list: {str(e)}")
         return jsonify({"error": "An error occurred"}), 500
+
+@registrations_bp.route('/test/list/<int:branch_id>', methods=['GET'])
+def get_all_tests_list_via_branch(branch_id):
+    try:
+        data = registrations_services.get_all_test_list(branch_id)
+        return jsonify(data), 200
+    except Exception as e:
+        print(f"Error in get_all_tests_list: {str(e)}")
+        return jsonify({"error": "An error occurred"}), 500

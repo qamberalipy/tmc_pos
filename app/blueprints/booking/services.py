@@ -2,6 +2,7 @@ import json
 from flask import session
 from sqlalchemy import func, and_, cast, String,case,Date,or_
 from app.blueprints import booking
+from app.blueprints.reports.services import _to_float
 from app.extensions import db
 from app.models import TestBookingDetails,User,Branch,Referred
 from werkzeug.security import generate_password_hash
@@ -196,6 +197,35 @@ def _generate_mr_no():
         new_seq = 1
 
     return f"{prefix}-{new_seq:04d}"
+
+def get_single_booking_details(booking_id):
+    try:
+        booking = db.session.query(
+            TestBooking.id.label("booking_id"),
+            TestBooking.patient_name,
+            TestBooking.mr_no,
+            TestBooking.branch_id,
+            Branch.branch_name,
+            TestBooking.paid_amount
+        ).outerjoin(Branch, Branch.id == TestBooking.branch_id)\
+         .filter(TestBooking.id == booking_id).first()
+
+        if not booking:
+            return {"error": "Booking not found"}, 404
+
+        return {
+            "booking": {
+                "booking_id": booking.booking_id,
+                "patient_name": booking.patient_name,
+                "mr_no": booking.mr_no,
+                "branch_id": booking.branch_id,
+                "branch_name": booking.branch_name,
+                "paid_amount": _to_float(booking.paid_amount)
+            }
+        }, 200
+    except Exception as e:
+        print(f"Error fetching booking details: {str(e)}")
+        return {"error": str(e)}, 500
 
 def update_booking_share_provider(booking_id, new_referred_id, user_id):
     try:
@@ -924,6 +954,7 @@ def get_all_test_bookings(branch_id=None, from_date=None, to_date=None):
                 Referred.name.label("referred_dr"),
                 TestBooking.net_receivable,
                 TestBooking.discount_value,
+                TestBooking.is_transferred_in,
                 TestBooking.paid_amount,
                 TestBooking.due_amount,
                 TestBooking.create_at,
@@ -1527,7 +1558,9 @@ def transfer_and_rebook_service(old_booking_id, target_branch_id, new_tests, due
 
     except IntegrityError as e:
         db.session.rollback()
+        print(f"Integrity Error: {str(e)}")
         return {"error": "Database integrity error. Check MR_NO constraints."}, 500
     except Exception as e:
         db.session.rollback()
+        print(f"Error in transfer_and_rebook_service: {str(e)}")
         return {"error": str(e)}, 500
