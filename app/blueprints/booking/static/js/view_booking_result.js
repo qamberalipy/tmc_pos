@@ -1,200 +1,170 @@
 $(document).ready(function () {
     
-    // --- NEW: Default One Month Filter using Global Lab Date (from main.js) ---
+    // Default One Month Filter using Global Lab Date (from main.js)
     if (!$("#from_date").val() || !$("#to_date").val()) {
-        $("#from_date").val(getGlobalLabDate(-30)); // 30 days ago (Lab Date)
-        $("#to_date").val(getGlobalLabDate(0));     // Today (Lab Date)
+        if (typeof getGlobalLabDate === 'function') {
+            $("#from_date").val(getGlobalLabDate(-30));
+            $("#to_date").val(getGlobalLabDate(0));
+        } else {
+            // Fallback if main.js is missing
+            let today = new Date().toISOString().split('T')[0];
+            $("#from_date").val(today);
+            $("#to_date").val(today);
+        }
     }
-    // -------------------------------------------------------------------------
 
-    // 1. Load data on page load
     getAssignedReports();
 
-    // 2. Bind Search Button
     $("#searchBtn").on("click", function() {
         getAssignedReports();
     });
 });
 
 // =======================================================
-// 🔥 FETCH DATA AND RENDER TABLE
+// 1. FETCH DATA AND RENDER TABLE
 // =======================================================
 function getAssignedReports() {
     if (typeof myshowLoader === 'function') myshowLoader();
 
-    // 1. Gather Filter Values
     let fromDate = $("#from_date").val();
     let toDate = $("#to_date").val();
-    let statuses = $("#status_filter").val(); // Returns an array e.g., ['Pending', 'Reported']
+    let statuses = $("#status_filter").val(); 
 
-    // 2. Build Query Parameters for Axios
     const params = new URLSearchParams();
-    
     if (fromDate) params.append('from_date', fromDate);
     if (toDate) params.append('to_date', toDate);
-    
     if (statuses && statuses.length > 0) {
-        statuses.forEach(s => params.append('status', s));
+        statuses.forEach(status => params.append('status', status));
     }
 
-    // 3. Make API Call
-    axios.get(baseUrl + "/reports/assigned-reports?" + params.toString())
+    axios.get(baseUrl + `/reports/assigned-reports?${params.toString()}`)
         .then(res => {
             let data = res.data;
-            
-            // Check for API error response
-            if(data.status === "error") {
-                showToastMessage("error", data.message);
-                return;
-            }
-
-            // Initialize/Destroy DataTable
-            let dtable = $("#assignedReportsTable").DataTable({
+            let table = $("#assignedReportsTable").DataTable({
                 destroy: true,
                 responsive: true,
-                order: [[0, 'desc']] // Sort by Booking ID descending
+                pageLength: 10,
+                order: [[0, "desc"]],
+                language: { emptyTable: "No assignments found for the selected criteria." }
             });
 
-            dtable.clear();
-            let rowsToAdd = [];
+            table.clear().draw();
 
-            data.forEach(item => {
+            $.each(data, function (i, item) {
+                let bookingHtml = `<span class="badge bg-light text-dark border">B#${item.booking_id}</span>`;
                 
-                // --- 1. Patient Info (Name + Age/Gender) ---
-                let patientInfoHtml = `
+                let patientHtml = `
                     <div class="d-flex flex-column">
-                        <span class="fw-bold text-dark">${item.patient_name || '-'}</span>
-                        <small class="text-muted" style="font-size:0.85em;">
-                            ${item.age || '-'} / ${item.gender || '-'}
-                        </small>
-                    </div>
-                `;
-
-                // --- 2. Contact Column ---
-                let contactHtml = `<span class="text-secondary">${item.contact_no || 'N/A'}</span>`;
-
-                // --- 3. Status Badge ---
-                let statusClass = "bg-warning text-dark";
-                if(item.status === 'Reported') statusClass = "bg-success";
-                else if(item.status === 'Declined') statusClass = "bg-danger";
+                        <span class="fw-bold">${item.patient_name || 'N/A'}</span>
+                        <small class="text-muted">${item.age || 'N/A'} Yrs | ${item.gender || 'N/A'}</small>
+                    </div>`;
                 
-                let statusHtml = `<span class="badge ${statusClass}">${item.status}</span>`;
+                let contactHtml = `<span class="small">${item.contact_no || '-'}</span>`;
+                let testHtml = `<span class="badge badge-test">${item.test_name}</span>`;
 
-                // --- 4. Booking ID & Test ---
-                let bookingIdHtml = `<span class="fw-bold text-primary">#${item.booking_id}</span>`;
-                let testHtml = `<span class="fw-semibold">${item.test_name}</span>`;
-                
-                // --- 5. Assign Info ---
-                let assignToHtml = `<span class="fw-bold text-dark">${item.assign_to}</span>`;
-                let assignByHtml = `
-                    <div class="d-flex flex-column">
-                        <span class="text-dark small fw-bold">${item.assign_by}</span>
-                        <small class="text-muted" style="font-size: 0.75rem;">${item.assigned_at || ''}</small>
-                    </div>
-                `;
+                // Status Formatting
+                let statusBadge = "bg-secondary";
+                let statusIcon = "bi-clock";
+                if (item.status === 'Reported') { statusBadge = "bg-success"; statusIcon = "bi-check-circle"; }
+                else if (item.status === 'Declined') { statusBadge = "bg-danger"; statusIcon = "bi-x-circle"; }
+                else if (item.status === 'Pending') { statusBadge = "bg-warning text-dark"; }
+                let statusHtml = `<span class="badge ${statusBadge}"><i class="bi ${statusIcon}"></i> ${item.status}</span>`;
 
-                // --- 6. Action Buttons ---
-                let printBtn = "";
-                
-                // Only show View/Print button if Reported or Pending (Pending might view details)
-                if (item.report_details_id) {
-                    printBtn = `
-                        <button class="btn btn-sm btn-info text-white me-1" 
-                            onclick="viewReport('${item.report_details_id}', ${item.balance})" 
-                            title="View Report">
-                            <i class="bi bi-eye"></i>
+                // Consolidated Assignment Column
+                let assignHtml = `
+                    <div class="d-flex flex-column small" style="gap: 2px;">
+                        <span><strong class="text-dark">Dr:</strong> ${item.assign_to || '-'}</span>
+                        <span class="text-muted"><i class="bi bi-person-fill-gear"></i> By: ${item.assign_by || '-'}</span>
+                        <span class="text-muted" style="font-size: 0.7rem;"><i class="bi bi-clock"></i> ${item.assigned_at || '-'}</span>
+                    </div>`;
+
+                // Actions based on status
+                let actionBtn = "";
+                if (item.status === "Reported") {
+                    actionBtn = `
+                        <button class="btn btn-sm btn-primary shadow-sm" onclick="printReport(${item.report_details_id}, ${item.balance})" title="View / Print Document">
+                            <i class="bi bi-printer"></i> View
                         </button>`;
                 } else {
-                    // Placeholder for pending
-                    printBtn = `
-                        <button class="btn btn-sm btn-secondary me-1" disabled title="Report not ready">
-                            <i class="bi bi-eye-slash"></i>
+                    actionBtn = `
+                        <button class="btn btn-sm btn-outline-danger shadow-sm" onclick="deleteAssignment(${item.id})" title="Revoke Assignment">
+                            <i class="bi bi-trash"></i>
                         </button>`;
                 }
 
-                // Delete Button (New)
-                let deleteBtn = `
-                    <button class="btn btn-sm btn-danger" 
-                        onclick="deleteAssignment('${item.id}')" 
-                        title="Delete Assignment Request">
-                        <i class="bi bi-trash"></i>
-                    </button>
-                `;
-
-                rowsToAdd.push([
-                    bookingIdHtml,
-                    patientInfoHtml, // New
-                    contactHtml,     // New
-                    testHtml,
-                    statusHtml,
-                    assignToHtml,
-                    assignByHtml,    // Combined By + At
-                    `<div class="d-flex">${printBtn} ${deleteBtn}</div>`
-                ]);
+                table.row.add([bookingHtml, patientHtml, contactHtml, testHtml, statusHtml, assignHtml, actionBtn]).draw(false);
             });
-
-            if (rowsToAdd.length > 0) dtable.rows.add(rowsToAdd);
-            dtable.draw(false);
         })
         .catch(err => {
-            console.error("Error fetching reports:", err);
-            let msg = err.response?.data?.message || "Failed to load data";
-            if (typeof showToastMessage === 'function') showToastMessage("error", msg);
-        })
-        .finally(() => { 
-            if (typeof myhideLoader === 'function') myhideLoader(); 
-        });
-}
-
-// =======================================================
-// 🔥 VIEW / PRINT REPORT
-// =======================================================
-function viewReport(reportDetailsId, dueAmount) {
-    if (!reportDetailsId) return;
-
-    // Safety Check
-    if (dueAmount > 0) {
-        if (typeof showToastMessage === 'function') {
-            showToastMessage("error", "Cannot print report. Clear dues first.");
-        } else {
-            alert("Cannot print report. Clear dues first.");
-        }
-        return;
-    }
-
-    // Open route in new tab
-    let url = baseUrl + "/reports/view-patient-report/" + reportDetailsId;
-    window.open(url, '_blank');
-}
-
-// =======================================================
-// 🔥 DELETE ASSIGNMENT (NEW)
-// =======================================================
-function deleteAssignment(id) {
-    if (!confirm("Are you sure you want to delete this assignment? The doctor will no longer see this request.")) {
-        return;
-    }
-
-    if (typeof myshowLoader === 'function') myshowLoader();
-
-    axios.delete(baseUrl + `/reports/assigned-reports/delete/${id}`)
-        .then(res => {
-            if (typeof showToastMessage === 'function') {
-                showToastMessage("success", "Request deleted successfully");
-            } else {
-                alert("Request deleted successfully");
-            }
-            getAssignedReports(); // Refresh table
-        })
-        .catch(err => {
-            let msg = err.response?.data?.error || "Failed to delete assignment";
-            if (typeof showToastMessage === 'function') {
-                showToastMessage("error", msg);
-            } else {
-                alert(msg);
-            }
+            console.error(err);
+            Swal.fire('Error', err.response?.data?.message || 'Failed to fetch assigned reports.', 'error');
         })
         .finally(() => {
             if (typeof myhideLoader === 'function') myhideLoader();
         });
+}
+
+// =======================================================
+// 2. PRINT / VIEW REPORT (CLOUD AWARE)
+// =======================================================
+function printReport(reportDetailsId, dueAmount) {
+    if (parseFloat(dueAmount) > 0) {
+        return Swal.fire("Action Blocked", "Cannot print report. Please clear patient dues first.", "warning");
+    }
+
+    if (typeof myshowLoader === 'function') myshowLoader();
+
+    // Fetch the report metadata to check for a cloud document URL
+    axios.get(`${baseUrl}/reports/get-report-data/${reportDetailsId}`)
+        .then(res => {
+            let data = res.data;
+            
+            if (data.report_file_url) {
+                // If it's a modern cloud upload, open the file directly in a new tab
+                window.open(data.report_file_url, '_blank');
+            } else {
+                // Fallback to legacy text-based HTML report
+                let url = baseUrl + "/reports/view-patient-report/" + reportDetailsId;
+                window.open(url, '_blank');
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            Swal.fire('Error', 'Failed to retrieve document information.', 'error');
+        })
+        .finally(() => {
+            if (typeof myhideLoader === 'function') myhideLoader();
+        });
+}
+
+// =======================================================
+// 3. DELETE ASSIGNMENT
+// =======================================================
+function deleteAssignment(id) {
+    Swal.fire({
+        title: "Revoke Assignment?",
+        text: "The doctor will no longer see this request in their pending list.",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonColor: "#d33",
+        cancelButtonColor: "#6c757d",
+        confirmButtonText: "Yes, delete it!"
+    }).then((result) => {
+        if (result.isConfirmed) {
+            if (typeof myshowLoader === 'function') myshowLoader();
+
+            axios.delete(`${baseUrl}/reports/assigned-reports/delete/${id}`)
+                .then(res => {
+                    Swal.fire("Deleted!", "The request has been revoked.", "success");
+                    getAssignedReports(); 
+                })
+                .catch(err => {
+                    let msg = err.response?.data?.error || "Failed to delete assignment.";
+                    Swal.fire("Error", msg, "error");
+                })
+                .finally(() => {
+                    if (typeof myhideLoader === 'function') myhideLoader();
+                });
+        }
+    });
 }
