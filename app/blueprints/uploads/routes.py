@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify
 from .services import start_multipart_upload, generate_part_urls, finish_multipart_upload
+from . import uploads_bp
 
-uploads_bp = Blueprint('uploads', __name__)
 
 @uploads_bp.route('/api/upload/init', methods=['POST'])
 def init_upload():
@@ -18,6 +18,7 @@ def init_upload():
         )
         return jsonify({"upload_id": upload_id, "file_key": file_key}), 200
     except ValueError as e:
+        print(f"Init Upload Validation Error: {e}")
         return jsonify({"error": str(e)}), 400
     except Exception as e:
         print(f"Init Upload Error: {e}")
