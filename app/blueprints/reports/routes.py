@@ -270,17 +270,17 @@ def checking_route():
         print(f"Error in checking_route: {str(e)}")
         return jsonify({"error": "Internal server error", "detail": str(e)}), 500
 
-@reports_bp.route("/save-report", methods=["POST"])
-def save_report():
-    try:
-        data = request.get_json(force=True)
-        user_id = session.get("user_id")
-        result=report_services.save_doctor_report(data, user_id)
-        return jsonify(result), 200
+# @reports_bp.route("/save-report", methods=["POST"])
+# def save_report():
+#     try:
+#         data = request.get_json(force=True)
+#         user_id = session.get("user_id")
+#         result=report_services.save_doctor_report(data, user_id)
+#         return jsonify(result), 200
     
-    except Exception as e:
-        print(e)
-        return jsonify({"error": str(e)}), 400
+#     except Exception as e:
+#         print(e)
+#         return jsonify({"error": str(e)}), 400
     
 @reports_bp.route("/get-report-data/<int:report_id>", methods=["GET"])
 def get_report_data(report_id):
@@ -291,16 +291,16 @@ def get_report_data(report_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 
-@reports_bp.route("/update-report/<int:report_id>", methods=["PUT"])
-def update_report(report_id):
-    try:
-        data = request.get_json(force=True)
-        user_id = session.get("user_id")
-        result = report_services.update_doctor_report(report_id, data, user_id)
-        return jsonify(result), 200
+# @reports_bp.route("/update-report/<int:report_id>", methods=["PUT"])
+# def update_report(report_id):
+#     try:
+#         data = request.get_json(force=True)
+#         user_id = session.get("user_id")
+#         result = report_services.update_doctor_report(report_id, data, user_id)
+#         return jsonify(result), 200
 
-    except Exception as e:
-        return jsonify({"error": str(e)}), 400
+#     except Exception as e:
+#         return jsonify({"error": str(e)}), 400
     
 @reports_bp.route("/view-patient-report/<int:report_id>", methods=["GET"])
 def view_patient_report(report_id):
@@ -381,3 +381,32 @@ def radiologist_report(doctor_id):
         # Log the actual error in your server logs
         print(f"Error generating report: {str(e)}")
         return jsonify({"error": "Internal Server Error", "message": str(e)}), 500
+    
+
+
+@reports_bp.route("/api/save-report", methods=["POST"])
+@login_required
+def save_report():
+    try:
+        data = request.get_json() # Back to JSON, no request.files!
+        user_id = session.get("user_id")
+        
+        result = report_services.save_doctor_report(data, user_id)
+        return jsonify(result), 200
+        
+    except Exception as e:
+        print(f"Error in save_report: {str(e)}")
+        return jsonify({"error": str(e)}), 400
+
+@reports_bp.route("/api/update-report/<int:report_id>", methods=["PUT"])
+@login_required
+def update_report(report_id):
+    try:
+        data = request.get_json()
+        user_id = session.get("user_id")
+        
+        result = report_services.update_doctor_report(report_id, data, user_id)
+        return jsonify(result), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
