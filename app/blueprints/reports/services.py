@@ -457,6 +457,8 @@ def get_doctor_pending_bookings(doctor_id):
             "assigned_by": user.name,
             "assigned_at": dr_detail.report_at.strftime("%Y-%m-%d %H:%M:%S") if dr_detail.report_at else None,
             "patient_name": booking.patient_name, # Added this (usually very helpful for doctors)
+            "age": booking.age,       
+            "gender": booking.gender,
             "technician_comments": booking.technician_comments,
             "test_name": test_name, # The specific name for this assigned row
             "test_id": dr_detail.test_id
@@ -593,7 +595,7 @@ def save_doctor_report(data, user_id):
 
 # 2. Update get_doctor_report_by_id
 def get_doctor_report_by_id(report_id):
-    # ... (Keep query logic same as original) ...
+    # ... (Keep the query logic the same) ...
     report = (
         db.session.query(DoctorReportData, Test_registration.test_name, DoctorReportingdetails.report_at, User)
         .join(Test_registration, Test_registration.id == DoctorReportData.test_id)
@@ -606,7 +608,7 @@ def get_doctor_report_by_id(report_id):
     if not report:
         raise NotFound("Report not found.")
 
-    # 3. Unpack the results (now includes doctor_user)
+    # Unpack the results
     report_obj, test_name, assigned_at, doctor_user = report
 
     return {
@@ -620,11 +622,20 @@ def get_doctor_report_by_id(report_id):
         "test_name": test_name,
 
         "booking_id": report_obj.booking_id,
+        
+        # Text fields
         "clinical_info": report_obj.clinical_info,
         "scanning_protocols": report_obj.scanning_protocols,
         "findings": report_obj.findings,
-        "incidental_findings": report_obj.incidental_findings, # <--- NEW
+        "incidental_findings": report_obj.incidental_findings, 
         "conclusion": report_obj.conclusion,
+
+        # --- ADD THESE 4 NEW LINES FOR FILE SUPPORT ---
+        "report_file_url": getattr(report_obj, 'report_file_url', None),
+        "report_file_name": getattr(report_obj, 'report_file_name', None),
+        "file_mime_type": getattr(report_obj, 'file_mime_type', None),
+        "file_size_bytes": getattr(report_obj, 'file_size_bytes', None),
+        # ----------------------------------------------
 
         # Tracking fields
         "assigned_at": assigned_at.strftime("%Y-%m-%d %H:%M:%S") if assigned_at else None,
@@ -634,7 +645,7 @@ def get_doctor_report_by_id(report_id):
         "updated_by": report_obj.updated_by,
         "created_at": report_obj.created_at.strftime("%Y-%m-%d %H:%M:%S") if report_obj.created_at else None,
         "updated_at": report_obj.updated_at.strftime("%Y-%m-%d %H:%M:%S") if report_obj.updated_at else None,
-        "doctor_signature": doctor_user.signature_data 
+        "doctor_signature": doctor_user.signature_data if hasattr(doctor_user, 'signature_data') else None
     }
 
 

@@ -3,17 +3,36 @@
 {% block stylesheets %}
 <link rel="stylesheet" href="https://cdn.datatables.net/1.10.22/css/jquery.dataTables.min.css">
 <link rel="stylesheet" href="https://cdn.datatables.net/responsive/2.2.6/css/responsive.dataTables.min.css">
-<link rel="stylesheet" href="https://cdn.datatables.net/buttons/1.6.5/css/buttons.dataTables.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
 <style>
-    /* Timeline Styles */
+    /* Restore standard scaling */
     .timeline { position: relative; margin-left: 20px; padding-left: 20px; border-left: 2px solid #dee2e6; }
     .timeline-item { position: relative; margin-bottom: 20px; }
     .timeline-icon { position: absolute; left: -34px; top: 0; }
     .timeline-icon span { width: 28px; height: 28px; }
     .badge-test { background-color: #e9ecef; color: #495057; margin-right: 4px; font-weight: 500; border: 1px solid #ced4da; }
     
-    /* Readonly Field Styling */
-    .form-control[readonly] { background-color: #f8f9fa; opacity: 1; color: #6c757d; }
+    /* Readonly Field Styling (from old code) */
+    .form-control[readonly] { background-color: #f8f9fa; opacity: 1; color: #6c757d; font-size: 0.875rem; }
+    
+    /* Upload Zone */
+    .drag-drop-zone {
+        border: 2px dashed #0d6efd;
+        border-radius: 8px;
+        background-color: #f8f9fa;
+        transition: all 0.2s ease;
+        cursor: pointer;
+    }
+    .drag-drop-zone:hover, .drag-drop-zone.dragover {
+        background-color: #e1f0ff;
+        border-color: #198754;
+    }
+    .preview-iframe {
+        width: 100%;
+        height: 450px;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+    }
 </style>
 {% endblock stylesheets %}
 
@@ -27,7 +46,7 @@
     <div class="jumbotron jumbotron-fluid rounded bg-white border-0 shadow-sm border-left py-3 px-4">
         <div class="justify-content-between mb-3 row align-items-center">  
             <div class="col-6 col-md-6">  
-              <h5 class="text-pos">Report Pending Cases</h5>
+              <h5 class="text-pos">Doctor's Pending Cases</h5>
             </div>
             <div class="col-6 col-md-6 text-end">
                 <button class="btn btn-sm btn-outline-secondary" onclick="getDoctorBookings()">
@@ -38,7 +57,7 @@
         
         <div class="text-dark">
             <div class="table-responsive">
-                <table id="doctorPendingTable" class="table table-bordered table-hover" style="width:100%">
+                <table id="doctorPendingTable" class="table table-bordered table-hover w-100">
                     <thead>
                       <tr>
                         <th>ID</th>
@@ -51,7 +70,7 @@
                         <th class="text-center">Action</th>
                       </tr>
                     </thead>
-                    <tbody id="table_body"></tbody>
+                    <tbody></tbody>
                   </table>
             </div>        
         </div>
@@ -59,7 +78,7 @@
 </div>
 
 <div class="modal fade" id="commentsModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">Technician Comments History</h5>
@@ -68,86 +87,71 @@
             <div class="modal-body">
                 <div id="commentsHistory" class="timeline mb-3"></div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-            </div>
         </div>
     </div>
 </div>
 
-<div class="modal fade" id="reportModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
-    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
-        <div class="modal-content">
-            <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title"><i class="bi bi-file-earmark-medical"></i> Create Report</h5>
+<div class="modal fade" id="uploadModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content shadow-lg">
+            <div class="modal-header bg-primary text-white py-2">
+                <h5 class="modal-title mb-0"><i class="bi bi-cloud-arrow-up"></i> Upload Final Report</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
+
             <div class="modal-body">
-                <form id="reportForm">
-                    <div class="row g-3 mb-3 border-bottom pb-3">
-                        <div class="col-md-1">
-                            <label class="form-label small fw-bold">Booking ID</label>
-                            <input type="text" class="form-control" id="rep_bookingId" readonly>
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label small fw-bold">Patient Name</label>
-                            <input type="text" class="form-control" id="rep_patientName" readonly>
-                        </div>
-                        <div class="col-md-1">
-                            <label class="form-label small fw-bold">Age</label>
-                            <input type="text" class="form-control" id="rep_age" readonly>
-                        </div>
-                        <div class="col-md-1">
-                            <label class="form-label small fw-bold">Gender</label>
-                            <input type="text" class="form-control" id="rep_gender" readonly>
-                        </div>
-                        <div class="col-md-3">
-                           <label class="form-label">Test Name</label>
-                           <input type="text" class="form-control" id="rep_testName" readonly>
-                           <input type="hidden" id="rep_testId" name="test_id">
-                       </div>
-                        <div class="col-md-3">
-                            <label class="form-label small fw-bold">Referred By</label>
-                            <input type="text" class="form-control" id="rep_refDr" readonly>
-                        </div>
+                <div class="row g-2 mb-3 border-bottom pb-3">
+                    <div class="col-md-2">
+                        <label class="form-label small fw-bold mb-1">Booking ID</label>
+                        <input type="text" class="form-control form-control-sm" id="rep_bookingId" readonly>
                     </div>
-
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Clinical Info</label>
-                        <textarea class="form-control" id="rep_clinical" rows="2" placeholder="Enter clinical history..."></textarea>
+                    <div class="col-md-4">
+                        <label class="form-label small fw-bold mb-1">Patient Name</label>
+                        <input type="text" class="form-control form-control-sm" id="rep_patientName" readonly>
                     </div>
-
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Scanning Protocols</label>
-                        <textarea class="form-control" id="rep_protocols" rows="2"></textarea>
+                    <div class="col-md-2">
+                        <label class="form-label small fw-bold mb-1">Age</label>
+                        <input type="text" class="form-control form-control-sm" id="rep_age" readonly>
                     </div>
-
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Findings (Detailed Report) *</label>
-                        <textarea class="form-control" id="rep_findings" rows="8" placeholder="Type findings here..."></textarea>
+                    <div class="col-md-2">
+                        <label class="form-label small fw-bold mb-1">Gender</label>
+                        <input type="text" class="form-control form-control-sm" id="rep_gender" readonly>
                     </div>
-
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Incidental Findings</label>
-                        <textarea class="form-control" id="rep_incidental" rows="2" placeholder="Any incidental findings..."></textarea>
+                    <div class="col-md-12 mt-2">
+                        <label class="form-label small fw-bold mb-1">Test Name</label>
+                        <input type="text" class="form-control form-control-sm" id="rep_testName" readonly>
                     </div>
+                </div>
 
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Conclusion / Impression</label>
-                        <textarea class="form-control" id="rep_conclusion" rows="3"></textarea>
+                <div id="selectionZone" class="drag-drop-zone py-4 text-center">
+                    <i class="bi bi-file-earmark-arrow-up display-5 text-primary mb-2"></i>
+                    <h5 class="fw-bold text-dark mb-1">Drag & Drop Document</h5>
+                    <p class="text-muted small mb-0">Or click to browse (PDF or Word, Max 15MB)</p>
+                    <input type="file" id="fileInput" class="d-none" accept=".pdf,.doc,.docx">
+                </div>
+
+                <div id="uploadProgressZone" class="text-center py-4" style="display: none;">
+                    <div class="spinner-border text-primary mb-2" role="status"></div>
+                    <h6 class="fw-bold" id="selectedFileName">filename.pdf</h6>
+                    <p class="text-muted small mb-2" id="uploadStatusText">Connecting...</p>
+                    <div class="progress" style="height: 8px;">
+                        <div id="uploadProgressBar" class="progress-bar progress-bar-striped progress-bar-animated bg-success" style="width: 0%;"></div>
                     </div>
+                </div>
 
-                    <div class="alert alert-light border d-flex justify-content-between align-items-center" role="alert">
-                        <small class="text-muted"><i class="bi bi-info-circle"></i> To ensure the report fits on one page, keep total characters under 3,200.</small>
-                        <span id="charCountBadge" class="badge bg-success">0 / 3200</span>
+                <div id="previewZone" style="display: none;">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="badge bg-success"><i class="bi bi-check-circle"></i> Document Ready</span>
+                        <button class="btn btn-sm btn-outline-danger" id="btnReplaceFile"><i class="bi bi-arrow-repeat"></i> Replace File</button>
                     </div>
-
-                </form>
+                    <div id="iframeContainer"></div>
+                </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                <button type="button" class="btn btn-primary px-4" id="btnSaveReport">
-                    <i class="bi bi-save"></i> Save Report
+
+            <div class="modal-footer py-2 bg-light">
+                <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-sm btn-primary px-4 fw-bold" id="btnSaveReport" disabled>
+                    <i class="bi bi-save"></i> Submit Report
                 </button>
             </div>
         </div>
@@ -158,5 +162,7 @@
 {% block javascript %}
 <script src="https://cdn.datatables.net/1.10.22/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/responsive/2.2.6/js/dataTables.responsive.min.js"></script>
-<script src="{{ url_for('reports.static', filename='js/doctor_pending_cases.js') }}"></script>
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="{{ url_for('reports.static', filename='js/doctor_pending_cases.js') }}?v=8"></script>
 {% endblock %}
