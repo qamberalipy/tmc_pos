@@ -8,6 +8,7 @@ from app.blueprints.booking import booking_bp
 from app.blueprints.registrations import registrations_bp
 from app.blueprints.transactions import transaction_bp
 from app.blueprints.reports import reports_bp
+from app.blueprints.uploads import uploads_bp
 from app.menu import MENU
 def create_app():
     app = Flask(__name__)
@@ -23,6 +24,7 @@ def create_app():
     app.register_blueprint(booking_bp, url_prefix='/booking')
     app.register_blueprint(transaction_bp, url_prefix='/transactions')
     app.register_blueprint(reports_bp, url_prefix='/reports')
+    app.register_blueprint(uploads_bp, url_prefix='/uploads')
     # Import all models so Flask-Migrate can detect them
     with app.app_context():
         from app import models

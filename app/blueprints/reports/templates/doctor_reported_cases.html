@@ -3,12 +3,39 @@
 {% block stylesheets %}
 <link rel="stylesheet" href="https://cdn.datatables.net/1.10.22/css/jquery.dataTables.min.css">
 <link rel="stylesheet" href="https://cdn.datatables.net/responsive/2.2.6/css/responsive.dataTables.min.css">
-<link rel="stylesheet" href="https://cdn.datatables.net/buttons/1.6.5/css/buttons.dataTables.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
 <style>
-    /* Custom badge style */
+    /* Compact Table & General Styles */
     .badge-test { background-color: #e9ecef; color: #495057; border: 1px solid #ced4da; }
-    /* Readonly styling */
-    .form-control[readonly], .form-control:disabled { background-color: #f8f9fa; opacity: 1; color: #6c757d; }
+    .form-control[readonly], .form-control:disabled { background-color: #f8f9fa; opacity: 1; color: #6c757d; font-size: 0.875rem; }
+    
+    /* Upload Zone Styles */
+    .drag-drop-zone {
+        border: 2px dashed #0d6efd;
+        border-radius: 8px;
+        background-color: #f8f9fa;
+        transition: all 0.2s ease;
+        cursor: pointer;
+    }
+    .drag-drop-zone:hover, .drag-drop-zone.dragover {
+        background-color: #e1f0ff;
+        border-color: #198754;
+    }
+    .preview-iframe {
+        width: 100%;
+        height: 450px;
+        border: none;
+        border-radius: 6px;
+    }
+    /* Clean Timeline Badges for Table */
+    .time-badge {
+        font-size: 0.75rem;
+        padding: 4px 8px;
+        border-radius: 4px;
+        display: inline-block;
+        width: 100%;
+        text-align: left;
+    }
 </style>
 {% endblock stylesheets %}
 
@@ -22,29 +49,32 @@
     <div class="jumbotron jumbotron-fluid rounded bg-white border-0 shadow-sm border-left py-3 px-4">
         <div class="justify-content-between mb-3 row align-items-center">  
             <div class="col-6 col-md-6">  
-              <h5 class="text-pos">View Reported Cases</h5>
+                <h5 class="text-pos mb-0 text-primary font-weight-bold">Doctor's Reported Cases</h5>
+                <p class="text-muted small mb-0">View and update previously submitted reports.</p>
             </div>
             <div class="col-6 col-md-6 text-end">
                 <button class="btn btn-sm btn-outline-secondary" onclick="getReportedBookings()">
-                    <i class="bi bi-arrow-clockwise"></i> Refresh
+                    <i class="bi bi-arrow-clockwise"></i> Refresh List
                 </button>
             </div>
         </div>
         
+        <hr>
+
         <div class="text-dark">
             <div class="table-responsive">
-                <table id="doctorReportedTable" class="table table-bordered table-hover" style="width:100%">
-                    <thead>
+                <table id="doctorReportedTable" class="table table-bordered table-hover w-100 align-middle">
+                    <thead class="table-light">
                       <tr>
                         <th>Booking ID</th>
-                        <th>Patient Name</th>
-                        <th>Test Name</th>
+                        <th>Patient Details</th>
+                        <th>Test Details</th>
                         <th>Status</th>
-                        <th>Reported at</th>
+                        <th style="min-width: 180px;">Timeline</th>
                         <th class="text-center">Action</th>
                       </tr>
                     </thead>
-                    <tbody id="table_body"></tbody>
+                    <tbody></tbody>
                   </table>
             </div>        
         </div>
@@ -52,65 +82,74 @@
 </div>
 
 <div class="modal fade" id="editReportModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
-    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
-        <div class="modal-content">
-            <div class="modal-header bg-warning text-dark">
-                <h5 class="modal-title"><i class="bi bi-pencil-square"></i> Edit Report</h5>
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content shadow-lg">
+            <div class="modal-header bg-warning py-2">
+                <h5 class="modal-title mb-0 text-dark fw-bold"><i class="bi bi-pencil-square"></i> Review / Update Report</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
+            
             <div class="modal-body">
-                <form id="editReportForm">
-                    <input type="hidden" id="edit_report_id">
-                    
-                    <div class="row g-3 mb-3 border-bottom pb-3">
-                        <div class="col-md-4">
-                            <label class="fw-bold">Patient Name</label>
-                            <input type="text" class="form-control" id="edit_patientName" readonly>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="fw-bold">Test Name</label>
-                            <input type="text" class="form-control" id="edit_testName" readonly>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="fw-bold">Referred Dr</label>
-                            <input type="text" class="form-control" id="edit_referredDr" readonly>
-                        </div>
-                    </div>
+                <input type="hidden" id="edit_report_id">
+                <input type="hidden" id="edit_booking_id">
 
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Clinical Info</label>
-                        <textarea class="form-control" id="edit_clinical" rows="2"></textarea>
+                <div class="row g-2 mb-3 border-bottom pb-3">
+                    <div class="col-md-2">
+                        <label class="form-label small fw-bold mb-1">Booking ID</label>
+                        <input type="text" class="form-control form-control-sm" id="edit_bookingId_display" readonly>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Scanning Protocols</label>
-                        <textarea class="form-control" id="edit_protocols" rows="2"></textarea>
+                    <div class="col-md-5">
+                        <label class="form-label small fw-bold mb-1">Patient Name</label>
+                        <input type="text" class="form-control form-control-sm" id="edit_patientName" readonly>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Findings (Detailed Report) *</label>
-                        <textarea class="form-control" id="edit_findings" rows="8"></textarea>
+                    <div class="col-md-2">
+                        <label class="form-label small fw-bold mb-1">Age</label>
+                        <input type="text" class="form-control form-control-sm" id="edit_age" readonly>
                     </div>
+                    <div class="col-md-3">
+                        <label class="form-label small fw-bold mb-1">Gender</label>
+                        <input type="text" class="form-control form-control-sm" id="edit_gender" readonly>
+                    </div>
+                    <div class="col-md-12 mt-2">
+                        <label class="form-label small fw-bold mb-1">Test Name</label>
+                        <input type="text" class="form-control form-control-sm" id="edit_testName" readonly>
+                    </div>
+                </div>
 
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Incidental Findings</label>
-                        <textarea class="form-control" id="edit_incidental" rows="2" placeholder="Any incidental findings..."></textarea>
+                <div id="documentPreviewZone">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span id="documentStatusBadge" class="badge bg-secondary px-3 py-2"><i class="bi bi-clock-history"></i> Original Document</span>
+                        <button class="btn btn-sm btn-outline-primary" id="btnShowReplace"><i class="bi bi-cloud-arrow-up"></i> Upload Replacement</button>
                     </div>
-
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Conclusion / Impression</label>
-                        <textarea class="form-control" id="edit_conclusion" rows="3"></textarea>
+                    <div id="documentIframeContainer" class="bg-light border rounded d-flex justify-content-center align-items-center" style="height: 450px;">
+                        <span class="text-muted"><div class="spinner-border spinner-border-sm"></div> Loading document...</span>
                     </div>
+                </div>
 
-                    <div class="alert alert-light border d-flex justify-content-between align-items-center" role="alert">
-                        <small class="text-muted"><i class="bi bi-info-circle"></i> To ensure the report fits on one page, keep total characters under 3,200.</small>
-                        <span id="charCountBadge" class="badge bg-success">0 / 3200</span>
+                <div id="documentSelectionZone" class="drag-drop-zone py-4 text-center" style="display: none;">
+                    <div class="d-flex justify-content-end px-3">
+                        <button class="btn btn-sm btn-link text-danger text-decoration-none" id="btnCancelReplace"><i class="bi bi-x-circle"></i> Cancel Update</button>
                     </div>
+                    <i class="bi bi-file-earmark-arrow-up display-5 text-primary mb-2"></i>
+                    <h5 class="fw-bold text-dark mb-1">Upload Corrected Document</h5>
+                    <p class="text-muted small mb-0">Drag & Drop or click to browse (PDF or Word, Max 15MB)</p>
+                    <input type="file" id="fileInput" class="d-none" accept=".pdf,.doc,.docx">
+                </div>
 
-                </form>
+                <div id="uploadProgressZone" class="text-center py-4" style="display: none;">
+                    <div class="spinner-border text-primary mb-2" role="status"></div>
+                    <h6 class="fw-bold" id="selectedFileName">filename.pdf</h6>
+                    <p class="text-muted small mb-2" id="uploadStatusText">Connecting...</p>
+                    <div class="progress" style="height: 8px;">
+                        <div id="uploadProgressBar" class="progress-bar progress-bar-striped progress-bar-animated bg-success" style="width: 0%;"></div>
+                    </div>
+                </div>
+
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-warning" id="btnUpdateReport">
-                    <i class="bi bi-save"></i> Update Report
+            <div class="modal-footer py-2 bg-light">
+                <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-sm btn-warning px-4 fw-bold" id="btnUpdateReport" disabled>
+                    <i class="bi bi-save"></i> Save Changes
                 </button>
             </div>
         </div>
@@ -121,5 +160,7 @@
 {% block javascript %}
 <script src="https://cdn.datatables.net/1.10.22/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/responsive/2.2.6/js/dataTables.responsive.min.js"></script>
-<script src="{{ url_for('reports.static', filename='js/doctor_reported_cases.js') }}"></script>
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="{{ url_for('reports.static', filename='js/doctor_reported_cases.js') }}?v=5"></script>
 {% endblock %}
