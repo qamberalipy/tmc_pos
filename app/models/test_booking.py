@@ -88,3 +88,27 @@ class BookingTransferLog(db.Model):
     mr_no = db.Column(db.String(225))
     transferred_cash_held = db.Column(db.Numeric(10,2), default=0.0)
     reason = db.Column(db.Text, nullable=True)
+
+class TechnicianBookingMedia(db.Model):
+    __tablename__ = "technician_booking_media"
+
+    id = db.Column(db.Integer, primary_key=True)
+    booking_id = db.Column(db.Integer, db.ForeignKey('test_booking.id'), nullable=False)
+    
+    # Cloudflare R2 Storage Pointers
+    file_url = db.Column(db.String(1024), nullable=False)
+    file_name = db.Column(db.String(255), nullable=False)
+    file_mime_type = db.Column(db.String(100), nullable=False)
+    
+    # MUST be BigInteger to support 3GB+ files
+    file_size_bytes = db.Column(db.BigInteger, nullable=False)
+    
+    # Audit & Tracking
+    uploaded_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    uploaded_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    
+    # Soft Delete for compliance (don't hard-delete medical records)
+    is_active = db.Column(db.Boolean, default=True)
+
+    # Relationship (Optional but helpful for ORM querying)
+    booking = db.relationship('TestBooking', backref=db.backref('technician_media', lazy=True))

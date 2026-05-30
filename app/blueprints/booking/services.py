@@ -13,7 +13,7 @@ from werkzeug.exceptions import BadRequest
 from app.helper import convert_to_utc
 from app.helper import get_lab_date_bounds # <-- Add this import at the top
 from sqlalchemy.ext.mutable import MutableDict, MutableList
-from app.models.test_booking import TestFilmUsage, TestBooking,FilmInventoryTransaction,BookingTransferLog
+from app.models.test_booking import TestFilmUsage, TestBooking,FilmInventoryTransaction,BookingTransferLog,TechnicianBookingMedia
 from app.models.test_registration import Test_registration
 from app.models.doctor_reporting_details import DoctorReportingdetails
 from app.models.expenses import Expenses
@@ -1564,3 +1564,144 @@ def transfer_and_rebook_service(old_booking_id, target_branch_id, new_tests, due
         db.session.rollback()
         print(f"Error in transfer_and_rebook_service: {str(e)}")
         return {"error": str(e)}, 500
+
+# TECHNICIAN DASHBOARD & MEDIA DRIVE SERVICE
+
+def get_technician_dashboard_list(branch_id, from_date=None, to_date=None, search_term=None):
+    try:
+        start_utc, end_utc = None, None
+        # Reuse your excellent lab_date_bounds logic
+        if from_date and to_date:
+            start_utc, end_utc = get_lab_date_bounds(from_date, to_date, branch_id)
+
+        query = db.session.query(
+            TestBooking.id,
+            TestBooking.mr_no,
+            TestBooking.patient_name,
+            TestBooking.age,
+            TestBooking.gender,
+            TestBooking.contact_no,
+            TestBooking.create_at,
+            TestBooking.technician_comments
+        ).filter(TestBooking.branch_id == branch_id)
+
+        if start_utc and end_utc:
+            query = query.filter(TestBooking.create_at >= start_utc, TestBooking.create_at <= end_utc)
+
+        if search_term:
+            query = query.filter(or_(
+                TestBooking.patient_name.ilike(f"%{search_term}%"),
+                TestBooking.mr_no.ilike(f"%{search_term}%"),
+                TestBooking.contact_no.ilike(f"%{search_term}%")
+            ))
+
+        records = query.order_by(TestBooking.create_at.desc()).limit(150).all()
+
+        data = []
+        for b in records:
+            # Quick check if comments exist so UI can show an icon
+            has_comments = False
+            if b.technician_comments:
+                try:
+                    comments_data = json.loads(b.technician_comments) if isinstance(b.technician_comments, str) else b.technician_comments
+                    has_comments = len(comments_data.get("comments", [])) > 0
+                except:
+                    pass
+
+            data.append({
+                "booking_id": b.id,
+                "mr_no": b.mr_no,
+                "patient_name": b.patient_name,
+                "age": b.age,
+                "gender": b.gender,
+                "contact_no": b.contact_no,
+                "date": b.create_at.strftime("%Y-%m-%d %I:%M %p") if b.create_at else None,
+                "has_comments": has_comments
+            })
+
+        return {"data": data}, 200
+
+    except Exception as e:
+        print(f"Error fetching tech dashboard: {str(e)}")
+        return {"error": "Failed to fetch patient records"}, 500
+
+
+def get_booking_media_list(booking_id, branch_id):
+    try:
+        # Security: ensure booking belongs to user's branch
+        booking = TestBooking.query.filter_by(id=booking_id, branch_id=branch_id).first()
+        if not booking:
+            return {"error": "Booking not found or access denied"}, 404
+            
+        media_records = TechnicianBookingMedia.query.filter_by(
+            booking_id=booking_id, 
+            is_active=True
+        ).order_by(TechnicianBookingMedia.uploaded_at.desc()).all()
+        
+        data = [{
+            "media_id": m.id,
+            "file_url": m.file_url,
+            "file_name": m.file_name,
+            "file_mime_type": m.file_mime_type,
+            "file_size_bytes": m.file_size_bytes,
+            "uploaded_at": m.uploaded_at.strftime("%Y-%m-%d %I:%M %p") if m.uploaded_at else None,
+            "uploaded_by": m.uploaded_by
+        } for m in media_records]
+        
+        return {"media": data}, 200
+        
+    except Exception as e:
+        print(f"Error [get_booking_media_list]: {str(e)}")
+        return {"error": "Failed to retrieve media records"}, 500
+
+
+def save_booking_media(booking_id, branch_id, media_data, user_id):
+    try:
+        booking = TestBooking.query.filter_by(id=booking_id, branch_id=branch_id).first()
+        if not booking:
+            return {"error": "Booking not found or access denied"}, 404
+
+        new_media = TechnicianBookingMedia(
+            booking_id=booking_id,
+            file_url=media_data['file_url'],
+            file_name=media_data['file_name'],
+            file_mime_type=media_data['file_mime_type'],
+            file_size_bytes=int(media_data['file_size_bytes']),
+            uploaded_by=user_id
+        )
+        
+        db.session.add(new_media)
+        db.session.commit()
+        
+        return {"message": "Media successfully linked to patient", "media_id": new_media.id}, 201
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error [save_booking_media]: {str(e)}")
+        return {"error": "Failed to save media to database"}, 500
+
+
+def delete_booking_media(media_id, branch_id):
+    try:
+        # Join ensures a technician in Branch A cannot delete media from Branch B
+        media = db.session.query(TechnicianBookingMedia).join(
+            TestBooking, TechnicianBookingMedia.booking_id == TestBooking.id
+        ).filter(
+            TechnicianBookingMedia.id == media_id,
+            TestBooking.branch_id == branch_id,
+            TechnicianBookingMedia.is_active == True
+        ).first()
+
+        if not media:
+            return {"error": "Media not found"}, 404
+
+        # Soft delete for medical records compliance
+        media.is_active = False
+        db.session.commit()
+        
+        return {"message": "Media deleted successfully"}, 200
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error [delete_booking_media]: {str(e)}")
+        return {"error": "Failed to delete media"}, 500

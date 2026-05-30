@@ -437,3 +437,68 @@ def transfer_booking_rebook_route():
 def get_booking_details_api(booking_id):
     result, status = booking_services.get_single_booking_details(booking_id)
     return jsonify(result), status
+
+# TECHNICIAN DASHBOARD & MEDIA DRIVE ROUTES
+
+@booking_bp.route('/view/technician-drive')
+@login_required
+def view_technician_drive():
+    try:
+        return render_template('technician_drive.html') # Create this template in your frontend
+    except Exception as e:
+        print(f"Error in view_technician_drive: {str(e)}")
+        return redirect(url_for('main.error_page'))
+
+@booking_bp.route("/technician-drive/list", methods=["GET"])
+@login_required
+def api_get_technician_drive_list():
+    branch_id = session.get("branch_id")
+    from_date = request.args.get("from_date")
+    to_date = request.args.get("to_date")
+    search_term = request.args.get("search", "").strip()
+
+    # Apply your 40-day limit logic if needed, or rely on frontend dates
+    if not from_date and not search_term:
+        limit_date_obj = datetime.now(timezone.utc) - timedelta(days=40)
+        from_date = limit_date_obj.strftime('%Y-%m-%d')
+
+    result, status = booking_services.get_technician_dashboard_list(
+        branch_id, from_date, to_date, search_term
+    )
+    return jsonify(result), status
+
+
+@booking_bp.route('/technician-media/<int:booking_id>', methods=['GET'])
+@login_required
+def api_get_booking_media(booking_id):
+    branch_id = session.get("branch_id")
+    
+    result, status = booking_services.get_booking_media_list(booking_id, branch_id)
+    return jsonify(result), status
+
+
+@booking_bp.route('/technician-media/<int:booking_id>', methods=['POST'])
+@login_required
+def api_add_booking_media(booking_id):
+    branch_id = session.get("branch_id")
+    user_id = session.get("user_id")
+    
+    data = request.get_json()
+    required_fields = ['file_url', 'file_name', 'file_mime_type', 'file_size_bytes']
+    
+    if not data or not all(field in data for field in required_fields):
+        return jsonify({"error": "Missing required media details"}), 400
+
+    result, status = booking_services.save_booking_media(
+        booking_id, branch_id, data, user_id
+    )
+    return jsonify(result), status
+
+
+@booking_bp.route('/technician-media/<int:media_id>', methods=['DELETE'])
+@login_required
+def api_delete_booking_media(media_id):
+    branch_id = session.get("branch_id")
+    
+    result, status = booking_services.delete_booking_media(media_id, branch_id)
+    return jsonify(result), status
