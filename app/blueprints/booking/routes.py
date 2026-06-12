@@ -502,3 +502,34 @@ def api_delete_booking_media(media_id):
     
     result, status = booking_services.delete_booking_media(media_id, branch_id)
     return jsonify(result), status
+
+@booking_bp.route('/api/v1/bookings/<int:booking_id>/chat', methods=['GET'])
+@login_required
+def api_get_chat_history(booking_id):
+    """Fetch paginated chat messages for the WhatsApp UI"""
+    page = request.args.get('page', 1, type=int)
+    limit = request.args.get('limit', 20, type=int)
+    
+    result, status = booking_services.get_paginated_chat_history(booking_id, page, limit)
+    return jsonify(result), status
+
+@booking_bp.route('/api/v1/bookings/<int:booking_id>/chat', methods=['POST'])
+@login_required
+def api_post_chat_message(booking_id):
+    """Post a new message and link pre-uploaded media IDs"""
+    user_id = session.get("user_id")
+    data = request.get_json()
+    
+    message_text = data.get('message', '').strip()
+    media_ids = data.get('media_ids', []) # Array of IDs from the R2 upload phase
+    
+    if not message_text and not media_ids:
+        return jsonify({"error": "Cannot send an empty message"}), 400
+
+    result, status = booking_services.add_chat_message(
+        booking_id=booking_id, 
+        user_id=user_id, 
+        message_text=message_text,
+        media_ids=media_ids
+    )
+    return jsonify(result), status

@@ -16,6 +16,7 @@ from sqlalchemy.ext.mutable import MutableDict, MutableList
 from app.models.test_booking import TestFilmUsage, TestBooking,FilmInventoryTransaction,BookingTransferLog,TechnicianBookingMedia
 from app.models.test_registration import Test_registration
 from app.models.doctor_reporting_details import DoctorReportingdetails
+from app.models.technician_chat_log import TechnicianChatLog
 from app.models.expenses import Expenses
 from app.models.referred import ReferralShare
 from app.models.expenses import PaymentTransaction
@@ -1705,3 +1706,103 @@ def delete_booking_media(media_id, branch_id):
         db.session.rollback()
         print(f"Error [delete_booking_media]: {str(e)}")
         return {"error": "Failed to delete media"}, 500
+    
+from app.models.technician_chat_log import TechnicianChatLog
+
+def get_paginated_chat_history(booking_id, page=1, per_page=20):
+    """
+    Fetches Chat UI history with proper pagination. 
+    Returns oldest to newest for standard chat rendering.
+    """
+    try:
+        # Query active chat logs with their user and attached media
+        pagination = TechnicianChatLog.query.filter_by(
+            booking_id=booking_id, 
+            is_deleted=False
+        ).order_by(TechnicianChatLog.created_at.desc()).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
+
+        chat_data = []
+        # Reverse the list so the frontend renders top-to-bottom (oldest to newest in view)
+        for log in reversed(pagination.items):
+            chat_data.append({
+                "id": log.id,
+                "user_name": log.user.username if log.user else "System",
+                "message": log.message,
+                "created_at": log.created_at.isoformat(),
+                "media": [{
+                    "id": m.id,
+                    "url": m.file_url,
+                    "name": m.file_name,
+                    "type": m.file_mime_type,
+                    "size": m.file_size_bytes
+                } for m in log.media_attachments if m.is_active]
+            })
+
+        return {
+            "messages": chat_data,
+            "has_next": pagination.has_next,
+            "has_prev": pagination.has_prev,
+            "current_page": pagination.page,
+            "total_pages": pagination.pages
+        }, 200
+
+    except Exception as e:
+        print(f"Error [get_paginated_chat_history]: {str(e)}")
+        return {"error": "Failed to retrieve chat history"}, 500
+
+
+def add_chat_message(booking_id, user_id, message_text, media_ids=None):
+    """
+    Creates a new chat bubble, links media, and safely appends to the legacy column.
+    """
+    try:
+        booking = TestBooking.query.get(booking_id)
+        if not booking:
+            return {"error": "Booking not found"}, 404
+
+        # 1. Create the granular chat log
+        new_chat = TechnicianChatLog(
+            booking_id=booking_id,
+            user_id=user_id,
+            message=message_text
+        )
+        db.session.add(new_chat)
+        db.session.flush() # Flush to get the new_chat.id
+
+        # 2. Link any uploaded media to this specific chat bubble
+        if media_ids and isinstance(media_ids, list):
+            media_records = TechnicianBookingMedia.query.filter(
+                TechnicianBookingMedia.id.in_(media_ids),
+                TechnicianBookingMedia.booking_id == booking_id
+            ).all()
+            for media in media_records:
+                media.chat_log_id = new_chat.id
+
+        # 3. Dual-Write to Legacy Field (Ensures Doctor View Never Breaks)
+        # We append a timestamped string to the existing db.Text column.
+        user_record = User.query.get(user_id)
+        sender_name = user_record.username if user_record else "Technician"
+        
+        timestamp_str = datetime.now().strftime("%d-%b-%Y %H:%M")
+        legacy_append_str = f"\n\n[{timestamp_str}] {sender_name}: {message_text}"
+        
+        if media_ids:
+            legacy_append_str += f" [Attached {len(media_ids)} file(s)]"
+
+        if booking.technician_comments:
+            booking.technician_comments += legacy_append_str
+        else:
+            booking.technician_comments = legacy_append_str.strip()
+
+        db.session.commit()
+        return {
+            "message": "Chat message added successfully", 
+            "chat_id": new_chat.id
+        }, 201
+
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error [add_chat_message]: {str(e)}")
+        return {"error": "Failed to add chat message"}, 500

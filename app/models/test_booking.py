@@ -112,3 +112,4 @@ class TechnicianBookingMedia(db.Model):
 
     # Relationship (Optional but helpful for ORM querying)
     booking = db.relationship('TestBooking', backref=db.backref('technician_media', lazy=True))
+    chat_log_id = db.Column(db.Integer, db.ForeignKey('technician_chat_log.id'), nullable=True)
