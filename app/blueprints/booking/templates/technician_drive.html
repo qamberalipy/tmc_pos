@@ -206,6 +206,12 @@
 <script>
     const INTERNAL_USER_ID = parseInt("{{ session.get('user_id', 0) }}") || 0;
     const APP_BASE_URL = window.location.origin;
+    
+    // --- THE FIX: Let Flask dynamically resolve the exact upload routes ---
+    // If your blueprint is registered under a prefix, url_for() automatically includes it!
+    const UPLOAD_API_INIT = "{{ url_for('uploads.init_upload') }}";
+    const UPLOAD_API_CHUNK = "{{ url_for('uploads.get_chunk_urls') }}";
+    const UPLOAD_API_COMPLETE = "{{ url_for('uploads.complete_upload') }}";
 </script>
 
 <script src="{{ url_for('booking.static', filename='js/technician_drive.js') }}"></script>

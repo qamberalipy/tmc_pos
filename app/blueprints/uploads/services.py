@@ -13,8 +13,11 @@ def get_r2_client():
         endpoint_url=f"https://{os.environ.get('R2_ACCOUNT_ID')}.r2.cloudflarestorage.com",
         aws_access_key_id=os.environ.get('R2_ACCESS_KEY'),
         aws_secret_access_key=os.environ.get('R2_SECRET_KEY'),
-        region_name='auto', # CRITICAL for R2 compatibility with Boto3
-        config=Config(signature_version='s3v4')
+        region_name='auto', # CRITICAL for R2 compatibility
+        config=Config(
+            signature_version='s3v4',
+            s3={'addressing_style': 'path'} # THE FIX: Forces path-style addressing required by Cloudflare for presigned URLs
+        )
     )
 
 def start_multipart_upload(filename, content_type, target_folder=None):

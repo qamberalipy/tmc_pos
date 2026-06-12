@@ -1701,14 +1701,12 @@ def delete_booking_media(media_id, branch_id):
         db.session.commit()
         
         return {"message": "Media deleted successfully"}, 200
-        
+            
     except Exception as e:
         db.session.rollback()
         print(f"Error [delete_booking_media]: {str(e)}")
         return {"error": "Failed to delete media"}, 500
     
-from app.models.technician_chat_log import TechnicianChatLog
-
 def get_paginated_chat_history(booking_id, page=1, per_page=20):
     """
     Fetches Chat UI history with proper pagination. 
@@ -1726,18 +1724,25 @@ def get_paginated_chat_history(booking_id, page=1, per_page=20):
         chat_data = []
         # Reverse the list so the frontend renders top-to-bottom (oldest to newest in view)
         for log in reversed(pagination.items):
+            
+            # --- THE FIX: Bulletproof name extraction ---
+            sender_name = "System"
+            if log.user:
+                sender_name = getattr(log.user, 'name', getattr(log.user, 'first_name', getattr(log.user, 'username', 'Technician')))
+
             chat_data.append({
                 "id": log.id,
-                "user_name": log.user.username if log.user else "System",
+                "user_id": log.user_id,
+                "user_name": sender_name,
                 "message": log.message,
-                "created_at": log.created_at.isoformat(),
+                "created_at": log.created_at.isoformat() if log.created_at else None,
                 "media": [{
                     "id": m.id,
                     "url": m.file_url,
                     "name": m.file_name,
                     "type": m.file_mime_type,
                     "size": m.file_size_bytes
-                } for m in log.media_attachments if m.is_active]
+                } for m in log.media_attachments if hasattr(m, 'is_active') and getattr(m, 'is_active', True)]
             })
 
         return {
@@ -1752,10 +1757,10 @@ def get_paginated_chat_history(booking_id, page=1, per_page=20):
         print(f"Error [get_paginated_chat_history]: {str(e)}")
         return {"error": "Failed to retrieve chat history"}, 500
 
-
-def add_chat_message(booking_id, user_id, message_text, media_ids=None):
+def add_chat_message(booking_id, user_id, message_text, media_payloads=None):
     """
-    Creates a new chat bubble, links media, and safely appends to the legacy column.
+    Unified entry point for Technician Comments.
+    Handles the Chat Log, Media Pointers, and Legacy Sync simultaneously.
     """
     try:
         booking = TestBooking.query.get(booking_id)
@@ -1769,27 +1774,35 @@ def add_chat_message(booking_id, user_id, message_text, media_ids=None):
             message=message_text
         )
         db.session.add(new_chat)
-        db.session.flush() # Flush to get the new_chat.id
+        db.session.flush() # Flush to get the new_chat.id for media linking
 
-        # 2. Link any uploaded media to this specific chat bubble
-        if media_ids and isinstance(media_ids, list):
-            media_records = TechnicianBookingMedia.query.filter(
-                TechnicianBookingMedia.id.in_(media_ids),
-                TechnicianBookingMedia.booking_id == booking_id
-            ).all()
-            for media in media_records:
-                media.chat_log_id = new_chat.id
+        # 2. Register Auto-Uploaded Media
+        saved_file_names = []
+        if media_payloads and isinstance(media_payloads, list):
+            for media_data in media_payloads:
+                new_media = TechnicianBookingMedia(
+                    booking_id=booking_id,
+                    file_url=media_data.get('file_url'),
+                    file_name=media_data.get('file_name'),
+                    file_mime_type=media_data.get('file_mime_type'),
+                    file_size_bytes=media_data.get('file_size_bytes'),
+                    uploaded_by=user_id,
+                    chat_log_id=new_chat.id # Link directly to the chat bubble
+                )
+                db.session.add(new_media)
+                saved_file_names.append(media_data.get('file_name'))
 
-        # 3. Dual-Write to Legacy Field (Ensures Doctor View Never Breaks)
-        # We append a timestamped string to the existing db.Text column.
+        # 3. Bulletproof Dual-Write to Legacy Field (Ensures Doctor View Never Breaks)
         user_record = User.query.get(user_id)
-        sender_name = user_record.username if user_record else "Technician"
+        
+        # Safely extract name regardless of database schema (Fixes the 500 error)
+        sender_name = getattr(user_record, 'name', getattr(user_record, 'first_name', getattr(user_record, 'username', 'Technician')))
         
         timestamp_str = datetime.now().strftime("%d-%b-%Y %H:%M")
         legacy_append_str = f"\n\n[{timestamp_str}] {sender_name}: {message_text}"
         
-        if media_ids:
-            legacy_append_str += f" [Attached {len(media_ids)} file(s)]"
+        if saved_file_names:
+            legacy_append_str += f" [Attachments: {', '.join(saved_file_names)}]"
 
         if booking.technician_comments:
             booking.technician_comments += legacy_append_str
@@ -1798,7 +1811,7 @@ def add_chat_message(booking_id, user_id, message_text, media_ids=None):
 
         db.session.commit()
         return {
-            "message": "Chat message added successfully", 
+            "message": "Chat and media synchronized successfully", 
             "chat_id": new_chat.id
         }, 201
 
