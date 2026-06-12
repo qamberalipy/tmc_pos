@@ -1,0 +1,231 @@
+{% extends "base.html" %}
+
+{% block stylesheets %}
+<style>
+    /* Google Drive Style File Cards */
+    .drive-file-card {
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        padding: 15px;
+        transition: box-shadow 0.2s, transform 0.2s;
+        background: #fff;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+    }
+    .drive-file-card:hover {
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        transform: translateY(-2px);
+    }
+    .file-icon { font-size: 2.5rem; color: #5f6368; margin-bottom: 10px; }
+    .file-icon.pdf { color: #d93025; }
+    .file-icon.image { color: #1a73e8; }
+    .file-icon.zip { color: #f2a600; }
+    
+    .file-name {
+        font-weight: 500;
+        font-size: 0.9rem;
+        word-break: break-all;
+        margin-bottom: 5px;
+    }
+    .file-meta { font-size: 0.75rem; color: #5f6368; margin-bottom: 10px; flex-grow: 1; }
+    
+    /* Drag & Drop Zone */
+    .upload-zone {
+        border: 2px dashed #1a73e8;
+        border-radius: 10px;
+        padding: 40px 20px;
+        text-align: center;
+        background: #f8f9fa;
+        cursor: pointer;
+        transition: background 0.3s;
+    }
+    .upload-zone.drag-active { background: #e8f0fe; border-color: #174ea6; }
+    .upload-progress-wrapper { margin-top: 15px; display: none; }
+</style>
+{% endblock stylesheets %}
+
+{% block content %}
+{% endblock %}
+
+{% block user_page %}
+<div class="main-div"> <div id="technicianDriveApp" v-cloak>
+        <div class="container-fluid py-4">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2 class="text-primary mb-0"><i class="bi bi-hdd-network"></i> Technician Drive Hub</h2>
+            </div>
+
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <label class="form-label text-muted small">From Date</label>
+                            <input type="date" class="form-control form-control-sm" v-model="filters.fromDate">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label text-muted small">To Date</label>
+                            <input type="date" class="form-control form-control-sm" v-model="filters.toDate">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label text-muted small">Search Patient / MR No</label>
+                            <div class="input-group input-group-sm">
+                                <input type="text" class="form-control" placeholder="Search..." v-model="filters.search" @keyup.enter="fetchPatients">
+                            </div>
+                        </div>
+                        <div class="col-md-2 d-flex align-items-end">
+                            <button class="btn btn-primary btn-sm w-100" @click="fetchPatients">
+                                <i class="bi bi-search"></i> Search
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-body p-0 table-responsive">
+                    <table class="table table-hover table-striped mb-0 align-middle">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>MR No</th>
+                                <th>Patient Name</th>
+                                <th>Age/Gender</th>
+                                <th>Date</th>
+                                <th class="text-center">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-if="loading.patients">
+                                <td colspan="5" class="text-center py-4">
+                                    <div class="spinner-border text-primary" role="status"></div>
+                                </td>
+                            </tr>
+                            <tr v-else-if="patients.length === 0">
+                                <td colspan="5" class="text-center py-4 text-muted">No patients found.</td>
+                            </tr>
+                            <tr v-else v-for="p in patients" :key="p.booking_id">
+                                <td><span class="badge bg-secondary">[[ p.mr_no ]]</span></td>
+                                <td class="fw-bold">[[ p.patient_name ]]</td>
+                                <td>[[ p.age ]] Y / [[ p.gender ]]</td>
+                                <td>[[ p.date ]]</td>
+                                <td class="text-center">
+                                    <button class="btn btn-sm btn-outline-info me-2" @click="openCommentsModal(p)" title="Technician Comments">
+                                        <i class="bi" :class="p.has_comments ? 'bi-chat-text-fill' : 'bi-chat-text'"></i> Comment
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-primary" @click="openDriveModal(p)" title="Open Media Drive">
+                                        <i class="bi bi-google-play"></i> Drive
+                                    </button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal fade" id="commentModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header bg-info text-white">
+                        <h5 class="modal-title"><i class="bi bi-chat-dots"></i> Add Comment - [[ currentBooking?.patient_name ]]</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">New Comment (Live Review)</label>
+                            <textarea class="form-control" v-model="newCommentText" rows="3" placeholder="Type clinical observations here..."></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer border-0 bg-light">
+                        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+                        <button type="button" class="btn btn-info btn-sm text-white" @click="saveComment" :disabled="loading.commenting">
+                            <span v-if="loading.commenting" class="spinner-border spinner-border-sm"></span>
+                            <span v-else>Save Comment</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal fade" id="driveModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+            <div class="modal-dialog modal-xl modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header bg-primary text-white">
+                        <h5 class="modal-title">
+                            <i class="bi bi-folder-symlink-fill"></i> Patient Drive: [[ currentBooking?.patient_name ]] ([[ currentBooking?.mr_no ]])
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" @click="closeDriveModal"></button>
+                    </div>
+                    <div class="modal-body bg-light">
+                        
+                        <div class="upload-zone mb-4" 
+                             :class="{'drag-active': isDragging}" 
+                             @dragover.prevent="isDragging = true" 
+                             @dragleave.prevent="isDragging = false" 
+                             @drop.prevent="handleDrop"
+                             @click="$refs.fileInput.click()">
+                            
+                            <i class="bi bi-cloud-arrow-up display-4 text-primary"></i>
+                            <h5 class="mt-3">Click or Drag & Drop Media Here</h5>
+                            <p class="text-muted small">Max file size: 3GB. Supports ZIP, PDF, DICOM, Images.</p>
+                            <input type="file" ref="fileInput" class="d-none" @change="handleFileSelect" multiple>
+                            
+                            <div v-if="uploadStatus.isUploading" class="mt-3 text-start" @click.stop>
+                                <div class="fw-bold text-dark mb-1">Uploading: [[ uploadStatus.currentFileName ]]</div>
+                                <div class="progress" style="height: 20px;">
+                                    <div class="progress-bar progress-bar-striped progress-bar-animated bg-success" 
+                                         :style="{ width: uploadStatus.progress + '%' }">
+                                        [[ uploadStatus.progress ]]%
+                                    </div>
+                                </div>
+                                <small class="text-muted">[[ formatBytes(uploadStatus.uploadedBytes) ]] / [[ formatBytes(uploadStatus.totalBytes) ]]</small>
+                            </div>
+                        </div>
+
+                        <hr>
+                        <h5 class="fw-bold mb-3 text-dark">Uploaded Media</h5>
+                        
+                        <div class="row g-3">
+                            <div v-if="loading.media" class="col-12 text-center py-3">
+                                <div class="spinner-border text-primary"></div>
+                            </div>
+                            <div v-else-if="mediaFiles.length === 0" class="col-12 text-center py-4 text-muted">
+                                <i class="bi bi-folder-x display-6"></i>
+                                <p class="mt-2">No media uploaded for this patient yet.</p>
+                            </div>
+                            
+                            <div v-else v-for="file in mediaFiles" :key="file.media_id" class="col-xl-2 col-lg-3 col-md-4 col-sm-6">
+                                <div class="drive-file-card">
+                                    <div class="text-center">
+                                        <i class="bi file-icon" :class="getFileIcon(file.file_mime_type)"></i>
+                                    </div>
+                                    <div class="file-name text-truncate" :title="file.file_name">[[ file.file_name ]]</div>
+                                    <div class="file-meta">
+                                        [[ formatBytes(file.file_size_bytes) ]]<br>
+                                        [[ file.uploaded_at ]]
+                                    </div>
+                                    <div class="d-flex justify-content-between mt-auto">
+                                        <a :href="file.file_url" target="_blank" class="btn btn-sm btn-light text-primary flex-grow-1 me-1" title="Download">
+                                            <i class="bi bi-download"></i>
+                                        </a>
+                                        <button class="btn btn-sm btn-light text-danger" @click="deleteMedia(file.media_id)" title="Delete">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block javascript %}
+<script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+
+<script src="{{ url_for('booking.static', filename='js/technician_drive.js') }}"></script>
+{% endblock %}
