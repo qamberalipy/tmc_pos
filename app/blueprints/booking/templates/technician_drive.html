@@ -6,189 +6,238 @@
 <link href="https://releases.transloadit.com/uppy/v3.21.0/uppy.min.css" rel="stylesheet">
 
 <style>
-    body { background-color: #f4f6f9; }
-    .workspace-wrapper-row { min-height: 85vh !important; }
+    /* ---------------------------------------------------
+       1. FIXED APP LAYOUT (Zero External Scroll)
+       --------------------------------------------------- */
+    body { background-color: #f0f2f5; overflow: hidden; } /* Lock main body */
     
-    .modern-tech-card {
-        min-height: 75vh !important;
+    .app-container {
+        height: calc(100vh - 70px); /* Adjust based on your top navbar height */
+        padding: 15px;
+        display: flex;
+        gap: 15px;
+    }
+
+    .app-panel {
+        background: #fff;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
         display: flex;
         flex-direction: column;
-        border: none;
-        border-radius: 12px;
-        background-color: #fff;
-        box-shadow: 0 4px 16px rgba(0,0,0,0.06);
         overflow: hidden;
     }
 
-    /* Active Row Highlight */
-    table.dataTable tbody tr.active-row {
-        background-color: #e9ecef !important;
-        border-left: 4px solid #0d6efd;
-    }
+    /* Left Panel (List) */
+    .left-panel { flex: 0 0 380px; }
+    .panel-body-scroll { flex: 1; overflow-y: auto; padding: 15px; }
 
-    /* Custom Uppy Overrides for Minimal, Clean Layout */
-    .uppy-Dashboard-inner {
-        width: 100% !important;
-        height: auto !important;
-        min-height: 120px !important;
-        border: 2px dashed #ced4da !important;
-        background-color: #f8f9fa !important;
-        border-radius: 10px !important;
-    }
-    .uppy-Dashboard-AddFiles { border: none !important; }
-    .uppy-DashboardItem {
-        width: 100% !important; /* Forces vertical stacking instead of horizontal mess */
-        max-width: 100% !important;
-    }
+    /* Right Panel (Workspace) */
+    .right-panel { flex: 1; position: relative; }
+    .empty-state { display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100%; background: #f8f9fa; }
 
-    /* WhatsApp Chat Architecture */
-    .chat-container-box {
-        flex: 1 1 auto;
-        height: 400px !important;
-        overflow-y: auto !important;
-        background-color: #efeae2;
-        background-image: url('https://www.transparenttextures.com/patterns/cubes.png');
-        padding: 24px;
-        border-bottom: 1px solid #e3e6f0;
-        position: relative;
+    /* ---------------------------------------------------
+       4. INSTAGRAM-STYLE COMMENTS
+       --------------------------------------------------- */
+    .comments-area {
+        flex: 1;
+        overflow-y: auto;
+        padding: 20px;
+        background-color: #ffffff;
     }
-    
-    /* Loading Overlay for Huge Uploads */
-    #uploadLockOverlay {
-        position: absolute;
-        top: 0; left: 0; right: 0; bottom: 0;
-        background: rgba(255,255,255,0.85);
-        z-index: 1000;
-        display: none;
-        flex-direction: column;
-        justify-content: center;
+    .comment-block {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 24px;
+    }
+    .comment-avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background-color: #e9ecef;
+        display: flex;
         align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        font-weight: bold;
+        color: #0d6efd;
     }
+    .comment-content { flex: 1; min-width: 0; }
+    .comment-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
+    .comment-name { font-weight: 600; font-size: 0.95rem; color: #050505; }
+    .comment-time { font-size: 0.75rem; color: #65676b; }
+    .comment-text { font-size: 0.95rem; color: #1c1e21; line-height: 1.4; word-wrap: break-word; }
 
-    /* Chat Bubbles */
-    .chat-bubble-row { display: flex; width: 100%; margin-bottom: 16px; clear: both; }
-    .chat-bubble-row.msg-left { justify-content: flex-start; }
-    .chat-bubble-row.msg-right { justify-content: flex-end; }
-    
-    .chat-bubble-body {
-        max-width: 80%;
-        padding: 10px 16px;
-        border-radius: 12px;
-        font-size: 0.95rem;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    /* ---------------------------------------------------
+       5. RIGID MEDIA THUMBNAILS
+       --------------------------------------------------- */
+    .media-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 10px;
+    }
+    .media-tile {
+        width: 80px;
+        height: 80px;
+        border-radius: 8px;
+        border: 1px solid #ced4da;
+        overflow: hidden;
         position: relative;
+        background: #f8f9fa;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-decoration: none !important;
     }
-    .chat-bubble-row.msg-left .chat-bubble-body { background-color: #ffffff; color: #2c3e50; border-top-left-radius: 0; }
-    .chat-bubble-row.msg-right .chat-bubble-body { background-color: #dcf8c6; color: #1a252f; border-top-right-radius: 0; }
-    
-    .chat-msg-meta { font-size: 0.7rem; color: #8e9ca8; display: block; text-align: right; margin-top: 6px; }
-    .chat-msg-sender { font-weight: 700; font-size: 0.8rem; margin-bottom: 4px; display: block; }
-    
-    .chat-attachment-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
-    .chat-attachment-card {
-        border-radius: 8px; overflow: hidden; border: 1px solid rgba(0,0,0,0.08);
-        max-width: 160px; background: #fff; padding: 4px; text-align: center;
-        text-decoration: none !important; transition: transform 0.2s;
+    .media-tile img { width: 100%; height: 100%; object-fit: cover; }
+    .media-tile.doc-tile { flex-direction: column; color: #495057; }
+    .media-tile.doc-tile i { font-size: 1.8rem; }
+    .media-tile.doc-tile span { font-size: 0.6rem; font-weight: bold; text-transform: uppercase; margin-top: 4px; }
+
+    /* ---------------------------------------------------
+       2. WHATSAPP-STYLE FOOTER
+       --------------------------------------------------- */
+    .app-footer {
+        padding: 12px 20px;
+        background: #f0f2f5;
+        border-top: 1px solid #e3e6f0;
+        display: flex;
+        align-items: center;
+        gap: 12px;
     }
-    .chat-attachment-card:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
-    .chat-attachment-card img { max-width: 100%; height: auto; border-radius: 6px; }
-    .chat-attachment-card.generic-doc { width: 160px; padding: 16px 8px; color: #444; }
-    .chat-attachment-card.generic-doc i { font-size: 2.2rem; color: #e74c3c; }
+    .input-wrapper {
+        flex: 1;
+        background: #fff;
+        border-radius: 24px;
+        display: flex;
+        align-items: center;
+        padding: 4px 16px;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    }
+    .input-wrapper input {
+        border: none;
+        box-shadow: none;
+        padding: 8px 0;
+        flex: 1;
+    }
+    .input-wrapper input:focus { outline: none; box-shadow: none; }
+    
+    .action-btn {
+        background: none;
+        border: none;
+        color: #54656f;
+        font-size: 1.4rem;
+        cursor: pointer;
+        padding: 4px;
+        transition: color 0.2s;
+    }
+    .action-btn:hover { color: #0d6efd; }
+    .send-btn {
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        background: #0d6efd;
+        color: #fff;
+        border: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.2rem;
+        transition: background 0.2s;
+    }
+    .send-btn:hover { background: #0b5ed7; }
+
+    /* Custom Scrollbars */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #ced4da; border-radius: 10px; }
+
+    table.dataTable tbody tr.active-row { background-color: #e1f0ff !important; border-left: 4px solid #0d6efd; }
 </style>
 {% endblock %}
 
 {% block user_page %}
-<div class="container-fluid py-4">
-    <div class="row workspace-wrapper-row">
-        
-        <div class="col-xl-4 col-lg-5 mb-4 transition-all" id="leftPanelLayout">
-            <div class="card modern-tech-card">
-                
-                <div class="card-header bg-white py-3 border-bottom">
-                    <h6 class="m-0 fw-bold text-dark mb-3"><i class="bi bi-collection-play-fill me-2 text-primary"></i>Active Worklist</h6>
-                    <div class="row g-2">
-                        <div class="col-5">
-                            <label class="small text-muted mb-1 fw-bold">From</label>
-                            <input type="date" id="filterFromDate" class="form-control form-control-sm">
-                        </div>
-                        <div class="col-5">
-                            <label class="small text-muted mb-1 fw-bold">To</label>
-                            <input type="date" id="filterToDate" class="form-control form-control-sm">
-                        </div>
-                        <div class="col-2 d-flex align-items-end">
-                            <button class="btn btn-sm btn-primary w-100" id="btnFilterList"><i class="bi bi-search"></i></button>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="card-body p-2">
-                    <table id="patientsTable" class="table table-hover align-middle w-100" style="font-size: 0.85rem;">
-                        <thead class="table-light">
-                            <tr>
-                                <th>Booking ID</th>
-                                <th>Patient Context</th>
-                                <th class="text-end">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody></tbody>
-                    </table>
-                </div>
+<div class="app-container">
+    
+    <div class="app-panel left-panel">
+        <div class="p-3 border-bottom bg-white z-1">
+            <h6 class="fw-bold text-dark mb-3"><i class="bi bi-list-task me-2 text-primary"></i>Worklist</h6>
+            <div class="row g-2">
+                <div class="col-5"><input type="date" id="filterFromDate" class="form-control form-control-sm text-muted"></div>
+                <div class="col-5"><input type="date" id="filterToDate" class="form-control form-control-sm text-muted"></div>
+                <div class="col-2"><button class="btn btn-sm btn-primary w-100" id="btnFilterList"><i class="bi bi-search"></i></button></div>
             </div>
         </div>
+        <div class="panel-body-scroll p-0">
+            <table id="patientsTable" class="table table-hover align-middle w-100 m-0 border-0" style="font-size: 0.85rem;">
+                <thead class="table-light sticky-top" style="z-index: 0;">
+                    <tr><th>Booking Context</th><th class="text-end">Action</th></tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
 
-        <div class="col-xl-8 col-lg-7 mb-4 transition-all" id="rightPanelLayout">
+    <div class="app-panel right-panel">
+        <div class="empty-state" id="emptyWorkspacePanel">
+            <div class="rounded-circle bg-white shadow-sm d-inline-flex p-4 mb-3">
+                <i class="bi bi-chat-square-text text-primary opacity-75" style="font-size: 3rem;"></i>
+            </div>
+            <h5 class="text-dark fw-bold">Select a Patient</h5>
+            <p class="text-muted small">Click 'Open' on the worklist to view comments and media.</p>
+        </div>
+
+        <div id="workspacePanel" style="display: none; height: 100%; flex-direction: column;">
             
-            <div class="card modern-tech-card justify-content-center align-items-center bg-light border-0" id="emptyWorkspacePanel">
-                <div class="text-center py-5">
-                    <div class="rounded-circle bg-white shadow-sm d-inline-flex p-4 mb-3">
-                        <i class="bi bi-chat-square-dots text-primary opacity-75" style="font-size: 3.5rem;"></i>
+            <div class="p-3 border-bottom bg-white d-flex justify-content-between align-items-center">
+                <div>
+                    <h6 class="m-0 fw-bold text-dark fs-5" id="wsPatientName">---</h6>
+                    <div class="text-muted small mt-1">
+                        <span id="wsBookingId" class="fw-bold text-primary"></span> &bull; 
+                        <span id="wsMrNo"></span> &bull; 
+                        <span id="wsAgeGender"></span>
                     </div>
-                    <h5 class="text-dark fw-bold">Technician Workspace</h5>
-                    <p class="text-muted small">Select a patient from the worklist to load their profile.</p>
+                </div>
+                <div class="d-flex align-items-center bg-light px-3 py-2 rounded-pill border">
+                    <span class="small fw-bold me-2 text-muted">Films:</span>
+                    <input type="number" id="filmUsageInput" class="form-control form-control-sm text-center border-0 bg-transparent fw-bold p-0" style="width: 40px;" min="0">
+                    <button class="btn btn-sm text-primary ms-2 p-0" id="btnUpdateFilms" title="Save Films"><i class="bi bi-check-circle-fill fs-5"></i></button>
                 </div>
             </div>
 
-            <div class="card modern-tech-card" id="workspacePanel" style="display: none;">
+            <div class="comments-area" id="chatHistoryBox"></div>
+
+            <div class="app-footer">
+                <button class="action-btn" data-bs-toggle="modal" data-bs-target="#uploadModal" title="Attach Media">
+                    <i class="bi bi-paperclip"></i>
+                </button>
                 
-                <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center flex-wrap gap-3">
-                    <div class="d-flex flex-column">
-                        <h5 class="m-0 fw-bold text-primary" id="wsPatientName">---</h5>
-                        <div class="text-muted small mt-1 fw-bold">
-                            <span class="badge bg-light text-dark border me-1" id="wsBookingId"></span>
-                            <span class="badge bg-light text-dark border me-1" id="wsMrNo"></span>
-                            <span class="badge bg-light text-dark border me-1" id="wsAgeGender"></span>
-                        </div>
-                    </div>
-                    
-                    <div class="d-flex align-items-center bg-light p-2 rounded-3 border">
-                        <span class="small fw-bold me-2 text-muted"><i class="bi bi-film me-1"></i>Films:</span>
-                        <input type="number" id="filmUsageInput" class="form-control form-control-sm text-center fw-bold" style="width: 70px; border-radius: 6px;" min="0" value="0">
-                        <button class="btn btn-sm btn-primary ms-2 px-3 fw-bold" style="border-radius: 6px;" id="btnUpdateFilms">Save</button>
-                    </div>
+                <div class="input-wrapper">
+                    <input type="text" id="chatMessageInput" placeholder="Write a comment..." autocomplete="off">
                 </div>
-
-                <div class="chat-container-box" id="chatHistoryBox">
-                    <div id="uploadLockOverlay">
-                        <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status"></div>
-                        <h5 class="mt-3 fw-bold text-dark">Uploading Large Files...</h5>
-                        <p class="text-muted small">Please wait. Do not close this window.</p>
-                    </div>
-                </div>
-
-                <div class="card-footer bg-white p-3 border-top-0 shadow-sm">
-                    <label class="small fw-bold text-muted mb-2">Attach Files (Images, Videos, Documents)</label>
-                    <div id="uppyDashboardContainer" class="mb-3"></div>
-                    <div class="input-group shadow-sm rounded-3 overflow-hidden border">
-                        <textarea class="form-control border-0 px-3 py-2" id="chatMessageInput" rows="2" style="resize: none;" placeholder="Type your comment update here..."></textarea>
-                        <button class="btn btn-success d-flex flex-column justify-content-center align-items-center px-4 border-0" id="btnSendChat" style="min-width: 120px;">
-                            <i class="bi bi-send-fill fs-5 mb-1"></i>
-                            <span class="small fw-bold">Send Msg</span>
-                        </button>
-                    </div>
-                </div>
-
+                
+                <button class="send-btn" id="btnSendChat">
+                    <i class="bi bi-send-fill"></i>
+                </button>
             </div>
 
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="uploadModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header border-bottom-0 pb-0">
+                <h5 class="modal-title fw-bold">Attach Media</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="uppyDashboardContainer"></div>
+            </div>
+            <div class="modal-footer border-top-0 bg-light rounded-bottom">
+                <button type="button" class="btn btn-secondary w-100" data-bs-dismiss="modal">Done Uploading</button>
+            </div>
         </div>
     </div>
 </div>
@@ -197,18 +246,12 @@
 {% block javascript %}
 <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
-<script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
-<script src="https://cdn.datatables.net/responsive/2.5.0/js/responsive.bootstrap5.min.js"></script>
-
 <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
 <script src="https://releases.transloadit.com/uppy/v3.21.0/uppy.min.js"></script>
 
 <script>
     const INTERNAL_USER_ID = parseInt("{{ session.get('user_id', 0) }}") || 0;
     const APP_BASE_URL = window.location.origin;
-    
-    // --- THE FIX: Let Flask dynamically resolve the exact upload routes ---
-    // If your blueprint is registered under a prefix, url_for() automatically includes it!
     const UPLOAD_API_INIT = "{{ url_for('uploads.init_upload') }}";
     const UPLOAD_API_CHUNK = "{{ url_for('uploads.get_chunk_urls') }}";
     const UPLOAD_API_COMPLETE = "{{ url_for('uploads.complete_upload') }}";
