@@ -7,12 +7,12 @@
 
 <style>
     /* ---------------------------------------------------
-       1. FIXED APP LAYOUT (Zero External Scroll)
+       1. FIXED APP LAYOUT & THEME ALIGNMENT
        --------------------------------------------------- */
-    body { background-color: #f0f2f5; overflow: hidden; } /* Lock main body */
+    body { background-color: #f0f2f5; overflow: hidden; } 
     
     .app-container {
-        height: calc(100vh - 70px); /* Adjust based on your top navbar height */
+        height: calc(100vh - 70px); 
         padding: 15px;
         display: flex;
         gap: 15px;
@@ -27,145 +27,119 @@
         overflow: hidden;
     }
 
-    /* Left Panel (List) */
-    .left-panel { flex: 0 0 380px; }
-    .panel-body-scroll { flex: 1; overflow-y: auto; padding: 15px; }
-
-    /* Right Panel (Workspace) */
+    /* Mobile Responsive Panel Toggles */
+    .left-panel { flex: 0 0 350px; }
     .right-panel { flex: 1; position: relative; }
+    
+    @media (max-width: 991.98px) {
+        .app-container { padding: 0; gap: 0; }
+        .app-panel { border-radius: 0; }
+        .left-panel { flex: 1; display: flex !important; }
+        .right-panel { flex: 1; display: none !important; }
+        
+        /* When Mobile Workspace is Active */
+        body.mobile-workspace-active .left-panel { display: none !important; }
+        body.mobile-workspace-active .right-panel { display: flex !important; }
+    }
+
+    .panel-body-scroll { flex: 1; overflow-y: auto; padding: 10px; }
     .empty-state { display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100%; background: #f8f9fa; }
 
     /* ---------------------------------------------------
-       4. INSTAGRAM-STYLE COMMENTS
+       2. INSTAGRAM-STYLE COMMENTS
        --------------------------------------------------- */
     .comments-area {
-        flex: 1;
-        overflow-y: auto;
-        padding: 20px;
-        background-color: #ffffff;
+        flex: 1; overflow-y: auto; padding: 20px; background-color: #ffffff;
     }
-    .comment-block {
-        display: flex;
-        gap: 12px;
-        margin-bottom: 24px;
-    }
+    .comment-block { display: flex; gap: 12px; margin-bottom: 24px; }
     .comment-avatar {
-        width: 40px;
-        height: 40px;
-        border-radius: 50%;
-        background-color: #e9ecef;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        flex-shrink: 0;
-        font-weight: bold;
-        color: #0d6efd;
+        width: 38px; height: 38px; border-radius: 50%;
+        background-color: var(--bs-primary); color: #fff;
+        display: flex; align-items: center; justify-content: center;
+        flex-shrink: 0; font-weight: bold;
     }
     .comment-content { flex: 1; min-width: 0; }
     .comment-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
-    .comment-name { font-weight: 600; font-size: 0.95rem; color: #050505; }
+    .comment-name { font-weight: 600; font-size: 0.9rem; color: #050505; }
     .comment-time { font-size: 0.75rem; color: #65676b; }
     .comment-text { font-size: 0.95rem; color: #1c1e21; line-height: 1.4; word-wrap: break-word; }
 
-    /* ---------------------------------------------------
-       5. RIGID MEDIA THUMBNAILS
-       --------------------------------------------------- */
-    .media-grid {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-        margin-top: 10px;
-    }
+    /* Rigid Media Thumbnails */
+    .media-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
     .media-tile {
-        width: 80px;
-        height: 80px;
-        border-radius: 8px;
-        border: 1px solid #ced4da;
-        overflow: hidden;
-        position: relative;
-        background: #f8f9fa;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        text-decoration: none !important;
+        width: 80px; height: 80px; border-radius: 8px;
+        border: 1px solid #ced4da; overflow: hidden; position: relative;
+        background: #f8f9fa; display: flex; align-items: center; justify-content: center;
     }
     .media-tile img { width: 100%; height: 100%; object-fit: cover; }
-    .media-tile.doc-tile { flex-direction: column; color: #495057; }
+    .media-tile.doc-tile { flex-direction: column; color: var(--bs-primary); text-decoration: none; }
     .media-tile.doc-tile i { font-size: 1.8rem; }
-    .media-tile.doc-tile span { font-size: 0.6rem; font-weight: bold; text-transform: uppercase; margin-top: 4px; }
+    .media-tile.doc-tile span { font-size: 0.6rem; font-weight: bold; margin-top: 4px; }
 
     /* ---------------------------------------------------
-       2. WHATSAPP-STYLE FOOTER
+       3. WHATSAPP STYLE FOOTER & UPLOAD DRAWER
        --------------------------------------------------- */
-    .app-footer {
-        padding: 12px 20px;
-        background: #f0f2f5;
-        border-top: 1px solid #e3e6f0;
-        display: flex;
-        align-items: center;
-        gap: 12px;
+    .app-footer-wrapper {
+        background: #f0f2f5; border-top: 1px solid #e3e6f0; display: flex; flex-direction: column;
     }
-    .input-wrapper {
-        flex: 1;
-        background: #fff;
-        border-radius: 24px;
-        display: flex;
-        align-items: center;
-        padding: 4px 16px;
-        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-    }
-    .input-wrapper input {
-        border: none;
-        box-shadow: none;
-        padding: 8px 0;
-        flex: 1;
-    }
-    .input-wrapper input:focus { outline: none; box-shadow: none; }
     
-    .action-btn {
-        background: none;
-        border: none;
-        color: #54656f;
-        font-size: 1.4rem;
-        cursor: pointer;
-        padding: 4px;
-        transition: color 0.2s;
+    /* Pending Uploads Preview Pill Area (WhatsApp Style) */
+    .upload-preview-area {
+        padding: 10px 20px 0 20px; display: flex; gap: 10px; overflow-x: auto;
     }
-    .action-btn:hover { color: #0d6efd; }
+    .preview-pill {
+        background: #fff; border-radius: 8px; padding: 4px 8px; display: flex; align-items: center; gap: 8px;
+        border: 1px solid #ced4da; font-size: 0.75rem; font-weight: 500; color: #495057;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05); white-space: nowrap; flex-shrink: 0;
+    }
+    .preview-pill i { color: var(--bs-primary); font-size: 1rem; }
+    .preview-pill .remove-btn { color: #dc3545; cursor: pointer; font-size: 1rem; margin-left: 5px; }
+
+    .app-footer {
+        padding: 12px 20px; display: flex; align-items: center; gap: 12px;
+    }
+    
+    /* Sliding Attachment Drawer */
+    .attachment-drawer {
+        height: 0; overflow: hidden; transition: height 0.3s ease; background: #fff;
+    }
+    .attachment-drawer.open { height: 260px; border-bottom: 1px solid #e3e6f0; }
+    .uppy-Dashboard-inner { width: 100% !important; height: 100% !important; border: none !important; border-radius: 0 !important; background: transparent !important; }
+
+    .input-wrapper {
+        flex: 1; background: #fff; border-radius: 24px; display: flex; align-items: center; padding: 4px 16px;
+    }
+    .input-wrapper input { border: none; box-shadow: none; padding: 8px 0; flex: 1; }
+    .input-wrapper input:focus { outline: none; }
+    
+    .action-btn { background: none; border: none; color: #54656f; font-size: 1.4rem; cursor: pointer; padding: 4px; transition: color 0.2s; }
+    .action-btn.active { color: var(--bs-primary); transform: rotate(45deg); }
     .send-btn {
-        width: 44px;
-        height: 44px;
-        border-radius: 50%;
-        background: #0d6efd;
-        color: #fff;
-        border: none;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1.2rem;
-        transition: background 0.2s;
+        width: 44px; height: 44px; border-radius: 50%; background: var(--bs-primary); color: #fff;
+        border: none; display: flex; align-items: center; justify-content: center; font-size: 1.2rem;
     }
-    .send-btn:hover { background: #0b5ed7; }
 
     /* Custom Scrollbars */
-    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: #ced4da; border-radius: 10px; }
 
-    table.dataTable tbody tr.active-row { background-color: #e1f0ff !important; border-left: 4px solid #0d6efd; }
+    table.dataTable tbody tr.active-row { background-color: #e1f0ff !important; border-left: 4px solid var(--bs-primary); }
+    .mobile-back-btn { display: none; }
+    @media (max-width: 991.98px) { .mobile-back-btn { display: block; } }
 </style>
 {% endblock %}
 
 {% block user_page %}
 <div class="app-container">
     
-    <div class="app-panel left-panel">
+    <div class="app-panel left-panel" id="mobileLeftPanel">
         <div class="p-3 border-bottom bg-white z-1">
-            <h6 class="fw-bold text-dark mb-3"><i class="bi bi-list-task me-2 text-primary"></i>Worklist</h6>
+            <h6 class="fw-bold text-dark mb-3"><i class="bi bi-list-task me-2" style="color: var(--bs-primary);"></i>Active Worklist</h6>
             <div class="row g-2">
                 <div class="col-5"><input type="date" id="filterFromDate" class="form-control form-control-sm text-muted"></div>
                 <div class="col-5"><input type="date" id="filterToDate" class="form-control form-control-sm text-muted"></div>
-                <div class="col-2"><button class="btn btn-sm btn-primary w-100" id="btnFilterList"><i class="bi bi-search"></i></button></div>
+                <div class="col-2"><button class="btn btn-sm text-white w-100" style="background-color: var(--bs-primary);" id="btnFilterList"><i class="bi bi-search"></i></button></div>
             </div>
         </div>
         <div class="panel-body-scroll p-0">
@@ -178,66 +152,63 @@
         </div>
     </div>
 
-    <div class="app-panel right-panel">
+    <div class="app-panel right-panel" id="mobileRightPanel">
+        
         <div class="empty-state" id="emptyWorkspacePanel">
             <div class="rounded-circle bg-white shadow-sm d-inline-flex p-4 mb-3">
-                <i class="bi bi-chat-square-text text-primary opacity-75" style="font-size: 3rem;"></i>
+                <i class="bi bi-chat-square-text opacity-50" style="font-size: 3rem; color: var(--bs-primary);"></i>
             </div>
             <h5 class="text-dark fw-bold">Select a Patient</h5>
-            <p class="text-muted small">Click 'Open' on the worklist to view comments and media.</p>
+            <p class="text-muted small">Open a record from the worklist to begin.</p>
         </div>
 
         <div id="workspacePanel" style="display: none; height: 100%; flex-direction: column;">
             
-            <div class="p-3 border-bottom bg-white d-flex justify-content-between align-items-center">
-                <div>
-                    <h6 class="m-0 fw-bold text-dark fs-5" id="wsPatientName">---</h6>
-                    <div class="text-muted small mt-1">
-                        <span id="wsBookingId" class="fw-bold text-primary"></span> &bull; 
-                        <span id="wsMrNo"></span> &bull; 
-                        <span id="wsAgeGender"></span>
+            <div class="p-2 p-md-3 border-bottom bg-white d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center">
+                    <button class="btn btn-light me-2 mobile-back-btn" onclick="closeMobileWorkspace()"><i class="bi bi-arrow-left"></i></button>
+                    <div>
+                        <h6 class="m-0 fw-bold text-dark fs-5" id="wsPatientName">---</h6>
+                        <div class="text-muted small mt-1">
+                            <span id="wsBookingId" class="fw-bold" style="color: var(--bs-primary);"></span> &bull; 
+                            <span id="wsMrNo"></span> &bull; 
+                            <span id="wsAgeGender"></span>
+                        </div>
                     </div>
                 </div>
-                <div class="d-flex align-items-center bg-light px-3 py-2 rounded-pill border">
-                    <span class="small fw-bold me-2 text-muted">Films:</span>
-                    <input type="number" id="filmUsageInput" class="form-control form-control-sm text-center border-0 bg-transparent fw-bold p-0" style="width: 40px;" min="0">
-                    <button class="btn btn-sm text-primary ms-2 p-0" id="btnUpdateFilms" title="Save Films"><i class="bi bi-check-circle-fill fs-5"></i></button>
+                
+                <div class="d-flex align-items-center bg-light px-2 px-md-3 py-1 py-md-2 rounded-pill border">
+                    <span class="small fw-bold me-1 me-md-2 text-muted d-none d-md-inline">Films:</span>
+                    <input type="number" id="filmUsageInput" class="form-control form-control-sm text-center border-0 bg-transparent fw-bold p-0" style="width: 30px;" min="0">
+                    <button class="btn btn-sm p-0 ms-1 ms-md-2" style="color: var(--bs-primary);" id="btnUpdateFilms"><i class="bi bi-check-circle-fill fs-5"></i></button>
                 </div>
             </div>
 
             <div class="comments-area" id="chatHistoryBox"></div>
 
-            <div class="app-footer">
-                <button class="action-btn" data-bs-toggle="modal" data-bs-target="#uploadModal" title="Attach Media">
-                    <i class="bi bi-paperclip"></i>
-                </button>
+            <div class="app-footer-wrapper">
                 
-                <div class="input-wrapper">
-                    <input type="text" id="chatMessageInput" placeholder="Write a comment..." autocomplete="off">
+                <div class="attachment-drawer" id="attachmentDrawer">
+                    <div id="uppyDashboardContainer"></div>
                 </div>
-                
-                <button class="send-btn" id="btnSendChat">
-                    <i class="bi bi-send-fill"></i>
-                </button>
+
+                <div class="upload-preview-area" id="uploadPreviewArea" style="display: none;"></div>
+
+                <div class="app-footer">
+                    <button class="action-btn" id="btnToggleDrawer" title="Attach Media or Camera">
+                        <i class="bi bi-paperclip"></i>
+                    </button>
+                    
+                    <div class="input-wrapper">
+                        <input type="text" id="chatMessageInput" placeholder="Add a caption or comment..." autocomplete="off">
+                    </div>
+                    
+                    <button class="send-btn" id="btnSendChat">
+                        <i class="bi bi-send-fill"></i>
+                    </button>
+                </div>
             </div>
 
-        </div>
-    </div>
-</div>
-
-<div class="modal fade" id="uploadModal" tabindex="-1" data-bs-backdrop="static">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow-lg">
-            <div class="modal-header border-bottom-0 pb-0">
-                <h5 class="modal-title fw-bold">Attach Media</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <div id="uppyDashboardContainer"></div>
-            </div>
-            <div class="modal-footer border-top-0 bg-light rounded-bottom">
-                <button type="button" class="btn btn-secondary w-100" data-bs-dismiss="modal">Done Uploading</button>
-            </div>
         </div>
     </div>
 </div>
@@ -247,6 +218,7 @@
 <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+
 <script src="https://releases.transloadit.com/uppy/v3.21.0/uppy.min.js"></script>
 
 <script>

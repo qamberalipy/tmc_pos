@@ -1,25 +1,40 @@
 let localDataTableInstance = null;
 let activeSessionBookingId = null;
 let currentUppyInstance = null;
-let pendingMediaUploads = []; 
+let pendingMediaUploads = []; // Queue for files ready to be sent
 
 $(document).ready(function () {
+    // 1. Initialize Dates
     const today = new Date();
     const twoDaysAgo = new Date();
     twoDaysAgo.setDate(today.getDate() - 2);
-
     $('#filterToDate').val(today.toISOString().split('T')[0]);
     $('#filterFromDate').val(twoDaysAgo.toISOString().split('T')[0]);
 
     initSystemComponents();
 
+    // 2. Event Bindings
     $('#btnFilterList').on('click', function() { if (localDataTableInstance) localDataTableInstance.ajax.reload(); });
     $('#btnUpdateFilms').off('click').on('click', executeFilmStateUpdate);
     $('#btnSendChat').off('click').on('click', dispatchUnifiedPayload);
     
-    // Allow 'Enter' key to send message in the new input
     $('#chatMessageInput').on('keypress', function (e) {
         if (e.which === 13) { e.preventDefault(); dispatchUnifiedPayload(); }
+    });
+
+    // 3. Attachment Drawer Toggle Logic
+    $('#btnToggleDrawer').on('click', function() {
+        const $drawer = $('#attachmentDrawer');
+        const $btn = $(this);
+        
+        if ($drawer.hasClass('open')) {
+            $drawer.removeClass('open');
+            $btn.removeClass('active');
+        } else {
+            $drawer.addClass('open');
+            $btn.addClass('active');
+            if (!currentUppyInstance) setupUppyMultipartEngine();
+        }
     });
 });
 
@@ -27,12 +42,9 @@ function initSystemComponents() {
     const targetEndpoint = `${APP_BASE_URL}/booking/technician-drive/list`;
 
     localDataTableInstance = $('#patientsTable').DataTable({
-        responsive: true,
-        destroy: true,
-        pageLength: 15,
-        scrollY: "calc(100vh - 220px)", // Locks table height
-        paging: false, // Infinite scroll style for the left panel
-        info: false,
+        responsive: true, destroy: true,
+        pageLength: 15, paging: false, info: false,
+        scrollY: "calc(100vh - 200px)", 
         ajax: {
             url: targetEndpoint,
             data: function(d) {
@@ -58,44 +70,55 @@ function initSystemComponents() {
                 }
             },
             {
-                data: null,
-                className: "text-end",
-                render: function() {
-                    return `<i class="bi bi-chevron-right text-muted"></i>`;
-                }
+                data: null, className: "text-end",
+                render: () => `<i class="bi bi-chevron-right text-muted"></i>`
             }
         ],
         order: [[0, "desc"]],
-        language: { search: "", searchPlaceholder: "Search patient..." }
+        language: { search: "", searchPlaceholder: "Search list..." }
     });
 }
 
+// -------------------------------------------------------------
+// MOBILE & WORKSPACE ORCHESTRATION
+// -------------------------------------------------------------
 window.mountWorkspaceScope = function(rowElement, bookingId, patientName, mrNo, age, gender, filmsCount) {
     if (!bookingId) return;
     activeSessionBookingId = bookingId;
     
+    // Desktop Highlight
     $('#patientsTable tbody tr').removeClass('active-row');
     $(rowElement).closest('tr').addClass('active-row');
 
+    // Mobile View Toggle
+    $('body').addClass('mobile-workspace-active');
+
+    // Reset UI
     $('#emptyWorkspacePanel').hide();
     $('#workspacePanel').css('display', 'flex');
-
     $('#wsPatientName').text(patientName);
     $('#wsBookingId').text(`B#${bookingId}`);
     $('#wsMrNo').text(`MR: ${mrNo}`);
     $('#wsAgeGender').text(`${age} Yrs | ${gender}`);
-    
     $('#filmUsageInput').val(filmsCount || 0);
     $('#chatMessageInput').val('');
-    pendingMediaUploads = []; 
+    
+    resetUploadState();
 
     syncChatTimelineData(bookingId);
-
-    if (!currentUppyInstance) setupUppyMultipartEngine();
-    else currentUppyInstance.cancelAll();
-
-    setTimeout(() => { $('#chatMessageInput').focus(); }, 100);
 };
+
+window.closeMobileWorkspace = function() {
+    $('body').removeClass('mobile-workspace-active');
+};
+
+function resetUploadState() {
+    pendingMediaUploads = [];
+    $('#uploadPreviewArea').hide().empty();
+    $('#attachmentDrawer').removeClass('open');
+    $('#btnToggleDrawer').removeClass('active');
+    if (currentUppyInstance) currentUppyInstance.cancelAll();
+}
 
 function executeFilmStateUpdate() {
     if (!activeSessionBookingId) return;
@@ -106,23 +129,20 @@ function executeFilmStateUpdate() {
         booking_id: activeSessionBookingId, total_new_films_used: currentCountValue,
         usage_type: "Workspace Update", test_id: 0, reason: "Updated via Technician Workspace"
     })
-    .then(res => {
-        if (typeof showToastMessage === 'function') showToastMessage('success', 'Films adjusted.');
-    })
+    .then(res => { if (typeof showToastMessage === 'function') showToastMessage('success', 'Films adjusted.'); })
     .finally(() => { if (typeof myhideLoader === 'function') myhideLoader(); });
 }
 
+// -------------------------------------------------------------
+// CHAT RENDERING (Instagram Style)
+// -------------------------------------------------------------
 function syncChatTimelineData(bookingId) {
     const $chatWrapper = $('#chatHistoryBox');
     $chatWrapper.empty().append('<div class="text-center py-4"><div class="spinner-border text-primary spinner-border-sm"></div></div>');
 
     axios.get(`${APP_BASE_URL}/booking/api/v1/bookings/${bookingId}/chat`)
-    .then(response => {
-        compileAndRenderChatTimeline(response.data.messages || []);
-    })
-    .catch(error => {
-        $chatWrapper.html('<div class="text-center text-danger py-4 small">Failed to load comments.</div>');
-    });
+    .then(response => { compileAndRenderChatTimeline(response.data.messages || []); })
+    .catch(error => { $chatWrapper.html('<div class="text-center text-danger py-4 small">Failed to load comments.</div>'); });
 }
 
 function compileAndRenderChatTimeline(messages) {
@@ -139,7 +159,6 @@ function compileAndRenderChatTimeline(messages) {
         const initial = senderName.charAt(0).toUpperCase();
         const timeLabel = new Date(msg.created_at).toLocaleString([], {month: 'short', day: 'numeric', hour: '2-digit', minute:'2-digit'});
 
-        // 5. RIGID MEDIA GRID GENERATION
         let mediaHtml = '';
         if (msg.media && msg.media.length > 0) {
             mediaHtml = '<div class="media-grid">';
@@ -152,8 +171,7 @@ function compileAndRenderChatTimeline(messages) {
                 } else {
                     mediaHtml += `
                         <a href="${attachment.url}" target="_blank" class="media-tile doc-tile">
-                            <i class="bi bi-file-earmark-text"></i>
-                            <span>${ext}</span>
+                            <i class="bi bi-file-earmark-text"></i><span>${ext}</span>
                         </a>`;
                 }
             });
@@ -162,7 +180,6 @@ function compileAndRenderChatTimeline(messages) {
 
         const safeText = (msg.message || '').replace(/\n/g, '<br>');
         
-        // 4. INSTAGRAM STYLE RENDER
         $chatWrapper.append(`
             <div class="comment-block">
                 <div class="comment-avatar">${initial}</div>
@@ -181,7 +198,9 @@ function compileAndRenderChatTimeline(messages) {
     $chatWrapper.animate({ scrollTop: $chatWrapper[0].scrollHeight }, 300);
 }
 
-// 3. ISOLATED MODAL UPLOADER
+// -------------------------------------------------------------
+// UPPY ENGINE (Camera Enabled) & PREVIEW PILLS
+// -------------------------------------------------------------
 function setupUppyMultipartEngine() {
     const mountingNode = document.getElementById('uppyDashboardContainer');
     if (!mountingNode) return;
@@ -191,9 +210,13 @@ function setupUppyMultipartEngine() {
         autoProceed: true 
     })
     .use(Uppy.Dashboard, {
-        target: mountingNode, inline: true, height: 350, 
+        target: mountingNode, inline: true, height: 260, 
         showProgressDetails: true, hideUploadButton: true,
         theme: 'light', proudlyDisplayPoweredByUppy: false
+    })
+    .use(Uppy.Webcam, { // NEW: Camera Integration Enabled
+        target: Uppy.Dashboard, modes: ['video-audio', 'video-only', 'audio-only', 'picture'],
+        mirror: true, facingMode: 'environment'
     })
     .use(Uppy.AwsS3Multipart, {
         limit: 4,
@@ -216,26 +239,67 @@ function setupUppyMultipartEngine() {
         abortMultipartUpload(file, opts) { return Promise.resolve(); }
     });
 
+    // Populate WhatsApp-Style Pills when upload completes
     currentUppyInstance.on('upload-success', (file, response) => {
+        const fileId = file.id;
         pendingMediaUploads.push({
-            file_url: response.body.location, file_name: file.name,
-            file_mime_type: file.type, file_size_bytes: file.size
+            id: fileId, // Tracking ID for removal
+            file_url: response.body.location, 
+            file_name: file.name,
+            file_mime_type: file.type, 
+            file_size_bytes: file.size
         });
-        // Visual cue on the main input when modal is closed
-        $('#chatMessageInput').attr('placeholder', `${pendingMediaUploads.length} file(s) attached. Write a comment...`);
+        
+        renderPreviewPills();
+        
+        // Auto-close drawer slightly to show the input
+        $('#attachmentDrawer').removeClass('open');
+        $('#btnToggleDrawer').removeClass('active');
     });
 }
 
+function renderPreviewPills() {
+    const $area = $('#uploadPreviewArea');
+    if (pendingMediaUploads.length === 0) {
+        $area.hide().empty();
+        return;
+    }
+
+    $area.empty().css('display', 'flex');
+    pendingMediaUploads.forEach(media => {
+        const icon = media.file_mime_type.includes('image') ? 'bi-image' : 'bi-file-earmark';
+        const safeName = media.file_name.length > 15 ? media.file_name.substring(0,12) + '...' : media.file_name;
+        
+        $area.append(`
+            <div class="preview-pill" id="pill-${media.id}">
+                <i class="bi ${icon}"></i>
+                <span>${safeName}</span>
+                <i class="bi bi-x remove-btn" onclick="removePendingMedia('${media.id}')"></i>
+            </div>
+        `);
+    });
+}
+
+window.removePendingMedia = function(fileId) {
+    pendingMediaUploads = pendingMediaUploads.filter(m => m.id !== fileId);
+    if (currentUppyInstance) currentUppyInstance.removeFile(fileId);
+    renderPreviewPills();
+};
+
+// -------------------------------------------------------------
+// UNIFIED SUBMISSION
+// -------------------------------------------------------------
 async function dispatchUnifiedPayload() {
     if (!activeSessionBookingId) return;
 
     const targetedMessageBody = $('#chatMessageInput').val().trim();
 
-    if (!targetedMessageBody && pendingMediaUploads.length === 0) return; // Silent return if empty
+    // Prevent double submission / empty submission
+    if (!targetedMessageBody && pendingMediaUploads.length === 0) return; 
 
     const $actionBtn = $('#btnSendChat');
     const originalIcon = $actionBtn.html();
-    $actionBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span>');
+    $actionBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm text-white"></span>');
 
     try {
         await axios.post(`${APP_BASE_URL}/booking/api/v1/bookings/${activeSessionBookingId}/chat`, {
@@ -243,10 +307,10 @@ async function dispatchUnifiedPayload() {
             media: pendingMediaUploads
         });
 
-        $('#chatMessageInput').val('').attr('placeholder', 'Write a comment...');
-        pendingMediaUploads = []; 
-        if (currentUppyInstance) currentUppyInstance.cancelAll();
-
+        // Interface Clean Reset
+        resetUploadState();
+        $('#chatMessageInput').val('');
+        
         syncChatTimelineData(activeSessionBookingId);
 
     } catch (error) {
