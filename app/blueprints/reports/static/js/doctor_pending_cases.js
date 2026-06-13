@@ -34,13 +34,12 @@ $(document).ready(function () {
                     let assignedBy = item.assigned_by || "-";
                     let assignedAt = item.assigned_at || "-";
 
-                    // Technician Comment Button (Restored)
+                    // THE ONLY CHANGE HERE: Technician Comment Button updated to fetch new API
                     let commentBtn;
                     if (item.technician_comments) {
-                        let safeCommentData = encodeURIComponent(item.technician_comments);
-                        commentBtn = `<button class="btn btn-sm btn-info text-white view-comments" style="min-width: 125px;" data-comments="${safeCommentData}"><i class="bi bi-chat-left-text-fill"></i> View History</button>`;
+                        commentBtn = `<button class="btn btn-sm btn-info text-white" style="min-width: 125px;" onclick="viewTechnicianComments(${item.booking_id})"><i class="bi bi-chat-left-text-fill"></i> View Notes</button>`;
                     } else {
-                        commentBtn = `<button class="btn btn-sm btn-light text-muted border" disabled style="min-width: 125px;"><i class="bi bi-dash-circle"></i> No History</button>`;
+                        commentBtn = `<button class="btn btn-sm btn-light text-muted border" disabled style="min-width: 125px;"><i class="bi bi-dash-circle"></i> No Notes</button>`;
                     }
                     
                     let safeItem = encodeURIComponent(JSON.stringify(item));
@@ -131,7 +130,7 @@ $(document).ready(function () {
     });
 
     // =======================================================
-    // 3. UPLOAD MODAL LOGIC
+    // 3. UPLOAD MODAL LOGIC (100% UNTOUCHED)
     // =======================================================
     $('#doctorPendingTable tbody').on('click', '.btn-upload', function () {
         currentItem = JSON.parse(decodeURIComponent($(this).data('item')));
@@ -245,7 +244,7 @@ $(document).ready(function () {
     }
 
     // =======================================================
-    // 4. DATABASE SUBMIT
+    // 4. DATABASE SUBMIT (100% UNTOUCHED)
     // =======================================================
     $('#btnSaveReport').on('click', async function() {
         if (!finalUploadedUrl || !currentItem) return;
@@ -276,4 +275,76 @@ $(document).ready(function () {
             btn.html(originalText).prop('disabled', false);
         }
     });
+
+    // =======================================================
+    // 5. NEW: TECHNICIAN COMMENTS VIEWER
+    // =======================================================
+    window.viewTechnicianComments = function(bookingId) {
+        const $chatBox = $('#doctorViewCommentsBox');
+        $chatBox.html('<div class="text-center py-5"><div class="spinner-border text-primary spinner-border-sm"></div><div class="mt-2 small text-muted">Loading notes...</div></div>');
+        
+        const commentsModal = new bootstrap.Modal(document.getElementById('technicianCommentsModal'));
+        commentsModal.show();
+
+        axios.get(`${API_BASE}/booking/api/v1/bookings/${bookingId}/chat`)
+            .then(response => {
+                const messages = response.data.messages || [];
+                $chatBox.empty();
+
+                if (messages.length === 0) {
+                    $chatBox.html(`
+                        <div class="text-center py-5 text-muted">
+                            <i class="bi bi-journal-x fs-1 opacity-50"></i>
+                            <p class="mt-2 mb-0">No technician notes found for this booking.</p>
+                        </div>
+                    `);
+                    return;
+                }
+
+                messages.forEach(msg => {
+                    const senderName = msg.user_name || 'System';
+                    const initial = senderName.charAt(0).toUpperCase();
+                    const timeLabel = new Date(msg.created_at).toLocaleString([], {month: 'short', day: 'numeric', hour: '2-digit', minute:'2-digit'});
+
+                    let mediaHtml = '';
+                    if (msg.media && msg.media.length > 0) {
+                        mediaHtml = '<div class="media-grid">';
+                        msg.media.forEach(attachment => {
+                            const typeStr = attachment.type || '';
+                            if (typeStr.includes('image')) {
+                                mediaHtml += `<a href="${attachment.url}" target="_blank" class="media-tile shadow-sm"><img src="${attachment.url}"></a>`;
+                            } else {
+                                const ext = attachment.name.split('.').pop().substring(0,4).toUpperCase();
+                                mediaHtml += `
+                                    <a href="${attachment.url}" target="_blank" class="media-tile doc-tile shadow-sm">
+                                        <i class="bi bi-file-earmark-text-fill"></i><span>${ext}</span>
+                                    </a>`;
+                            }
+                        });
+                        mediaHtml += '</div>';
+                    }
+
+                    const safeText = (msg.message || '').replace(/\n/g, '<br>');
+                    const textBlock = safeText ? `<div class="comment-text">${safeText}</div>` : '';
+                    
+                    $chatBox.append(`
+                        <div class="comment-block">
+                            <div class="comment-avatar shadow-sm">${initial}</div>
+                            <div class="comment-content">
+                                <div class="comment-header">
+                                    <span class="comment-name">${senderName}</span>
+                                    <span class="comment-time">${timeLabel}</span>
+                                </div>
+                                ${textBlock}
+                                ${mediaHtml}
+                            </div>
+                        </div>
+                    `);
+                });
+            })
+            .catch(error => {
+                console.error("Failed to fetch technician notes:", error);
+                $chatBox.html('<div class="text-center py-5 text-danger"><i class="bi bi-exclamation-triangle fs-3"></i><p class="mt-2">Failed to load notes.</p></div>');
+            });
+    };
 });
