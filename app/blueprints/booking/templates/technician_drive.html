@@ -7,126 +7,265 @@
 
 <style>
     /* ---------------------------------------------------
-       1. FIXED APP LAYOUT & THEME ALIGNMENT
+       1. PREMIUM MODERN LAYOUT & COLOR PALETTE
        --------------------------------------------------- */
-    body { background-color: #f0f2f5; overflow: hidden; } 
+    :root {
+        --app-bg: #f1f5f9;       /* Cooler, deeper app background */
+        --panel-left-bg: #ffffff; /* Crisp white for the list */
+        --panel-right-bg: #f8fafc; /* Very subtle cool tint for workspace */
+        --border-color: #e2e8f0;  /* Soft border color */
+        --text-main: #1e293b;
+        --text-muted: #64748b;
+        --hover-bg: #f1f5f9;
+        --active-bg: #e0f2fe;     /* Very light blue for active state */
+        --active-border: #0ea5e9; /* Crisp blue border for active state */
+    }
+
+    body { 
+        background-color: var(--app-bg); 
+        overflow: hidden; 
+        font-family: 'Inter', 'Segoe UI', sans-serif;
+    } 
     
     .app-container {
         height: calc(100vh - 70px); 
-        padding: 15px;
+        padding: 20px; 
         display: flex;
-        gap: 15px;
+        gap: 20px;
     }
 
+    /* Base Panel Styling */
     .app-panel {
-        background: #fff;
-        border-radius: 12px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        border-radius: 16px; 
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
         display: flex;
         flex-direction: column;
         overflow: hidden;
+        border: 1px solid var(--border-color);
     }
 
-    /* Mobile Responsive Panel Toggles */
-    .left-panel { flex: 0 0 350px; }
-    .right-panel { flex: 1; position: relative; }
+    /* Left Panel (Worklist) Specifics */
+    .left-panel { 
+        flex: 0 0 380px; 
+        background-color: var(--panel-left-bg);
+    }
+    .panel-body-scroll { flex: 1; overflow-y: auto; padding: 0; } /* Removed padding for flush list items */
     
-    @media (max-width: 991.98px) {
-        .app-container { padding: 0; gap: 0; }
-        .app-panel { border-radius: 0; }
-        .left-panel { flex: 1; display: flex !important; }
-        .right-panel { flex: 1; display: none !important; }
-        
-        /* When Mobile Workspace is Active */
-        body.mobile-workspace-active .left-panel { display: none !important; }
-        body.mobile-workspace-active .right-panel { display: flex !important; }
+    /* Right Panel (Workspace) Specifics */
+    .right-panel { 
+        flex: 1; 
+        position: relative; 
+        background-color: var(--panel-right-bg);
     }
-
-    .panel-body-scroll { flex: 1; overflow-y: auto; padding: 10px; }
-    .empty-state { display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100%; background: #f8f9fa; }
 
     /* ---------------------------------------------------
-       2. INSTAGRAM-STYLE COMMENTS
+       2. WORKLIST (LEFT PANEL) - MODERN UI FIX
        --------------------------------------------------- */
-    .comments-area {
-        flex: 1; overflow-y: auto; padding: 20px; background-color: #ffffff;
+    /* Remove default table borders */
+    table.dataTable.table-hover > tbody > tr {
+        border-bottom: 1px solid var(--border-color);
+        transition: all 0.2s ease;
+        cursor: pointer;
     }
-    .comment-block { display: flex; gap: 12px; margin-bottom: 24px; }
-    .comment-avatar {
-        width: 38px; height: 38px; border-radius: 50%;
-        background-color: var(--bs-primary); color: #fff;
+    
+    /* Modern Hover State */
+    table.dataTable.table-hover > tbody > tr:hover {
+        background-color: var(--hover-bg) !important;
+        transform: translateX(4px); /* Subtle nudge */
+    }
+
+    /* Modern Active State */
+    table.dataTable tbody tr.active-row { 
+        background-color: var(--active-bg) !important; 
+        border-left: 4px solid var(--active-border); 
+    }
+
+    /* The "Button" Replacement (Animated Chevron) */
+    .action-chevron {
+        color: #94a3b8;
+        font-size: 1.2rem;
+        transition: transform 0.2s ease, color 0.2s ease;
+    }
+    table.dataTable tbody tr:hover .action-chevron {
+        transform: translateX(4px);
+        color: var(--bs-primary);
+    }
+    table.dataTable tbody tr.active-row .action-chevron {
+        color: var(--bs-primary);
+    }
+
+    /* DataTables specific cleanup */
+    table.dataTable.no-footer { border-bottom: none; }
+    .dataTables_empty { padding: 40px 20px !important; text-align: center; color: var(--text-muted); }
+
+    /* Filter Header Styling */
+    .filter-header {
+        background: var(--panel-left-bg);
+        border-bottom: 1px solid var(--border-color);
+        box-shadow: 0 4px 6px -4px rgba(0,0,0,0.05); /* Soft inner shadow */
+        z-index: 10;
+    }
+
+    /* ---------------------------------------------------
+       3. RIGHT PANEL (WORKSPACE) - POLISH
+       --------------------------------------------------- */
+    .empty-state { 
+        display: flex; flex-direction: column; justify-content: center; 
+        align-items: center; height: 100%; background: var(--panel-right-bg); 
+    }
+    .empty-state-icon {
+        width: 120px; height: 120px; border-radius: 50%;
+        background: #ffffff; box-shadow: 0 10px 25px rgba(0,0,0,0.05);
         display: flex; align-items: center; justify-content: center;
-        flex-shrink: 0; font-weight: bold;
+        margin-bottom: 24px;
+    }
+
+    .workspace-header {
+        background: #ffffff; /* Keep header white for contrast against gray workspace */
+        border-bottom: 1px solid var(--border-color);
+        box-shadow: 0 4px 6px -4px rgba(0,0,0,0.02);
+    }
+
+    /* Comments Area */
+    .comments-area {
+        flex: 1; overflow-y: auto; padding: 24px; 
+        background-color: var(--panel-right-bg); /* Use the subtle tint */
+    }
+    
+    .comment-block { display: flex; gap: 16px; margin-bottom: 28px; }
+    .comment-avatar {
+        width: 44px; height: 44px; border-radius: 14px; 
+        background: linear-gradient(135deg, var(--bs-primary), #4e73df);
+        color: #fff; display: flex; align-items: center; justify-content: center;
+        flex-shrink: 0; font-weight: 700; font-size: 1.1rem;
+        box-shadow: 0 4px 10px rgba(2, 26, 113, 0.15);
     }
     .comment-content { flex: 1; min-width: 0; }
-    .comment-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
-    .comment-name { font-weight: 600; font-size: 0.9rem; color: #050505; }
-    .comment-time { font-size: 0.75rem; color: #65676b; }
-    .comment-text { font-size: 0.95rem; color: #1c1e21; line-height: 1.4; word-wrap: break-word; }
+    .comment-header { display: flex; align-items: baseline; margin-bottom: 6px; gap: 10px; }
+    .comment-name { font-weight: 700; font-size: 0.95rem; color: var(--text-main); }
+    .comment-time { font-size: 0.75rem; color: var(--text-muted); font-weight: 500; }
+    
+    /* Chat Bubble Refinement */
+    .comment-text { 
+        font-size: 0.95rem; color: var(--text-main); line-height: 1.5; 
+        word-wrap: break-word; background: #ffffff; 
+        padding: 14px 18px; border-radius: 0 16px 16px 16px;
+        display: inline-block; border: 1px solid var(--border-color);
+        box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+    }
 
     /* Rigid Media Thumbnails */
-    .media-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    .media-grid { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
     .media-tile {
-        width: 80px; height: 80px; border-radius: 8px;
-        border: 1px solid #ced4da; overflow: hidden; position: relative;
-        background: #f8f9fa; display: flex; align-items: center; justify-content: center;
+        width: 90px; height: 90px; border-radius: 12px;
+        border: 1px solid var(--border-color); overflow: hidden; position: relative;
+        background: #fff; display: flex; align-items: center; justify-content: center;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .media-tile:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 16px rgba(0,0,0,0.08);
     }
     .media-tile img { width: 100%; height: 100%; object-fit: cover; }
     .media-tile.doc-tile { flex-direction: column; color: var(--bs-primary); text-decoration: none; }
-    .media-tile.doc-tile i { font-size: 1.8rem; }
-    .media-tile.doc-tile span { font-size: 0.6rem; font-weight: bold; margin-top: 4px; }
+    .media-tile.doc-tile i { font-size: 2.2rem; margin-bottom: 2px; }
+    .media-tile.doc-tile span { font-size: 0.7rem; font-weight: 700; color: var(--text-muted); }
 
     /* ---------------------------------------------------
-       3. WHATSAPP STYLE FOOTER & UPLOAD DRAWER
+       4. MODERN APP FOOTER
        --------------------------------------------------- */
     .app-footer-wrapper {
-        background: #f0f2f5; border-top: 1px solid #e3e6f0; display: flex; flex-direction: column;
+        background: rgba(255, 255, 255, 0.95); 
+        backdrop-filter: blur(10px);
+        border-top: 1px solid var(--border-color); 
+        display: flex; flex-direction: column;
     }
     
-    /* Pending Uploads Preview Pill Area (WhatsApp Style) */
-    .upload-preview-area {
-        padding: 10px 20px 0 20px; display: flex; gap: 10px; overflow-x: auto;
-    }
+    .upload-preview-area { padding: 12px 24px 0 24px; display: flex; gap: 12px; overflow-x: auto; }
     .preview-pill {
-        background: #fff; border-radius: 8px; padding: 4px 8px; display: flex; align-items: center; gap: 8px;
-        border: 1px solid #ced4da; font-size: 0.75rem; font-weight: 500; color: #495057;
-        box-shadow: 0 1px 2px rgba(0,0,0,0.05); white-space: nowrap; flex-shrink: 0;
+        background: #fff; border-radius: 24px; padding: 8px 14px; 
+        display: flex; align-items: center; gap: 8px;
+        border: 1px solid var(--border-color); font-size: 0.8rem; font-weight: 600; color: var(--text-main);
+        box-shadow: 0 2px 6px rgba(0,0,0,0.03); white-space: nowrap; flex-shrink: 0;
     }
-    .preview-pill i { color: var(--bs-primary); font-size: 1rem; }
-    .preview-pill .remove-btn { color: #dc3545; cursor: pointer; font-size: 1rem; margin-left: 5px; }
+    .preview-pill i { color: var(--bs-primary); font-size: 1.1rem; }
+    .preview-pill .remove-btn { color: #ef4444; cursor: pointer; font-size: 1.2rem; transition: color 0.2s; }
+    .preview-pill .remove-btn:hover { color: #b91c1c; }
 
-    .app-footer {
-        padding: 12px 20px; display: flex; align-items: center; gap: 12px;
-    }
+    .app-footer { padding: 16px 24px; display: flex; align-items: center; gap: 16px; }
     
-    /* Sliding Attachment Drawer */
-    .attachment-drawer {
-        height: 0; overflow: hidden; transition: height 0.3s ease; background: #fff;
-    }
-    .attachment-drawer.open { height: 260px; border-bottom: 1px solid #e3e6f0; }
+    .attachment-drawer { height: 0; overflow: hidden; transition: height 0.3s cubic-bezier(0.4, 0, 0.2, 1); background: #ffffff; }
+    .attachment-drawer.open { height: 280px; border-top: 1px solid var(--border-color); }
     .uppy-Dashboard-inner { width: 100% !important; height: 100% !important; border: none !important; border-radius: 0 !important; background: transparent !important; }
 
+    /* Modern Input */
     .input-wrapper {
-        flex: 1; background: #fff; border-radius: 24px; display: flex; align-items: center; padding: 4px 16px;
+        flex: 1; background: var(--app-bg); border-radius: 30px; 
+        display: flex; align-items: center; padding: 8px 24px;
+        border: 1px solid transparent; transition: all 0.2s;
     }
-    .input-wrapper input { border: none; box-shadow: none; padding: 8px 0; flex: 1; }
+    .input-wrapper:focus-within { 
+        background: #fff; border-color: #cbd5e1; 
+        box-shadow: 0 0 0 4px rgba(2, 26, 113, 0.05); 
+    }
+    .input-wrapper input { border: none; box-shadow: none; padding: 6px 0; flex: 1; background: transparent; color: var(--text-main); font-size: 0.95rem; }
     .input-wrapper input:focus { outline: none; }
+    .input-wrapper input::placeholder { color: #94a3b8; font-weight: 500; }
     
-    .action-btn { background: none; border: none; color: #54656f; font-size: 1.4rem; cursor: pointer; padding: 4px; transition: color 0.2s; }
-    .action-btn.active { color: var(--bs-primary); transform: rotate(45deg); }
-    .send-btn {
-        width: 44px; height: 44px; border-radius: 50%; background: var(--bs-primary); color: #fff;
-        border: none; display: flex; align-items: center; justify-content: center; font-size: 1.2rem;
+    .action-btn { 
+        background: var(--app-bg); border: none; color: var(--text-muted); 
+        width: 46px; height: 46px; border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 1.3rem; cursor: pointer; transition: all 0.2s; 
     }
+    .action-btn:hover { background: #e2e8f0; color: var(--bs-primary); }
+    .action-btn.active { background: var(--bs-primary); color: #fff; transform: rotate(45deg); }
+    
+    .send-btn {
+        width: 48px; height: 48px; border-radius: 50%; 
+        background: linear-gradient(135deg, var(--bs-primary), #4e73df); color: #fff;
+        border: none; display: flex; align-items: center; justify-content: center; 
+        font-size: 1.2rem; transition: transform 0.2s, box-shadow 0.2s;
+        box-shadow: 0 4px 12px rgba(2, 26, 113, 0.25);
+    }
+    .send-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(2, 26, 113, 0.35); }
 
     /* Custom Scrollbars */
     ::-webkit-scrollbar { width: 6px; height: 6px; }
     ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: #ced4da; border-radius: 10px; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 
-    table.dataTable tbody tr.active-row { background-color: #e1f0ff !important; border-left: 4px solid var(--bs-primary); }
+    /* ---------------------------------------------------
+       5. STRICT MOBILE RESPONSIVENESS
+       --------------------------------------------------- */
     .mobile-back-btn { display: none; }
-    @media (max-width: 991.98px) { .mobile-back-btn { display: block; } }
+    
+    @media (max-width: 991.98px) { 
+        .app-container { padding: 0; }
+        .app-panel { border-radius: 0; border: none; }
+        .left-panel { flex: 1; display: flex !important; }
+        .right-panel { flex: 1; display: none !important; }
+        
+        body.mobile-workspace-active .left-panel { display: none !important; }
+        body.mobile-workspace-active .right-panel { display: flex !important; }
+        
+        /* Native iOS/Android style back button */
+        .mobile-back-btn { 
+            display: flex; align-items: center; justify-content: center; 
+            width: 40px; height: 40px; border-radius: 12px; border: none; 
+            background: var(--app-bg); color: var(--text-main);
+            transition: background 0.2s;
+        }
+        .mobile-back-btn:active { background: #e2e8f0; }
+        
+        .workspace-header { padding: 12px 16px !important; }
+        .app-footer { padding: 12px 16px; }
+        .input-wrapper { padding: 4px 16px; }
+        
+        /* Ensure table text wraps correctly on narrow screens */
+        .patient-name-truncate { max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    }
 </style>
 {% endblock %}
 
@@ -134,19 +273,28 @@
 <div class="app-container">
     
     <div class="app-panel left-panel" id="mobileLeftPanel">
-        <div class="p-3 border-bottom bg-white z-1">
-            <h6 class="fw-bold text-dark mb-3"><i class="bi bi-list-task me-2" style="color: var(--bs-primary);"></i>Active Worklist</h6>
+        <div class="p-4 filter-header">
+            <h5 class="fw-bold mb-4 text-dark" style="letter-spacing: -0.5px;">Active Worklist</h5>
             <div class="row g-2">
-                <div class="col-5"><input type="date" id="filterFromDate" class="form-control form-control-sm text-muted"></div>
-                <div class="col-5"><input type="date" id="filterToDate" class="form-control form-control-sm text-muted"></div>
-                <div class="col-2"><button class="btn btn-sm text-white w-100" style="background-color: var(--bs-primary);" id="btnFilterList"><i class="bi bi-search"></i></button></div>
+                <div class="col-5">
+                    <label class="small fw-bold mb-1" style="font-size: 0.65rem; color: #94a3b8;">START DATE</label>
+                    <input type="date" id="filterFromDate" class="form-control form-control-sm text-muted rounded-3 bg-light border-0 px-2 py-1">
+                </div>
+                <div class="col-5">
+                    <label class="small fw-bold mb-1" style="font-size: 0.65rem; color: #94a3b8;">END DATE</label>
+                    <input type="date" id="filterToDate" class="form-control form-control-sm text-muted rounded-3 bg-light border-0 px-2 py-1">
+                </div>
+                <div class="col-2 d-flex align-items-end">
+                    <button class="btn btn-sm text-white w-100 rounded-3 shadow-sm d-flex align-items-center justify-content-center" style="background-color: var(--bs-primary); height: 31px;" id="btnFilterList">
+                        <i class="bi bi-search"></i>
+                    </button>
+                </div>
             </div>
         </div>
-        <div class="panel-body-scroll p-0">
-            <table id="patientsTable" class="table table-hover align-middle w-100 m-0 border-0" style="font-size: 0.85rem;">
-                <thead class="table-light sticky-top" style="z-index: 0;">
-                    <tr><th>Booking Context</th><th class="text-end">Action</th></tr>
-                </thead>
+        
+        <div class="panel-body-scroll">
+            <table id="patientsTable" class="table align-middle w-100 m-0" style="font-size: 0.9rem;">
+                <thead class="d-none"><tr><th>Context</th><th>Action</th></tr></thead>
                 <tbody></tbody>
             </table>
         </div>
@@ -155,32 +303,34 @@
     <div class="app-panel right-panel" id="mobileRightPanel">
         
         <div class="empty-state" id="emptyWorkspacePanel">
-            <div class="rounded-circle bg-white shadow-sm d-inline-flex p-4 mb-3">
-                <i class="bi bi-chat-square-text opacity-50" style="font-size: 3rem; color: var(--bs-primary);"></i>
+            <div class="empty-state-icon">
+                <i class="bi bi-chat-square-quote opacity-50" style="font-size: 3.5rem; color: var(--bs-primary);"></i>
             </div>
-            <h5 class="text-dark fw-bold">Select a Patient</h5>
-            <p class="text-muted small">Open a record from the worklist to begin.</p>
+            <h4 class="text-dark fw-bold mb-2" style="letter-spacing: -0.5px;">Technician Workspace</h4>
+            <p class="text-center px-4" style="color: var(--text-muted); font-size: 0.95rem;">Select a patient from the worklist to view history, <br>add comments, or upload media.</p>
         </div>
 
         <div id="workspacePanel" style="display: none; height: 100%; flex-direction: column;">
             
-            <div class="p-2 p-md-3 border-bottom bg-white d-flex justify-content-between align-items-center">
-                <div class="d-flex align-items-center">
-                    <button class="btn btn-light me-2 mobile-back-btn" onclick="closeMobileWorkspace()"><i class="bi bi-arrow-left"></i></button>
-                    <div>
-                        <h6 class="m-0 fw-bold text-dark fs-5" id="wsPatientName">---</h6>
-                        <div class="text-muted small mt-1">
-                            <span id="wsBookingId" class="fw-bold" style="color: var(--bs-primary);"></span> &bull; 
+            <div class="p-3 p-md-4 d-flex justify-content-between align-items-center z-1 workspace-header">
+                <div class="d-flex align-items-center overflow-hidden">
+                    <button class="mobile-back-btn me-3 flex-shrink-0" onclick="closeMobileWorkspace()">
+                        <i class="bi bi-chevron-left fs-5"></i>
+                    </button>
+                    <div class="overflow-hidden">
+                        <h5 class="m-0 fw-bold text-dark patient-name-truncate" id="wsPatientName" style="letter-spacing: -0.5px;">---</h5>
+                        <div class="small mt-1 fw-medium" style="color: var(--text-muted); white-space: nowrap;">
+                            <span id="wsBookingId" style="color: var(--bs-primary);"></span> &bull; 
                             <span id="wsMrNo"></span> &bull; 
                             <span id="wsAgeGender"></span>
                         </div>
                     </div>
                 </div>
                 
-                <div class="d-flex align-items-center bg-light px-2 px-md-3 py-1 py-md-2 rounded-pill border">
-                    <span class="small fw-bold me-1 me-md-2 text-muted d-none d-md-inline">Films:</span>
-                    <input type="number" id="filmUsageInput" class="form-control form-control-sm text-center border-0 bg-transparent fw-bold p-0" style="width: 30px;" min="0">
-                    <button class="btn btn-sm p-0 ms-1 ms-md-2" style="color: var(--bs-primary);" id="btnUpdateFilms"><i class="bi bi-check-circle-fill fs-5"></i></button>
+                <div class="d-flex align-items-center bg-light px-2 px-md-3 py-1 py-md-2 rounded-pill border flex-shrink-0 ms-2">
+                    <span class="small fw-bold me-1 me-md-2 d-none d-md-inline" style="color: var(--text-muted);">Films</span>
+                    <input type="number" id="filmUsageInput" class="form-control form-control-sm text-center border-0 bg-transparent fw-bold p-0 text-dark" style="width: 32px; font-size: 1rem;" min="0">
+                    <button class="btn btn-sm p-0 ms-1 ms-md-2" style="color: var(--bs-primary);" id="btnUpdateFilms" title="Save Films"><i class="bi bi-check-circle-fill fs-4"></i></button>
                 </div>
             </div>
 
@@ -195,16 +345,16 @@
                 <div class="upload-preview-area" id="uploadPreviewArea" style="display: none;"></div>
 
                 <div class="app-footer">
-                    <button class="action-btn" id="btnToggleDrawer" title="Attach Media or Camera">
-                        <i class="bi bi-paperclip"></i>
+                    <button class="action-btn" id="btnToggleDrawer" title="Attach Media">
+                        <i class="bi bi-plus-lg"></i>
                     </button>
                     
                     <div class="input-wrapper">
-                        <input type="text" id="chatMessageInput" placeholder="Add a caption or comment..." autocomplete="off">
+                        <input type="text" id="chatMessageInput" placeholder="Write an update..." autocomplete="off">
                     </div>
                     
                     <button class="send-btn" id="btnSendChat">
-                        <i class="bi bi-send-fill"></i>
+                        <i class="bi bi-send-fill" style="margin-left: -2px;"></i>
                     </button>
                 </div>
             </div>
@@ -218,7 +368,6 @@
 <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-
 <script src="https://releases.transloadit.com/uppy/v3.21.0/uppy.min.js"></script>
 
 <script>

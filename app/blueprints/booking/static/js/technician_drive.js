@@ -6,10 +6,10 @@ let pendingMediaUploads = []; // Queue for files ready to be sent
 $(document).ready(function () {
     // 1. Initialize Dates
     const today = new Date();
-    const twoDaysAgo = new Date();
-    twoDaysAgo.setDate(today.getDate() - 2);
+    const onemonthAgo = new Date();
+    onemonthAgo.setDate(today.getDate() - 30);
     $('#filterToDate').val(today.toISOString().split('T')[0]);
-    $('#filterFromDate').val(twoDaysAgo.toISOString().split('T')[0]);
+    $('#filterFromDate').val(onemonthAgo.toISOString().split('T')[0]);
 
     initSystemComponents();
 
@@ -43,8 +43,8 @@ function initSystemComponents() {
 
     localDataTableInstance = $('#patientsTable').DataTable({
         responsive: true, destroy: true,
-        pageLength: 15, paging: false, info: false,
-        scrollY: "calc(100vh - 200px)", 
+        pageLength: 20, paging: false, info: false,
+        scrollY: "calc(100vh - 180px)", 
         ajax: {
             url: targetEndpoint,
             data: function(d) {
@@ -61,21 +61,32 @@ function initSystemComponents() {
                     const safeName = (data.patient_name || 'Unregistered').replace(/'/g, "\\'");
                     const targetId = data.booking_id || data.id; 
                     return `
-                        <div class="d-flex flex-column" style="cursor:pointer;" 
+                        <div class="py-2 px-3" style="cursor:pointer;" 
                              onclick="mountWorkspaceScope(this, ${targetId}, '${safeName}', '${data.mr_no || ''}', '${data.age || ''}', '${data.gender || ''}', ${data.total_no_of_films_used || 0})">
-                            <span class="fw-bold text-dark">${data.patient_name || 'Unregistered'}</span>
-                            <span class="text-muted small">B#${targetId} | MR: ${data.mr_no || 'N/A'}</span>
+                            <div class="fw-bold mb-1" style="color: var(--text-main); font-size: 0.95rem;">${data.patient_name || 'Unregistered'}</div>
+                            <div class="small fw-medium" style="color: var(--text-muted);">
+                                <span style="color: var(--bs-primary);">B#${targetId}</span> &bull; MR: ${data.mr_no || 'N/A'}
+                            </div>
                         </div>
                     `;
                 }
             },
             {
-                data: null, className: "text-end",
-                render: () => `<i class="bi bi-chevron-right text-muted"></i>`
+                data: null, className: "text-end align-middle pe-4",
+                render: function(data) {
+                    const safeName = (data.patient_name || 'Unregistered').replace(/'/g, "\\'");
+                    const targetId = data.booking_id || data.id; 
+                    // Render the animated Chevron instead of the ugly blue button
+                    return `
+                        <div onclick="mountWorkspaceScope(this.closest('tr'), ${targetId}, '${safeName}', '${data.mr_no || ''}', '${data.age || ''}', '${data.gender || ''}', ${data.total_no_of_films_used || 0})" style="cursor:pointer;">
+                            <i class="bi bi-chevron-right action-chevron"></i>
+                        </div>
+                    `;
+                }
             }
         ],
         order: [[0, "desc"]],
-        language: { search: "", searchPlaceholder: "Search list..." }
+        language: { search: "", searchPlaceholder: "Search records..." }
     });
 }
 
@@ -188,7 +199,7 @@ function compileAndRenderChatTimeline(messages) {
                         <span class="comment-name">${senderName}</span>
                         <span class="comment-time">${timeLabel}</span>
                     </div>
-                    <div class="comment-text">${safeText}</div>
+                    ${safeText ? `<div class="comment-text">${safeText}</div>` : ''}
                     ${mediaHtml}
                 </div>
             </div>
