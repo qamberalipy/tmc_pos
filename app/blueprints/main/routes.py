@@ -72,15 +72,35 @@ def login():
                 session['branch_id'] = user.get('branch_id')
                 session['doctor_signature'] = user.get('doctor_signature')
                 print("User Signature:", session['doctor_signature'])
+                
                 # --- NEW LOGIC: Check Doctor Signature ---
                 if user.get('role') == 'doctor' and not user.get('has_signature'):
                     flash('Please complete your profile by adding your digital signature.', 'warning')
-                    session
                     return redirect(url_for('users.profile'))
                 # -----------------------------------------
 
                 flash('Login successful!', 'success')
-                return redirect(url_for('admin.view_admin_dashboard'))
+                
+                # ==========================================
+                # NEW SAFE ROLE-BASED REDIRECTION
+                # ==========================================
+                role = user.get('role')
+                
+                # Map roles to their specific starting pages
+                role_landing_pages = {
+                    'admin': 'admin.view_admin_dashboard',
+                    'staff': 'admin.view_admin_dashboard',
+                    'doctor': 'reports.view_pending_cases',
+                    'techician': 'booking.view_technician_drive' # Matched your spelling from menu.py
+                }
+                
+                # Get the target route. If the role somehow isn't in the list, 
+                # fallback safely to the main dashboard.
+                target_endpoint = role_landing_pages.get(role, 'main.dashboard')
+                
+                return redirect(url_for(target_endpoint))
+                # ==========================================
+
             else:
                 flash('Invalid email or password.', 'error')
                 return redirect(url_for('main.login'))

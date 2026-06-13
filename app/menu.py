@@ -109,7 +109,7 @@ MENU = {
                 {"label": "View Booking", "icon": "bi-list-check", "endpoint": "booking.view_view_booking"},
                 {"label": "Book Results", "icon": "bi-file-earmark-medical", "endpoint": "booking.view_booking_result"},
                 {"label": "View Dues", "icon": "bi-cash-stack", "endpoint": "booking.view_dues"},
-                {"label": "Technician Media Drive", "icon": "bi bi-folder2-open", "endpoint": "booking.view_technician_drive"}
+                # {"label": "Technician Media Drive", "icon": "bi bi-folder2-open", "endpoint": "booking.view_technician_drive"}
             ]
         },
         {
@@ -158,6 +158,14 @@ MENU = {
             "label": "Report Cases", 
             "icon": "bi bi-eye-fill", 
             "endpoint": "reports.view_reported_cases",
+            "css_class": "nav-group-booking" 
+        },
+    ],
+    "techician": [
+        {
+            "label": "Technician Workspace", 
+            "icon": "bi-folder2-open", 
+            "endpoint": "booking.view_technician_drive",
             "css_class": "nav-group-booking" 
         },
     ],
