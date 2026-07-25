@@ -327,11 +327,7 @@
                     </div>
                 </div>
                 
-                <div class="d-flex align-items-center bg-light px-2 px-md-3 py-1 py-md-2 rounded-pill border flex-shrink-0 ms-2">
-                    <span class="small fw-bold me-1 me-md-2 d-none d-md-inline" style="color: var(--text-muted);">Films</span>
-                    <input type="number" id="filmUsageInput" class="form-control form-control-sm text-center border-0 bg-transparent fw-bold p-0 text-dark" style="width: 32px; font-size: 1rem;" min="0">
-                    <button class="btn btn-sm p-0 ms-1 ms-md-2" style="color: var(--bs-primary);" id="btnUpdateFilms" title="Save Films"><i class="bi bi-check-circle-fill fs-4"></i></button>
-                </div>
+                <button class="btn btn-action text-dark shadow-sm flex-shrink-0 ms-2" id="btnEditFilms" title="Edit Films"><i class="bi bi-plus-square"></i></button>
             </div>
 
             <div class="comments-area" id="chatHistoryBox"></div>
@@ -359,6 +355,51 @@
                 </div>
             </div>
 
+        </div>
+    </div>
+<div class="modal fade" id="filmsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit Films</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="bookingIdInput">
+                <div class="row">
+                    <div class="col-md-6">
+                        <label class="mb-1 small fw-bold">Select Test *</label>
+                        <select id="testIdSelect" class="form-control mb-2"></select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="mb-1 small fw-bold">Current Films (This Test):</label>
+                        <input type="number" class="form-control mb-2" id="currentFilmsInput" disabled>
+                    </div>
+                </div>
+                <hr>
+                <div class="row">
+                    <div class="col-md-6">
+                        <label class="mb-1 text-primary small fw-bold">Add/Change Films By: *</label>
+                        <input type="number" class="form-control mb-2" id="changedFilmsInput" placeholder="e.g. 2" min="0">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="mb-1 small fw-bold">New Booking Grand Total:</label>
+                        <input type="number" class="form-control mb-2 fw-bold" id="totalFilmsUsedInput" disabled style="background-color: #f8f9fa;">
+                    </div>
+                </div>
+                <label class="mb-1 small fw-bold">Cause *</label>
+                <select id="causeSelect" class="form-control mb-2">
+                    <option value="Extra">Extra</option>
+                    <option value="Repeat">Repeat</option>
+                    <option value="Error">Error</option>
+                </select>
+                <label class="mb-1 small fw-bold">Reason *</label>
+                <textarea id="reasonInput" rows="3" class="form-control" placeholder="Enter reason for change..."></textarea>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="SaveEditfilms">Save Changes</button>
+            </div>
         </div>
     </div>
 </div>
