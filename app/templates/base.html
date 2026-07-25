@@ -51,7 +51,7 @@
         </li>
         {% endif %}
 
-        {% if session.get('user_role') == 'staff' %}
+        {% if session.get('user_id') %}
         <li class="nav-item d-flex align-items-center me-4">
           
           <div class="me-3 text-end d-none d-md-block border-end pe-3">

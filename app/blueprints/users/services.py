@@ -2,7 +2,7 @@ from flask import json, session
 from app.extensions import db
 from app.models import Role, Branch, User   
 from app.models.shift import ShiftSession
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from werkzeug.security import generate_password_hash
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -249,6 +249,16 @@ def start_user_shift(user_id, branch_id):
         status='Open'
     ).first()
     
+    if active_shift:
+        st = active_shift.start_time
+        if st and st.tzinfo is None:
+            st = st.replace(tzinfo=timezone.utc)
+        if st and (datetime.now(timezone.utc) - st) > timedelta(hours=15):
+            active_shift.end_time = active_shift.start_time + timedelta(hours=15)
+            active_shift.status = 'Closed'
+            db.session.commit()
+            active_shift = None
+
     if active_shift:
         return active_shift
 

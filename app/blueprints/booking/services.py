@@ -1,6 +1,6 @@
 import json
 from flask import session
-from sqlalchemy import func, and_, cast, String,case,Date,or_
+from sqlalchemy import func, and_, cast, String,case,Date,or_, exists
 from app.blueprints import booking
 from app.blueprints.reports.services import _to_float
 from app.extensions import db
@@ -918,6 +918,7 @@ def _format_test_booking(row):
         "date": row.create_at.strftime("%Y-%m-%d") if row.create_at else None,
         "referred_dr": row.referred_dr,
         "give_share_to": row.give_share_to,
+        "sent_to_doctor": row.sent_to_doctor,
         # This contains: [{"id": 12, "test_name": "xyz", "film_issued": False}, ...]
         "test_booking_details": row.test_booking_details,  
         "technician_comments": row.technician_comments,
@@ -965,6 +966,10 @@ def get_all_test_bookings(branch_id=None, from_date=None, to_date=None):
                 Branch.branch_name.label("branch_name"),
                 User.name.label("created_by_name"),
                 TestBooking.give_share_to,
+                exists().where(
+                    DoctorReportingdetails.booking_id == db.cast(TestBooking.id, db.String),
+                    DoctorReportingdetails.is_active == True
+                ).label("sent_to_doctor"),
                 func.json_agg(
                     func.json_build_object(
                         'id', Test_registration.id,

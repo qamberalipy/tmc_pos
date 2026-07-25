@@ -15,7 +15,6 @@ $(document).ready(function () {
 
     // 2. Event Bindings
     $('#btnFilterList').on('click', function() { if (localDataTableInstance) localDataTableInstance.ajax.reload(); });
-    $('#btnUpdateFilms').off('click').on('click', executeFilmStateUpdate);
     $('#btnSendChat').off('click').on('click', dispatchUnifiedPayload);
     
     $('#chatMessageInput').on('keypress', function (e) {
@@ -131,18 +130,61 @@ function resetUploadState() {
     if (currentUppyInstance) currentUppyInstance.cancelAll();
 }
 
-function executeFilmStateUpdate() {
+let grandTotalFilms = 0;
+
+$(document).on('click', '#btnEditFilms', function () {
     if (!activeSessionBookingId) return;
-    const currentCountValue = $('#filmUsageInput').val();
+    const $testSelect = $("#testIdSelect");
+    $("#bookingIdInput").val(activeSessionBookingId);
+    $("#changedFilmsInput, #reasonInput, #currentFilmsInput").val("");
+    $testSelect.html('<option value="">Loading tests...</option>');
 
     if (typeof myshowLoader === 'function') myshowLoader();
-    axios.post(`${APP_BASE_URL}/booking/films/`, { 
-        booking_id: activeSessionBookingId, total_new_films_used: currentCountValue,
-        usage_type: "Workspace Update", test_id: 0, reason: "Updated via Technician Workspace"
-    })
-    .then(res => { if (typeof showToastMessage === 'function') showToastMessage('success', 'Films adjusted.'); })
-    .finally(() => { if (typeof myhideLoader === 'function') myhideLoader(); });
-}
+    axios.get(`${APP_BASE_URL}/booking/get-films-by-booking/${activeSessionBookingId}`)
+        .then(res => {
+            grandTotalFilms = Number(res.data.grand_total_films) || 0;
+            $("#totalFilmsUsedInput").val(grandTotalFilms);
+            $testSelect.empty().append('<option value="">-- Select Test --</option>');
+            (res.data.details || []).forEach(item => {
+                let opt = $('<option>', { value: item.test_id, text: item.test_name }).data('films', item.films_used);
+                $testSelect.append(opt);
+            });
+            $("#filmsModal").modal("show");
+        })
+        .finally(() => { if (typeof myhideLoader === 'function') myhideLoader(); });
+});
+
+$(document).on("change", "#testIdSelect", function () {
+    $("#currentFilmsInput").val($(this).find(':selected').data('films') || 0);
+});
+
+$(document).on("input", "#changedFilmsInput", function () {
+    $("#totalFilmsUsedInput").val(grandTotalFilms + (Number($(this).val()) || 0));
+});
+
+$(document).on("click", "#SaveEditfilms", function () {
+    const bookingId = parseInt($("#bookingIdInput").val());
+    const testId = $("#testIdSelect").val();
+    const currentTestFilms = Number($("#currentFilmsInput").val()) || 0;
+    const addedFilms = Number($("#changedFilmsInput").val()) || 0;
+    const filmsUnderTest = currentTestFilms + addedFilms;
+    const totalNewFilmsUsed = Number($("#totalFilmsUsedInput").val());
+
+    const payload = {
+        booking_id: bookingId, test_id: parseInt(testId),
+        films_under_test: filmsUnderTest, total_new_films_used: totalNewFilmsUsed,
+        usage_type: $("#causeSelect").val(), reason: $("#reasonInput").val().trim()
+    };
+    if (!payload.test_id) return showToastMessage("error", "Please select a test.");
+    if (addedFilms <= 0) return showToastMessage("error", "Please enter a valid number of films.");
+    if (!payload.reason) return showToastMessage("error", "Reason is required.");
+
+    if (typeof myshowLoader === 'function') myshowLoader();
+    axios.post(`${APP_BASE_URL}/booking/films/`, payload)
+        .then(() => { showToastMessage("success", "Film usage updated!"); $("#filmsModal").modal("hide"); })
+        .catch(err => handleAxiosError ? handleAxiosError(err) : console.error(err))
+        .finally(() => { if (typeof myhideLoader === 'function') myhideLoader(); });
+});
 
 // -------------------------------------------------------------
 // CHAT RENDERING (Instagram Style)

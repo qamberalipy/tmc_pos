@@ -308,9 +308,13 @@ function getAllTestBookings() {
 
             let currentShareId = t.give_share_to || "";
 
-            // --- 2. NEW: Visual Badge for Transferred-In Bookings ---
+            // --- 2. NEW: Visual Badge for Transferred-In Bookings & Sent to Doctor ---
             let transferBadge = t.is_transferred_in 
                 ? `<span class="badge bg-warning text-dark ms-1" style="font-size:0.65rem;"><i class="bi bi-box-arrow-in-right"></i> Transferred In</span>` 
+                : ``;
+
+            let sentBadge = t.sent_to_doctor
+                ? `<br><span class="badge bg-info text-dark ms-1" style="font-size:0.65rem;"><i class="bi bi-send-check"></i> Sent to Dr</span><br>`
                 : ``;
 
             // --- 3. UPDATE: Add Transfer Button & Apply Security Locks ---
@@ -331,6 +335,7 @@ function getAllTestBookings() {
             let actions = `
             <div class="d-flex gap-1 justify-content-center">
                 <a href="${baseUrl}/booking/receipt/${t.booking_id}" target="_blank" class="btn btn-action text-success shadow-sm" title="Print Receipt"><i class="bi bi-printer"></i></a>
+                <a href="${baseUrl}/booking/print-sticker/${t.booking_id}" target="_blank" class="btn btn-action text-secondary shadow-sm" title="Print Sticker"><i class="bi bi-tag"></i></a>
                 
                 <button class="btn btn-action text-primary shadow-sm comment-booking" data-id="${t.booking_id}" title="Comments"><i class="bi bi-chat-left-text"></i></button>
                 
@@ -345,12 +350,12 @@ function getAllTestBookings() {
             rowsToAdd.push([
                 `<input type="checkbox" class="chk-booking custom-chk" value="${t.booking_id}">`,
                 `<div><div class="fw-bold">#${t.booking_id}</div><div class="text-muted text-xs">${t.date}</div></div>`,
-                `<div><div class="fw-bold text-primary">${t.patient_name} ${transferBadge}</div><div class="text-muted text-xs">MR: ${t.mr_no || 'N/A'}</div></div>`,
+                `<div><div class="fw-bold text-primary">${t.patient_name} ${transferBadge}${sentBadge}</div><div class="text-muted text-xs">MR: ${t.mr_no || 'N/A'}</div></div>`,
                 testHtml,
                 `<div class="text-xs fw-medium">${t.referred_dr || 'Self'}</div>`,
-                `<div class="text-end text-muted text-xs">${t.total_amount}</div>`,
-                `<div class="text-end fw-bold">${t.received}</div>`,
-                `<div class="text-end fw-bold ${t.balance > 0 ? 'text-danger' : 'text-success'}">${t.balance}</div>`,
+                `<div class=" text-xs">${t.total_amount}</div>`,
+                `<div class=" fw-bold text-success">${t.received}</div>`,
+                `<div class=" fw-bold ${t.balance > 0 ? 'text-danger' : 'text-success'}">${t.balance}</div>`,
                 actions
             ]);
         });

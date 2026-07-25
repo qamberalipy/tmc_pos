@@ -95,6 +95,18 @@ def view_receipt(booking_id):
         print(f"Error in view_receipt: {str(e)}")
         return redirect(url_for("main.error_page"))
 
+@booking_bp.route('/print-sticker/<int:booking_id>')
+@login_required
+def print_sticker(booking_id):
+    try:
+        booking, status = booking_services.get_booking_details(booking_id)
+        if status != 200:
+            return render_template("error.html", message=booking.get("error", "Booking not found")), status
+        return render_template('sticker.html', booking=booking)
+    except Exception as e:
+        print(f"Error in print_sticker: {str(e)}")
+        return redirect(url_for("main.error_page"))
+
 @booking_bp.route("/test-booking", methods=["GET"])
 def get_all_test_bookings():
     role = session.get("role", "").lower()

@@ -535,7 +535,7 @@ $(document).on("click", "#submit_booking", async function () {
         // --- 2. Collect Data ---
         const payload = {
             mr_no: $("#mr_ref_no").val().trim() || null, 
-            patient_name: $("#patient_name").val().trim(),
+            patient_name: ($("#patient_title option:selected").text() + " " + $("#patient_name").val().trim()).trim(),
             gender: $("#gender").val(),
             age: $("#age").val() ? parseInt($("#age").val()) : null,
             contact_no: $("#contact_no").val().trim(),
