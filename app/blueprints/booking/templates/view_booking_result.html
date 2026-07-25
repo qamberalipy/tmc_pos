@@ -20,6 +20,39 @@
     
     /* Clean Table Badges */
     .badge-test { background-color: #e9ecef; color: #495057; border: 1px solid #ced4da; }
+
+    .dt-buttons .dt-button {
+        all: unset;
+        display: inline-flex !important;
+        align-items: center;
+        gap: 6px;
+        cursor: pointer;
+    }
+    .dt-buttons .dt-button.buttons-excel {
+        padding: 8px 16px !important;
+        border-radius: 8px !important;
+        background: #198754 !important;
+        color: #fff !important;
+        font-weight: 600;
+        font-size: 0.85rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+        transition: all 0.2s;
+    }
+    .dt-buttons .dt-button.buttons-pdf {
+        padding: 8px 16px !important;
+        border-radius: 8px !important;
+        background: #dc3545 !important;
+        color: #fff !important;
+        font-weight: 600;
+        font-size: 0.85rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+        transition: all 0.2s;
+    }
+    .dt-buttons .dt-button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.12);
+        opacity: 0.92;
+    }
 </style>
 {% endblock stylesheets %}
 
@@ -57,6 +90,10 @@
                     <div>
                         <button class="btn btn-primary shadow-sm" id="searchBtn"><i class="bi bi-search"></i> Search</button>
                     </div>
+                    <div>
+                        <label class="form-label small mb-1 fw-bold d-block">&nbsp;</label>
+                        <div id="exportBtnGroup" class="d-flex gap-1"></div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -75,7 +112,7 @@
                                 <th>Test Name</th>
                                 <th>Status</th>
                                 <th style="min-width: 160px;">Assignment Info</th>
-                                <th class="text-center">Action</th>
+                                <th class="text-center no-export">Action</th>
                             </tr>
                         </thead>
                         <tbody></tbody>
@@ -90,6 +127,12 @@
 {% block javascript %}
 <script src="https://cdn.datatables.net/1.10.22/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/responsive/2.2.6/js/dataTables.responsive.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/1.6.5/js/dataTables.buttons.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/1.6.5/js/buttons.html5.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/1.6.5/js/buttons.print.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/pdfmake.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/vfs_fonts.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>

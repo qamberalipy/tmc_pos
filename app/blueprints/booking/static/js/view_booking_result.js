@@ -45,8 +45,14 @@ function getAssignedReports() {
                 responsive: true,
                 pageLength: 10,
                 order: [[0, "desc"]],
-                language: { emptyTable: "No assignments found for the selected criteria." }
+                language: { emptyTable: "No assignments found for the selected criteria." },
+                buttons: [
+                    { extend: 'excelHtml5', text: '<i class="bi bi-file-earmark-excel"></i> Excel', exportOptions: { columns: ':not(.no-export)' } },
+                    { extend: 'pdfHtml5', text: '<i class="bi bi-file-earmark-pdf"></i> PDF', orientation: 'landscape', pageSize: 'A4', exportOptions: { columns: ':not(.no-export)' } }
+                ]
             });
+
+            table.buttons().container().appendTo('#exportBtnGroup');
 
             table.clear().draw();
 
