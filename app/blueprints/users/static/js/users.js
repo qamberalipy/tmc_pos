@@ -276,4 +276,13 @@ $(document).on('click', '#update_user', function (e) {
         });
 });
 
+if (typeof axios !== 'undefined') {
+    axios.interceptors.response.use(res => res, err => {
+        if (err.response && err.response.status === 403 && err.response.data?.error === "shift_required") {
+            alert("Please start your shift");
+        }
+        return Promise.reject(err);
+    });
+}
+
 
