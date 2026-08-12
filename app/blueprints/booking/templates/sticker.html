@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8" />
   <title>Diagnostic Sticker - {{ booking.patient_name or 'Patient' }}</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/JsBarcode/3.11.5/JsBarcode.all.min.js"></script>
+  <script src="{{ url_for('booking.static', filename='js/vendor/JsBarcode.all.min.js') }}"></script>
   <style>
     @page {
       size: 5.12in 4.12in;
@@ -152,7 +152,7 @@
           <div><b>MR/Ref No:</b> {{ booking.mr_no or 'N/A' }}</div>
         </div>
         <div class="info-col">
-          <span class="datetime">Date Time: {{ booking.booking_date or '-' }}</span>
+          <span class="datetime">Date Time: {{ booking.booking_date or booking.printed_at or '-' }}</span>
         </div>
       </div>
 
@@ -188,6 +188,7 @@
           jsbarcode-margin="0">
         </svg>
       </div>
+      <div id="barcode-fallback" style="display:none;text-align:center;font-size:13px;font-weight:700;letter-spacing:2px;">*{{ booking.booking_id }}*</div>
 
     </div>
   </div>
@@ -198,7 +199,12 @@
 
   <script>
     window.addEventListener('DOMContentLoaded', function () {
-      if (window.JsBarcode) { JsBarcode('.barcode').init(); }
+      try {
+        if (window.JsBarcode) { JsBarcode('.barcode').init(); }
+        else { document.getElementById('barcode-fallback').style.display = 'block'; }
+      } catch (e) {
+        document.getElementById('barcode-fallback').style.display = 'block';
+      }
       window.print();
     });
   </script>
