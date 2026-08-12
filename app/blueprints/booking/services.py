@@ -680,7 +680,9 @@ def get_films_audit(branch_id=None, from_date=None, to_date=None):
             query = query.filter(TestFilmUsage.used_at >= from_date)
 
         if to_date:
-            query = query.filter(TestFilmUsage.used_at <= to_date)
+            from datetime import datetime, timedelta
+            to_date_end = datetime.strptime(to_date, "%Y-%m-%d") + timedelta(days=1)
+            query = query.filter(TestFilmUsage.used_at < to_date_end)
 
         query = query.order_by(TestFilmUsage.used_at.desc())
 

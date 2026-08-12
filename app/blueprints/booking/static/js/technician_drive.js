@@ -44,6 +44,7 @@ function initSystemComponents() {
         responsive: true, destroy: true,
         pageLength: 20, paging: false, info: false,
         scrollY: "calc(100vh - 180px)", 
+        ordering: false,
         ajax: {
             url: targetEndpoint,
             data: function(d) {
@@ -84,7 +85,6 @@ function initSystemComponents() {
                 }
             }
         ],
-        order: [[0, "desc"]],
         language: { search: "", searchPlaceholder: "Search records..." }
     });
 }
