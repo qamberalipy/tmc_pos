@@ -624,6 +624,7 @@ $(document).on("click", "#submit_booking", async function () {
 
             $("#booking_id").text(responseData.booking_id);
             $("#print_receipt_btn").attr("href", baseUrl + "/booking/receipt/" + responseData.booking_id);
+            $("#print_sticker_btn").attr("href", baseUrl + "/booking/print-sticker/" + responseData.booking_id);
 
             $("html, body").animate({ scrollTop: 0 }, 500);
             $(".select2-selection").removeClass("border-danger");
