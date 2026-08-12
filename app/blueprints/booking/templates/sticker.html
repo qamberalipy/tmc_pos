@@ -1,161 +1,213 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
-  <title>Patient Sticker - {{ booking.patient_name }}</title>
+  <title>Diagnostic Sticker - {{ booking.patient_name or 'Patient' }}</title>
+  <script src="{{ url_for('booking.static', filename='js/vendor/JsBarcode.all.min.js') }}"></script>
   <style>
     @page {
-      size: 4in 2in;
+      size: 5.12in 4.12in;
       margin: 0;
     }
 
     @media print {
-      .no-print {
-        display: none !important;
-      }
-      body {
-        -webkit-print-color-adjust: exact;
-        print-color-adjust: exact;
-        background: #fff !important;
+      .no-print { display: none !important; }
+      html, body {
+        margin: 0 !important;
         padding: 0 !important;
+        width: 5.12in;
+        height: 4.12in;
+        overflow: hidden;
       }
-      .sticker {
-        border: none !important;
-        box-shadow: none !important;
-        width: 4in !important;
-        height: 2in !important;
-      }
+      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .sticker { margin: 0 !important; box-shadow: none !important; }
     }
+
+    * { box-sizing: border-box; }
 
     body {
       margin: 0;
-      padding: 10px;
-      background: #f2f2f2;
-      font-family: Arial, sans-serif;
-      font-size: 11px;
+      background: #e9e9e9;
+      font-family: Arial, Helvetica, sans-serif;
       color: #000;
       display: flex;
       flex-direction: column;
+      justify-content: center;
       align-items: center;
+      min-height: 100vh;
     }
 
+    .divider {
+      border: none;
+      border-top: 1px solid #000;
+      margin: 3px 0;
+    }
+
+    /* Outer sticker = exact page size */
     .sticker {
-      width: 4in;
-      height: 2in;
-      box-sizing: border-box;
-      padding: 6mm 8mm;
+      width: 5.12in;
+      height: 4.12in;
       background: #fff;
-      border: 1px dashed #ccc;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    /* Inner content = centered with safe margins to avoid unprintable edges */
+    .sticker-inner {
+      width: calc(100% - 0.34in);
+      height: calc(100% - 0.3in);
       display: flex;
       flex-direction: column;
-      justify-content: space-between;
-      overflow: hidden;
+      gap: 2mm;
+      font-size: 16px;
+      line-height: 1.25;
+      justify-content: center;
     }
 
-    .header {
+    .box { border: 1.6px solid #000; padding: 3px 8px; }
+
+    .title-box { text-align: center; padding: 4px 8px; }
+    .title-box .name { font-size: 19px; font-weight: 800; letter-spacing: 0.5px; }
+
+    .printed { font-size: 13px; text-align: right; }
+
+    .test-type-box {
+      text-align: center;
+      font-size: 17px;
+      font-weight: 700;
+      padding: 4px 8px;
+      max-height: 2.2em;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    .datetime { display: block; font-size: 13px; font-weight: 400; text-align: right; }
+
+    .info-grid {
       display: flex;
       justify-content: space-between;
-      align-items: center;
-      border-bottom: 1px solid #000;
-      padding-bottom: 3px;
+      gap: 12px;
+    }
+    .info-col { flex: 1; }
+    .info-col div { margin-bottom: 2px; }
+    .info-col b { font-weight: 700; }
+
+    .detail-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 16px;
+    }
+    .detail-table td {
+      vertical-align: top;
+      width: 50%;
+      padding: 0 5px;
+    }
+    .detail-table td div { margin-bottom: 2px; }
+    .detail-table b { font-weight: 700; }
+
+    .barcode-wrap { display: flex; justify-content: center; }
+    .barcode-wrap svg { height: 14mm; }
+
+    .controls { text-align: center; margin-top: 14px; }
+    button {
+      padding: 6px 10px; font-size: 14px; background: #007bff;
+      color: #fff; border: none; border-radius: 4px; cursor: pointer;
     }
 
-    .header img {
-      max-height: 26px;
-      width: auto;
-    }
-
-    .header-info {
-      text-align: right;
-      font-size: 10px;
-      font-weight: bold;
-    }
-
-    .patient-info {
-      margin-top: 4px;
-      font-size: 11px;
-      line-height: 1.3;
-    }
-
-    .patient-name {
-      font-size: 13px;
-      font-weight: bold;
-    }
-
-    .info-row {
-      display: flex;
-      justify-content: space-between;
-      margin-top: 2px;
-      font-size: 10px;
-    }
-
-    .test-list {
-      margin-top: 4px;
-      border-top: 1px dashed #666;
-      padding-top: 4px;
-      font-size: 10px;
-      font-weight: 600;
-      max-height: 0.6in;
-      overflow: hidden;
-      word-wrap: break-word;
-    }
-
-    .no-print-btn {
-      margin-top: 12px;
-      padding: 6px 16px;
-      background: #0d6efd;
-      color: #fff;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 13px;
-    }
+    h2, p { margin: 0; padding: 0; }
   </style>
 </head>
+
 <body>
 
   <div class="sticker">
-    <div>
-      <div class="header">
-        <img src="{{ url_for('booking.static', filename='logo_for_receipt.png') }}" alt="TMC POS">
-        <div class="header-info">
-          <div>ID: #{{ booking.booking_id }}</div>
-          <div>MR: {{ booking.mr_no or 'N/A' }}</div>
+    <div class="sticker-inner">
+
+      <!-- Lab name -->
+      <div class="box title-box">
+        <div class="name">TMC Diagnostic Center</div>
+      </div>
+
+      <!-- Printed On -->
+      <div class="printed">Printed On: {{ booking.printed_at or '' }}</div>
+
+      <!-- Test type box -->
+      <div class="box test-type-box">
+        {%- if booking.tests -%}
+          {{ booking.tests | map(attribute='test_name') | select | join(' / ') }}
+        {%- else -%}
+          N/A
+        {%- endif -%}
+      </div>
+
+      <!-- Booking ID / MR-Ref No / Date Time -->
+      <div class="info-grid">
+        <div class="info-col">
+          <div><b>Booking ID:</b> {{ booking.booking_id or '-' }}</div>
+          <div><b>MR/Ref No:</b> {{ booking.mr_no or 'N/A' }}</div>
+        </div>
+        <div class="info-col">
+          <span class="datetime">Date Time: {{ booking.booking_date or booking.printed_at or '-' }}</span>
         </div>
       </div>
 
-      <div class="patient-info">
-        <div class="patient-name">{{ booking.patient_name }}</div>
-        <div class="info-row">
-          <span><b>Age/Gender:</b> {{ booking.age or '-' }} yrs / {{ booking.gender or '-' }}</span>
-          <span><b>Date:</b> {{ booking.printed_at or booking.date or '' }}</span>
-        </div>
-        <div class="info-row">
-          <span><b>Ref By:</b> {{ booking.referred_by or 'Self' }}</span>
-          <span><b>Contact:</b> {{ booking.contact_no or '-' }}</span>
-        </div>
-      </div>
-    </div>
+      <!-- Patient details -->
+      <table class="detail-table">
+        <tr>
+          <td style="padding-left:0;">
+            <div><b>Patient Name:</b> {{ booking.patient_name or '-' }}</div>
+            <div><b>Age:</b> {{ booking.age or '-' }}</div>
+            <div><b>Gender:</b> {{ booking.gender or '-' }}</div>
+          </td>
+          <td>
+            <div><b>Contact No:</b> {{ booking.contact_no or '-' }}</div>
+          </td>
+        </tr>
+      </table>
 
-    <div class="test-list">
-      <b>Tests:</b> 
-      {% if booking.tests %}
-        {% for test in booking.tests %}
-          {{ test.test_name }}{% if not loop.last %}, {% endif %}
-        {% endfor %}
-      {% else %}
-        N/A
-      {% endif %}
+      <div><b>Refered Dr:</b> {{ booking.referred_by or 'Self' }}</div>
+
+      <!-- Show pending due only when balance > 0 -->
+      {%- if booking.financials and booking.financials.balance and booking.financials.balance > 0 -%}
+      <div>This due is pending</div>
+      {%- endif -%}
+
+      <hr class="divider">
+
+      <!-- Barcode -->
+      <div class="barcode-wrap">
+        <svg class="barcode"
+          jsbarcode-value="{{ booking.booking_id }}"
+          jsbarcode-height="40"
+          jsbarcode-fontsize="10"
+          jsbarcode-margin="0">
+        </svg>
+      </div>
+      <div id="barcode-fallback" style="display:none;text-align:center;font-size:13px;font-weight:700;letter-spacing:2px;">*{{ booking.booking_id }}*</div>
+
     </div>
   </div>
 
-  <button class="no-print no-print-btn" onclick="window.print()">Print Sticker</button>
+  <div class="controls no-print">
+    <button onclick="window.print()">Print Sticker</button>
+  </div>
 
   <script>
-    window.onload = function() {
+    window.addEventListener('DOMContentLoaded', function () {
+      try {
+        if (window.JsBarcode) { JsBarcode('.barcode').init(); }
+        else { document.getElementById('barcode-fallback').style.display = 'block'; }
+      } catch (e) {
+        document.getElementById('barcode-fallback').style.display = 'block';
+      }
       window.print();
-    };
+    });
   </script>
 </body>
+
 </html>
