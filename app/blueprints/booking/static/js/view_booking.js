@@ -371,9 +371,7 @@ function getAllTestBookings() {
 function rebindTableEvents() {
     $("#testReg_table").off("click", ".comment-booking").on("click", ".comment-booking", function () {
         let bookingId = $(this).data("id");
-        $("#saveCommentBtn").data("booking-id", bookingId);
-        fetchComments(bookingId);
-        $("#commentsModal").modal("show");
+        window.open(`${baseUrl}/booking/view/technician-drive?booking_id=${bookingId}`, "_blank");
     });
 
     $("#testReg_table").off("click", ".edit-films").on("click", ".edit-films", function () {

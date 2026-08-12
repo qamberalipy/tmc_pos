@@ -468,14 +468,14 @@ def api_get_technician_drive_list():
     from_date = request.args.get("from_date")
     to_date = request.args.get("to_date")
     search_term = request.args.get("search", "").strip()
+    deep_link_id = request.args.get("booking_id", type=int)
 
-    # Apply your 40-day limit logic if needed, or rely on frontend dates
-    if not from_date and not search_term:
+    if not from_date and not search_term and not deep_link_id:
         limit_date_obj = datetime.now(timezone.utc) - timedelta(days=40)
         from_date = limit_date_obj.strftime('%Y-%m-%d')
 
     result, status = booking_services.get_technician_dashboard_list(
-        branch_id, from_date, to_date, search_term
+        branch_id, from_date, to_date, search_term, deep_link_id
     )
     return jsonify(result), status
 

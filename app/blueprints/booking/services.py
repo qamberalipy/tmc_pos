@@ -680,7 +680,9 @@ def get_films_audit(branch_id=None, from_date=None, to_date=None):
             query = query.filter(TestFilmUsage.used_at >= from_date)
 
         if to_date:
-            query = query.filter(TestFilmUsage.used_at <= to_date)
+            from datetime import datetime, timedelta
+            to_date_end = datetime.strptime(to_date, "%Y-%m-%d") + timedelta(days=1)
+            query = query.filter(TestFilmUsage.used_at < to_date_end)
 
         query = query.order_by(TestFilmUsage.used_at.desc())
 
@@ -1573,26 +1575,21 @@ def transfer_and_rebook_service(old_booking_id, target_branch_id, new_tests, due
 
 # TECHNICIAN DASHBOARD & MEDIA DRIVE SERVICE
 
-def get_technician_dashboard_list(branch_id, from_date=None, to_date=None, search_term=None):
+def get_technician_dashboard_list(branch_id, from_date=None, to_date=None, search_term=None, deep_link_id=None):
     try:
         start_utc, end_utc = None, None
-        # Reuse your excellent lab_date_bounds logic
         if from_date and to_date:
             start_utc, end_utc = get_lab_date_bounds(from_date, to_date, branch_id)
 
         query = db.session.query(
-            TestBooking.id,
-            TestBooking.mr_no,
-            TestBooking.patient_name,
-            TestBooking.age,
-            TestBooking.gender,
-            TestBooking.contact_no,
-            TestBooking.create_at,
-            TestBooking.technician_comments
+            TestBooking.id, TestBooking.mr_no, TestBooking.patient_name,
+            TestBooking.age, TestBooking.gender, TestBooking.contact_no,
+            TestBooking.create_at, TestBooking.technician_comments
         ).filter(TestBooking.branch_id == branch_id)
 
         if start_utc and end_utc:
-            query = query.filter(TestBooking.create_at >= start_utc, TestBooking.create_at <= end_utc)
+            date_filter = and_(TestBooking.create_at >= start_utc, TestBooking.create_at <= end_utc)
+            query = query.filter(or_(date_filter, TestBooking.id == deep_link_id) if deep_link_id else date_filter)
 
         if search_term:
             query = query.filter(or_(
