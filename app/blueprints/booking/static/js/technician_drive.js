@@ -50,9 +50,30 @@ function initSystemComponents() {
             data: function(d) {
                 d.from_date = $('#filterFromDate').val();
                 d.to_date = $('#filterToDate').val();
+                d.booking_id = new URLSearchParams(window.location.search).get('booking_id') || undefined;
                 if (d.search && d.search.value) d.search = d.search.value; else delete d.search;
             },
-            dataSrc: function (json) { return json.data || json || []; }
+            dataSrc: function (json) {
+                const rows = json.data || json || [];
+                const params = new URLSearchParams(window.location.search);
+                const deepLinkId = params.get('booking_id');
+                if (deepLinkId && !window.__deepLinkHandled) {
+                    window.__deepLinkHandled = true; // fire once only
+                    const match = rows.find(r => String(r.booking_id || r.id) === String(deepLinkId));
+                    if (match) {
+                        setTimeout(() => {
+                            mountWorkspaceScope(null, match.booking_id || match.id,
+                                match.patient_name || 'Unregistered', match.mr_no || '',
+                                match.age || '', match.gender || '', match.total_no_of_films_used || 0);
+                            params.delete('booking_id');
+                            history.replaceState({}, '', `${location.pathname}${params.toString() ? '?' + params : ''}`);
+                        }, 0);
+                    } else {
+                        console.warn('Deep-linked booking_id not found in results:', deepLinkId);
+                    }
+                }
+                return rows;
+            }
         },
         columns: [
             { 
