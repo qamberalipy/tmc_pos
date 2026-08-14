@@ -50,6 +50,9 @@ def create_app():
                   'users.api_start_shift', 'users.api_end_shift', 'users.api_shift_status'}
         if request.endpoint in EXEMPT or (request.endpoint and request.endpoint.endswith('.static')):
             return
+        # Role-based exclusion: only fire for Staff portal roles
+        if session.get('user_role') != 'staff':
+            return
         from app.shift_guard import get_active_shift
         shift = get_active_shift(session['user_id'])
         if not shift:

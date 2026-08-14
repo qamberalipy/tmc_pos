@@ -137,9 +137,11 @@ $(document).ready(function () {
         
         // Populate Compact Form Fields
         $('#rep_bookingId').val(currentItem.booking_id);
+        $('#rep_mrNo').val(currentItem.mr_no || 'N/A');
         $('#rep_patientName').val(currentItem.patient_name || 'N/A');
         $('#rep_age').val(currentItem.age || 'N/A');
         $('#rep_gender').val(currentItem.gender || 'N/A');
+        $('#rep_referredBy').val(currentItem.referred_by || 'Self');
         $('#rep_testName').val(currentItem.test_name);
 
         resetUploadUI();

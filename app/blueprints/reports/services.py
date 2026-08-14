@@ -15,6 +15,7 @@ from app.models.branch import Branch
 from collections import defaultdict
 from app.models.expense_head import Expense_head
 from app.helper import get_lab_date_bounds
+from app.models.referred import Referred
 from werkzeug.exceptions import BadRequest, NotFound
 from app.models.expenses import PaymentTransaction
 
@@ -433,11 +434,13 @@ def get_doctor_pending_bookings(doctor_id):
             DoctorReportingdetails,
             TestBooking,
             User,
-            Test_registration.test_name  # Select the specific test name
+            Test_registration.test_name,  # Select the specific test name
+            Referred.name.label("referred_by")
         )
         .join(TestBooking, TestBooking.id == cast(DoctorReportingdetails.booking_id, Integer))
         .join(User, User.id == DoctorReportingdetails.assign_by)
         .join(Test_registration, Test_registration.id == DoctorReportingdetails.test_id) # Direct Link
+        .outerjoin(Referred, and_(Referred.id == TestBooking.referred_dr, Referred.is_doctor == True))
         .filter(
             DoctorReportingdetails.doctor_id == doctor_id_str,
             DoctorReportingdetails.status == "Pending"
@@ -448,20 +451,22 @@ def get_doctor_pending_bookings(doctor_id):
 
     output = []
     
-    # Unpack the 4 items returned by the query
-    for dr_detail, booking, user, test_name in results:
+    # Unpack the 5 items returned by the query
+    for dr_detail, booking, user, test_name, referred_by in results:
         output.append({
             "reporting_id": dr_detail.id,
             "booking_id": dr_detail.booking_id,
             "status": dr_detail.status,
             "assigned_by": user.name,
             "assigned_at": dr_detail.report_at.strftime("%Y-%m-%d %H:%M:%S") if dr_detail.report_at else None,
-            "patient_name": booking.patient_name, # Added this (usually very helpful for doctors)
+            "patient_name": booking.patient_name,
+            "mr_no": booking.mr_no,
             "age": booking.age,       
             "gender": booking.gender,
             "technician_comments": booking.technician_comments,
             "test_name": test_name, # The specific name for this assigned row
-            "test_id": dr_detail.test_id
+            "test_id": dr_detail.test_id,
+            "referred_by": referred_by or "Self"
         })
 
     return output

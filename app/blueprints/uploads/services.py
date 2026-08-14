@@ -54,7 +54,13 @@ def start_multipart_upload(filename, content_type, target_folder=None):
 
     safe_filename = secure_filename(filename)
     file_extension = os.path.splitext(safe_filename)[1].lower() if '.' in safe_filename else ''
-    unique_filename = f"{uuid.uuid4().hex}{file_extension}"
+    is_archive = ALLOWED_MIME_TYPES.get(content_type) == 'zips'
+
+    if is_archive and safe_filename:
+        base_name = os.path.splitext(safe_filename)[0][:80]  # cap length, avoid absurd keys
+        unique_filename = f"{base_name}-{uuid.uuid4().hex[:8]}{file_extension}"
+    else:
+        unique_filename = f"{uuid.uuid4().hex}{file_extension}"
     
     category_folder = ALLOWED_MIME_TYPES.get(content_type, 'others')
     safe_target = secure_filename(target_folder) if target_folder else 'misc'

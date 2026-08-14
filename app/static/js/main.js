@@ -157,8 +157,8 @@ $(document).ready(function () {
  */
 $(document).ready(function () {
     
-    // Shift Logic - Only execute if user role is defined and is NOT an admin
-    if (typeof userRole !== 'undefined' && userRole !== 'admin') {
+    // Shift Logic - Only execute if user role is defined and is staff
+    if (typeof userRole !== 'undefined' && userRole === 'staff') {
         initLiveClock();
         fetchShiftStatus();
     }
