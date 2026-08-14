@@ -247,30 +247,13 @@ def update_booking_share_provider(booking_id, new_referred_id, user_id):
         # 3. Handle 'None' or empty string input
         new_id = int(new_referred_id) if new_referred_id else None
         
-        # ---------------------------------------------------------
-        # UPDATE LOGIC: Sync referred_dr, referred_non_dr, and give_share_to
-        # ---------------------------------------------------------
         if new_id:
-            # Fetch the referred person details to know if they are a Doctor or Not
             provider = Referred.query.get(new_id)
             if not provider:
                 return {"error": "Selected provider not found in database"}, 404
-
-            # Update the main share column
             booking.give_share_to = new_id
-
-            # Sync legacy columns based on is_doctor status
-            if provider.is_doctor:
-                booking.referred_dr = new_id
-                booking.referred_non_dr = None  # Clear the non-doctor field
-            else:
-                booking.referred_non_dr = new_id
-                booking.referred_dr = None      # Clear the doctor field
         else:
-            # If removing the share, clear ALL related fields
             booking.give_share_to = None
-            booking.referred_dr = None
-            booking.referred_non_dr = None
 
         # Metadata updates
         booking.update_by = user_id
