@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  tmc_pos_web:
+    build: .
+    container_name: tmc_pos_container
+    ports:
+      - "5000:5000"
+    # This tells Docker to load your existing .env file into the container
+    env_file:
+      - .env
+    # If the PC restarts or the app crashes, Docker will automatically restart it
+    restart: unless-stopped
