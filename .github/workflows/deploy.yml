@@ -13,10 +13,10 @@ jobs:
         run: |
           cd /home/tmcpos/tmc-pos
           git pull origin main
-          sudo docker compose up -d --build
+          docker compose up -d --build
           
           # Give the container 5 seconds to boot
           sleep 5
           
           # Force the running container to upgrade the database schema
-          sudo docker exec tmc_pos_container flask db upgrade
+          docker exec tmc_pos_container flask db upgrade
