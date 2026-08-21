@@ -1,0 +1,16 @@
+name: Deploy to On-Premise Server
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    steps:
+      - name: Pull Latest Changes and Rebuild Container
+        run: |
+          cd /home/tmcpos/tmc-pos
+          git pull origin main
+          sudo docker compose up -d --build
