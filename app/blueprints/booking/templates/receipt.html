@@ -1,323 +1,184 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-  <meta charset="UTF-8" />
-  <title>Diagnostic Receipt</title>
-  <style>
-    /* Print page */
-    @page {
-      size: A5 landscape;
-      margin: 0mm;
-      /* We'll account for printer margins in the layout */
-    }
+<meta charset="UTF-8" />
+<title>Diagnostic Receipt</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Nastaliq+Urdu:wght@500&display=swap" rel="stylesheet">
+<style>
+@page{size:A5 landscape;margin:0mm}
+*{box-sizing:border-box}
+@media print{
+  .no-print{display:none!important}
+  body{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .receipt{height:140mm;overflow:hidden}
+}
+body{margin:0;background:#f2f2f2;font-family:'Segoe UI',Arial,sans-serif;font-size:11px;
+  display:flex;justify-content:center;padding:8px;color:#1c1c1c}
+.receipt{width:210mm;height:140mm;box-sizing:border-box;padding:5mm 10mm;background:#fff;
+  display:flex;flex-direction:column;box-shadow:0 2px 6px rgba(0,0,0,.12);line-height:1.25;
+  position:relative;page-break-inside:avoid}
 
-    /* Print helpers */
-    @media print {
-      .no-print {
-        display: none !important;
-      }
+/* space reserved for pre-printed letterhead — locked, never shrinks */
+.letterhead-space{height:20mm;flex-shrink:0;flex-grow:0}
+@media screen{
+  .letterhead-space{border:1px dashed #ccc;border-top:none;border-left:none;border-right:none}
+}
 
-      /* try to make colors print properly */
-      body {
-        -webkit-print-color-adjust: exact;
-        print-color-adjust: exact;
-      }
+.sec-label{font-size:7.5px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#7a1f2b;margin:4px 0 2px}
 
-      /* ensure receipt uses the measured height for page fitting */
-      .receipt {
-        height: 140mm;
-        /* slightly smaller than 148mm to account for printer margins */
-        overflow: hidden;
-        /* avoids Chrome adding a blank page when something barely overflows */
-      }
-    }
+.booking-strip{margin-top:2px;border:1px solid #ccc;background:#f6f6f6;padding:4px 9px;border-radius:3px;
+  display:flex;justify-content:space-between;font-size:10px}
+.booking-strip .lbl{font-size:7.5px;text-transform:uppercase;letter-spacing:.5px;font-weight:700;display:block}
+.booking-strip .val{font-size:11px;font-weight:700}
 
-    /* Basic page layout */
-    body {
-      margin: 0;
-      background: #f2f2f2;
-      font-family: Arial, sans-serif;
-      font-size: 11px;
-      display: flex;
-      justify-content: center;
-      padding: 8px;
-      /* screen padding around the paper preview */
-    }
+.patient-grid{display:flex;flex-wrap:wrap;gap:4px 0;justify-content:center;text-align:center}
+.patient-grid .cell{flex:0 0 33.333%}
+.patient-grid .cell .lbl{font-size:7px;text-transform:uppercase;letter-spacing:.4px;font-weight:700}
+.patient-grid .cell .v{font-weight:700;font-size:11px;margin-top:1px}
+.patient-grid .cell .v.name{font-size:12.5px}
 
-    /* The paper */
-    .receipt {
-      width: 210mm;
-      /* A5 landscape width */
-      height: 140mm;
-      /* intentionally a bit smaller than full 148mm */
-      box-sizing: border-box;
-      /* include padding in the height */
-      padding: 6mm;
-      /* safe internal padding */
-      background: #fff;
-      display: flex;
-      flex-direction: column;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
-      line-height: 1.3;
-      color: #000;
-      position: relative;
-      page-break-inside: avoid;
-    }
+.patient-divider{border:none;border-top:1.3px solid #ccc;margin-top:5px}
 
-    /* Make content expand and push footer down */
-    .content {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      overflow: hidden;
-      /* hide any tiny overflow that would create a blank page */
-    }
+.test-table{margin-top:4px;width:100%;border-collapse:collapse;font-size:9.5px}
+.test-table thead th{text-align:left;font-weight:700;font-size:8px;letter-spacing:.3px;text-transform:uppercase;
+  color:#7a1f2b;border-bottom:1.5px solid #7a1f2b;padding:3px 6px}
+.test-table tbody td{padding:3px 6px;border-bottom:1px solid #e2e2e2;line-height:1.2}
+.test-table .tname{font-weight:700}
+.test-table .payable{font-weight:700;text-align:right}
 
-    /* Header */
-    .header {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      margin-bottom: 2mm;
-    }
+.split{display:flex;gap:20px;margin-top:5px;flex:1;min-width:0}
+.notes{flex:1.2;font-size:8px;line-height:1.4;min-width:0}
+.notes .urdu-list{direction:rtl;text-align:right;width:100%;max-width:100%;
+  font-family:'Noto Nastaliq Urdu','Segoe UI',Tahoma,sans-serif;font-size:9px;line-height:1.55}
+.notes .urdu-list .uline{width:100%;overflow-wrap:break-word;word-break:break-word;box-sizing:border-box;margin:1px 0}
 
-    .header img {
-      max-width: 370px;
-      height: auto;
-    }
+.summary{flex:1;font-size:10px}
+.summary-box{border:2px solid #7a1f2b;border-radius:5px;padding:5px 9px}
+.summary .row{display:flex;justify-content:space-between;padding:1.5px 0}
+.summary .row.net{font-weight:700;font-size:11px;border-top:1px solid #ccc;border-bottom:1px solid #ccc;margin-top:1px;padding:3px 0}
+.summary .row.balance{font-weight:700;font-size:12px;margin-top:3px;padding:3px 9px;border-radius:4px;color:#a3241f;background:#fbe6e5}
 
-    /* PIN / MR */
-    .pin-section {
-      margin-top: 2mm;
-      padding: 4px;
-      border: 1px solid #000;
-      font-size: 11px;
-      display: flex;
-      justify-content: space-between;
-      background: #f5f5f5;
-    }
+.footer{text-align:center;margin-top:auto;padding-top:4px;border-top:1px solid #ccc;font-size:8px;word-break:break-word}
+.footer b{color:#1c1c1c}
 
-    /* Details */
-    .details {
-      display: flex;
-      justify-content: space-between;
-      margin-top: 4px;
-      gap: 12px;
-      font-size: 11px;
-    }
+/* auto-compact when there are 4+ tests (worst case: 5 bookings) */
+.receipt.dense .sec-label{margin:3px 0 2px}
+.receipt.dense .patient-grid{gap:2px 0}
+.receipt.dense .patient-grid .cell .v{font-size:10px}
+.receipt.dense .patient-grid .cell .v.name{font-size:11px}
+.receipt.dense .test-table{font-size:8.5px}
+.receipt.dense .test-table thead th{padding:2px 6px}
+.receipt.dense .test-table tbody td{padding:2px 6px}
+.receipt.dense .split{margin-top:3px;gap:14px}
+.receipt.dense .notes{font-size:7px}
+.receipt.dense .notes .urdu-list{font-size:8px;line-height:1.35}
+.receipt.dense .summary-box{padding:4px 8px}
+.receipt.dense .summary .row{padding:1px 0}
+.receipt.dense .summary .row.net{font-size:10px;padding:2px 0}
+.receipt.dense .summary .row.balance{font-size:11px;padding:2px 8px;margin-top:2px}
+.receipt.dense .footer{font-size:7.5px;padding-top:3px}
 
-    .details div {
-      min-width: 0;
-      margin-bottom: 4px;
-    }
+.stamp{position:absolute;right:12mm;bottom:24mm;border:1px solid #000;padding:6px;font-size:11px;transform:rotate(-6deg);opacity:.75}
 
-    /* Table */
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 6px;
-      font-size: 11px;
-    }
-
-    th,
-    td {
-      border-top: 1px solid #000;
-      border-bottom: 1px solid #000;
-      padding: 5px 6px;
-      text-align: left;
-    }
-
-    th {
-      background: #f5f5f5;
-      font-weight: 600;
-    }
-
-    /* Container with notes + totals */
-    .container {
-      display: flex;
-      justify-content: space-between;
-      gap: 12px;
-      align-items: flex-start;
-      margin-top: 6px;
-    }
-
-    .notes {
-      font-size: 10px;
-      flex: 1;
-    }
-
-    .notes p {
-      margin: 2px 0;
-    }
-
-    .totals {
-      width: 200px;
-      font-size: 11px;
-    }
-
-    .totals .row {
-      display: flex;
-      justify-content: space-between;
-      margin: 2px 0;
-    }
-
-    .totals .label {
-      font-weight: 600;
-    }
-
-    .totals .value {
-      text-align: right;
-      min-width: 60px;
-    }
-
-    /* Footer */
-    .footer {
-      font-size: 9px;
-      border-top: 1px solid #000;
-      padding-top: 4px;
-      text-align: center;
-      margin-top: auto;
-      /* push it to the bottom */
-      page-break-inside: avoid;
-      /* keep footer on the same printed page */
-      word-break: break-word;
-    }
-
-    /* stamp: keep it absolutely positioned but within the receipt bounds */
-    .stamp {
-      position: absolute;
-      right: 12mm;
-      bottom: 24mm;
-      border: 1px solid #000;
-      padding: 6px;
-      font-size: 11px;
-      transform: rotate(-6deg);
-      opacity: 0.75;
-    }
-
-    /* controls/UI */
-    .controls {
-      text-align: center;
-      margin-top: 10px;
-    }
-
-    button {
-      padding: 6px 10px;
-      font-size: 14px;
-      background: #007bff;
-      color: #fff;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-
-    /* small helpers to avoid big margins from elements */
-    h2,
-    p {
-      margin: 0;
-      padding: 0;
-    }
-  </style>
+.controls{text-align:center;margin-top:10px}
+button{padding:6px 10px;font-size:14px;background:#7a1f2b;color:#fff;border:none;border-radius:4px;cursor:pointer}
+h2,p{margin:0;padding:0}
+</style>
 </head>
 
 <body>
   <div>
     <div class="receipt">
-      <!-- Header -->
-      <div class="header">
-        <!-- Keep your original Flask url_for call if using Flask -->
-        <img src="{{ url_for('booking.static', filename='logo_for_receipt.png') }}" alt="logo">
+
+      <!-- pre-printed letterhead area: header removed intentionally -->
+      <div class="letterhead-space"></div>
+
+      <div class="booking-strip">
+        <span><span class="lbl">Booking ID</span><span class="val">{{ booking.booking_id }}</span></span>
+        <span style="text-align:right"><span class="lbl">Bill Date</span><span class="val" id="billDate"></span></span>
       </div>
 
-      <!-- page content container (expands to push footer) -->
-      <div class="content">
-        <!-- Booking ID / MR -->
-        <div class="pin-section">
-          <div>Booking ID: {{ booking.booking_id }}</div>
-          <div>MR No: {{ booking.mr_no }}</div>
+      <div class="sec-label">Patient Information</div>
+      <div class="patient-grid">
+        <div class="cell"><div class="lbl">Patient Name</div><div class="v name">{{ booking.patient_name }}</div></div>
+        <div class="cell"><div class="lbl">Gender</div><div class="v">{{ booking.gender }}</div></div>
+        <div class="cell"><div class="lbl">MR No.</div><div class="v">{{ booking.mr_no }}</div></div>
+        <div class="cell"><div class="lbl">Age</div><div class="v">{{ booking.age }} Years</div></div>
+        <div class="cell"><div class="lbl">Contact No.</div><div class="v">{{ booking.contact_no }}</div></div>
+        <div class="cell"><div class="lbl">Referred By</div><div class="v">{{ booking.referred_by }}</div></div>
+      </div>
+
+      <hr class="patient-divider">
+
+      <table class="test-table">
+        <thead>
+          <tr><th>Title</th><th>Reporting Date</th><th>Sample</th><th style="text-align:right">Payable</th></tr>
+        </thead>
+        <tbody>
+          {% for test in booking.tests %}
+          <tr>
+            <td class="tname">{{ test.test_name }}</td>
+            <td>{{ test.reporting_date or '-' }}</td>
+            <td>{{ test.sample_to_follow or 'In / Out' }}</td>
+            <td class="payable">{{ "{:,.0f}".format(test.amount) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <div class="split">
+        <div class="notes">
+          <div class="sec-label" style="margin-top:2px">Terms &amp; Conditions</div>
+          <div class="urdu-list" dir="rtl" lang="ur">
+            <div class="uline">1۔ ٹیسٹ رپورٹ ریڈیالوجسٹ کی درخواست پر تاخیر کا شکار ہو سکتی ہے۔</div>
+            <div class="uline">2۔ یہ رسید دکھائے بغیر رپورٹ فراہم نہیں کی جائے گی۔</div>
+            <div class="uline">3۔ اگر سہولت استعمال نہ کی جائے تو ایک ماہ کے بعد رقم کی واپسی کا دعویٰ نہیں کیا جا سکتا۔</div>
+            <div class="uline">4۔ رقم کی واپسی نہیں کی جائے گی۔</div>
+            <div class="uline">5۔ براہ کرم رپورٹ کے لیے پانچ بجے کے بعد تشریف لائیں۔</div>
+          </div>
         </div>
 
-        <!-- Patient details -->
-        <div class="details">
-          <div>
-            <div><b>Name:</b> {{ booking.patient_name }}</div>
-            <div><b>Ref By:</b> {{ booking.referred_by }}</div>
-            <div><b>Gender:</b> {{ booking.gender }}</div>
-          </div>
-          <div>
-            <div><b>Age:</b> {{ booking.age }} years</div>
-            <div><b>Contact No:</b> {{ booking.contact_no }}</div>
-          </div>
-        </div>
-        <!-- Test table -->
-        <table>
-          <thead>
-            <tr>
-              <th>Title</th>
-              <th>Reporting Date</th>
-              <th>Sample</th>
-              <th>Payable</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for test in booking.tests %}
-            <tr>
-              <td>{{ test.test_name }}</td> <!-- replace with test name if you join TestRegistration -->
-              <td>{{ test.reporting_date or '-' }}</td>
-              <td>{{ test.sample_to_follow or 'In / Out' }}</td>
-              <td>{{ "{:,.0f}".format(test.amount) }}</td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-
-        <!-- notes + totals side-by-side -->
-        <div class="container">
-          <div class="notes">
-            
-
-            <p>1) Test report may be delayed on Radiologist's request</p>
-            <p>2) Reports shall not be given without presenting this slip</p>
-            <p>3) If facility is not availed, refund cannot be claimed after a month</p>
-            <p>4) Refunds shall not be made.</p>
-            <p>5) براہِ کرم رپورٹ کے لیے پانچ بجے (5:00) کے بعد تشریف لائن۔</p>
-          </div>
-
-          <div class="totals">
-            <div class="row"><span class="label">Total Payable:</span><span class="value">{{
-                "{:,.0f}".format(booking.financials.net_payable) }}</span></div>
-            <div class="row"><span class="label">Discount</span><span class="value">{{ booking.financials.discount_value
-                }}</span></div>
-            <div class="row"><span class="label">Net Payable:</span><span class="value">{{
-                "{:,.0f}".format(booking.financials.net_payable) }}</span></div>
-            <div class="row"><span class="label">Received:</span><span class="value">{{
-                "{:,.0f}".format(booking.financials.received) }}</span></div>
-            <div class="row" style="margin-top:8px;"><span class="label">Balance:</span><span class="value">{{
-                "{:,.0f}".format(booking.financials.balance) }}</span></div>
+        <div class="summary">
+          <div class="summary-box">
+            <div class="sec-label" style="margin-top:2px">Payment Summary</div>
+            <div class="row"><span>Total Amount</span><span>{{ "{:,.0f}".format(booking.financials.net_payable) }}</span></div>
+            <div class="row"><span>Discount</span><span>{{ booking.financials.discount_value }}</span></div>
+            <div class="row net"><span>Total Payable</span><span>{{ "{:,.0f}".format(booking.financials.net_payable) }}</span></div>
+            <div class="row"><span>Received</span><span>{{ "{:,.0f}".format(booking.financials.received) }}</span></div>
+            <div class="row balance"><span>Balance</span><span>{{ "{:,.0f}".format(booking.financials.balance) }}</span></div>
           </div>
         </div>
       </div>
 
-
-
-      <!-- Footer (kept at bottom) -->
       <div class="footer">
-        <div style="font-weight:600;">
+        <div style="font-weight:600">
           {{ booking.branch.address }} |
-          Phone: {{ booking.branch.contact }}{% if booking.branch.additional_contact %} | {{
-          booking.branch.additional_contact }}{% endif %}
+          Phone: {{ booking.branch.contact }}{% if booking.branch.additional_contact %} | {{ booking.branch.additional_contact }}{% endif %}
         </div>
         <div>Printed by: {{ booking.current_user }} @ {{ booking.printed_at }}</div>
       </div>
     </div>
 
-    <!-- UI only -->
     <div class="controls no-print">
       <button onclick="window.print()">Print Receipt</button>
     </div>
   </div>
-</body>
 
+  <script>
+    (function () {
+      var months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+      var d = new Date();
+      var formatted = String(d.getDate()).padStart(2,"0") + "-" + months[d.getMonth()] + "-" + d.getFullYear();
+      document.getElementById("billDate").textContent = formatted;
+
+      // Auto-compact layout when there are 4 or more booked tests,
+      // so the worst case (5 bookings) still fits on one page.
+      var rowCount = document.querySelectorAll(".test-table tbody tr").length;
+      if (rowCount >= 4) {
+        document.querySelector(".receipt").classList.add("dense");
+      }
+    })();
+  </script>
+</body>
 </html>
