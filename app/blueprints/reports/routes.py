@@ -410,3 +410,36 @@ def update_report(report_id):
 
     except Exception as e:
         return jsonify({"error": str(e)}), 400
+
+
+# ---------------------------------------------------------------------------
+# Monthly Commission Sheet
+# ---------------------------------------------------------------------------
+
+@reports_bp.route("/view/monthly-commission-sheet")
+@login_required
+def view_monthly_commission_sheet():
+    """Render the Monthly Commission Sheet page with a month picker."""
+    return render_template("monthly_commission_sheet.html")
+
+
+@reports_bp.route("/monthly-commission-sheet/data", methods=["GET"])
+@login_required
+def api_monthly_commission_sheet():
+    """
+    GET /reports/monthly-commission-sheet/data?month=2026-07
+    branch_id is taken from the session (same pattern used by all other APIs).
+    """
+    branch_id = session.get("branch_id")
+    month_str = request.args.get("month")
+
+    if not branch_id or not month_str:
+        return jsonify({"error": "Missing required parameters: branch_id (session) or month"}), 400
+
+    try:
+        result, status = report_services.get_monthly_commission_sheet(branch_id, month_str)
+        print(f"Result: {result}")
+        return jsonify(result), status
+    except Exception as exc:
+        print(f"Error in monthly_commission_sheet: {str(exc)}")
+        return jsonify({"error": str(exc)}), 500
