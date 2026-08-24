@@ -75,7 +75,8 @@ MENU = {
                 {"label": "Test Wise Report", "icon": "bi-file-earmark-bar-graph", "endpoint": "#"},
                 {"label": "Doctor Wise Report", "icon": "bi-file-earmark-bar-graph", "endpoint": "#"},
                 {"label": "Expense Report", "icon": "bi-file-earmark-bar-graph", "endpoint": "#"},
-                {"label": "Radiologist Logs", "icon": "bi-file-earmark-bar-graph", "endpoint": "reports.view_radiologist_logs"}
+                {"label": "Radiologist Logs", "icon": "bi-file-earmark-bar-graph", "endpoint": "reports.view_radiologist_logs"},
+                {"label":"Commision Report", "icon":"bi-file-earmark-bar-graph", "endpoint":"reports.view_monthly_commission_sheet"}
             ]
         },
     ],
@@ -142,7 +143,8 @@ MENU = {
                 {"label": "Test Wise Report", "icon": "bi-file-earmark-bar-graph", "endpoint": "#"},
                 {"label": "Doctor Wise Report", "icon": "bi-file-earmark-bar-graph", "endpoint": "#"},
                 {"label": "Expense Report", "icon": "bi-file-earmark-bar-graph", "endpoint": "#"},
-                {"label": "Radiologist Logs", "icon": "bi-file-earmark-bar-graph", "endpoint": "reports.view_radiologist_logs"}
+                {"label": "Radiologist Logs", "icon": "bi-file-earmark-bar-graph", "endpoint": "reports.view_radiologist_logs"},
+                 {"label":"Commision Report", "icon":"bi-file-earmark-bar-graph", "endpoint":"reports.view_monthly_commission_sheet"}
             ]
         },
     ],

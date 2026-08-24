@@ -1,0 +1,312 @@
+{% extends "base.html" %}
+
+{% block stylesheets %}
+<link rel="stylesheet"
+      href="https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min.css">
+<link rel="stylesheet"
+      href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.bootstrap5.min.css">
+
+<style>
+    .filter-card {
+        background-color: #f8f9fa;
+        border: 1px solid #e9ecef;
+    }
+    #commissionTable th,
+    #commissionTable td {
+        padding: 6px 10px !important;
+        font-size: 13.5px;
+        vertical-align: middle;
+    }
+    #commissionTable tfoot th {
+        font-weight: 700;
+        background-color: #e8f4fd;
+    }
+    #loadingOverlay {
+        display: none;
+        position: absolute;
+        inset: 0;
+        background: rgba(255, 255, 255, 0.75);
+        z-index: 10;
+        align-items: center;
+        justify-content: center;
+    }
+    .table-wrapper { position: relative; min-height: 120px; }
+    #placeholderMsg {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 60px 0;
+        color: #adb5bd;
+    }
+    #placeholderMsg i { font-size: 3rem; }
+</style>
+{% endblock %}
+
+
+{% block user_page %}
+
+<div class="container-fluid py-3 rounded bg-white shadow-sm mb-3">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 class="fw-bold mb-0 text-dark">
+            <i class="bi bi-journal-text text-primary me-2"></i>Monthly Commission Sheet
+        </h4>
+    </div>
+
+    <div class="card border-0 filter-card rounded-3 shadow-sm">
+        <div class="card-body p-4">
+            <h6 class="fw-bold text-primary mb-3">
+                <i class="bi bi-funnel"></i> Report Filters
+            </h6>
+            <div class="row g-3 align-items-end">
+                <div class="col-md-3">
+                    <label for="monthPicker"
+                           class="form-label fw-bold text-muted small text-uppercase mb-1">
+                        Select Month *
+                    </label>
+                    <input type="month" class="form-control shadow-none" id="monthPicker">
+                </div>
+                <div class="col-md-3">
+                    <button class="btn btn-primary fw-bold px-4" id="generateBtn">
+                        <i class="bi bi-file-earmark-bar-graph"></i> Generate Report
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container-fluid py-3 rounded bg-white shadow-sm">
+
+    <div id="placeholderMsg">
+        <i class="bi bi-calendar2-month mb-2"></i>
+        <span class="fw-semibold">Select a month and click <em>Generate Report</em></span>
+    </div>
+
+    <div id="tableSection" style="display: none;">
+        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+            <h6 class="mb-0 fw-bold text-secondary" id="reportHeading"></h6>
+            <div class="d-flex gap-2" id="dtButtonContainer"></div>
+        </div>
+
+        <div class="table-wrapper">
+            <div id="loadingOverlay">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-bordered table-sm table-striped w-100"
+                       id="commissionTable">
+                    <thead class="table-light">
+                        <tr>
+                            <th>S.No</th>
+                            <th>Date</th>
+                            <th>Patient Name</th>
+                            <th>Ref by Dr.</th>
+                            <th>Investigations</th>
+                            <th class="text-end">Charges</th>
+                            <th class="text-end">Grand Total</th>
+                            <th class="text-end">Cut Incentive</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                    <tfoot>
+                        <tr>
+                            <th colspan="5" class="text-end">Total Amount Rs.</th>
+                            <th class="text-end" id="footCharges"></th>
+                            <th class="text-end" id="footGrandTotal"></th>
+                            <th class="text-end" id="footCutIncentive"></th>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}
+
+
+{% block javascript %}
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.8/js/dataTables.bootstrap5.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/dataTables.buttons.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.bootstrap5.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/pdfmake.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/vfs_fonts.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.html5.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.print.min.js"></script>
+
+<script>
+(function () {
+    "use strict";
+
+    let dtInstance = null;
+
+    const generateBtn    = document.getElementById("generateBtn");
+    const monthPicker    = document.getElementById("monthPicker");
+    const tableSection   = document.getElementById("tableSection");
+    const placeholderMsg = document.getElementById("placeholderMsg");
+    const loadingOverlay = document.getElementById("loadingOverlay");
+    const reportHeading  = document.getElementById("reportHeading");
+
+    // Pre-fill current month
+    const today = new Date();
+    monthPicker.value = today.toISOString().slice(0, 7);
+
+    function fmt(value) {
+        const n = parseFloat(value);
+        return isNaN(n) || n === 0 ? "" : n.toLocaleString("en-PK", { maximumFractionDigits: 0 });
+    }
+
+    function fmtNum(value) {
+        const n = parseFloat(value);
+        return isNaN(n) ? 0 : n;
+    }
+
+    function showLoading(show) {
+        loadingOverlay.style.display = show ? "flex" : "none";
+    }
+
+    function initTable(rows) {
+        if (dtInstance) {
+            dtInstance.destroy();
+            dtInstance = null;
+            $("#dtButtonContainer").empty();
+        }
+
+        const tableData = rows.map(function (r) {
+            return [
+                r.s_no,
+                r.date,
+                r.patient_name,
+                r.ref_by_dr,
+                r.investigations,
+                r.charges !== "" ? parseFloat(r.charges) : "",
+                r.grand_total !== "" ? parseFloat(r.grand_total) : "",
+                r.cut_incentive !== "" ? parseFloat(r.cut_incentive) : ""
+            ];
+        });
+
+        dtInstance = $("#commissionTable").DataTable({
+            data: tableData,
+            destroy: true,
+            dom: "Bfrtip",
+            buttons: [
+                {
+                    extend: "excelHtml5",
+                    text: '<i class="bi bi-file-earmark-excel me-1"></i> Export Excel',
+                    className: "btn btn-success btn-sm shadow-sm",
+                    title: reportHeading.textContent,
+                    exportOptions: { columns: ":visible" }
+                },
+                {
+                    extend: "pdfHtml5",
+                    text: '<i class="bi bi-file-earmark-pdf me-1"></i> Export PDF',
+                    className: "btn btn-danger btn-sm shadow-sm",
+                    title: reportHeading.textContent,
+                    orientation: "landscape",
+                    pageSize: "A4",
+                    exportOptions: { columns: ":visible" }
+                },
+                {
+                    extend: "print",
+                    text: '<i class="bi bi-printer me-1"></i> Print',
+                    className: "btn btn-secondary btn-sm shadow-sm",
+                    title: reportHeading.textContent,
+                    exportOptions: { columns: ":visible" }
+                }
+            ],
+            paging:   false,
+            ordering: false,
+            info:     false,
+            searching: true,
+            columnDefs: [
+                {
+                    targets: [5, 6, 7],
+                    className: "text-end",
+                    render: function (data) {
+                        return data !== "" && data !== null
+                            ? parseFloat(data).toLocaleString("en-PK", { maximumFractionDigits: 0 })
+                            : "";
+                    }
+                }
+            ],
+            initComplete: function () {
+                var btns = $(this.api().buttons().container());
+                $("#dtButtonContainer").append(btns);
+            }
+        });
+
+        // Footer totals
+        let totCharges = 0, totGrand = 0, totCut = 0;
+        rows.forEach(function (r) {
+            totCharges += fmtNum(r.charges);
+            totGrand   += fmtNum(r.grand_total);
+            if (r.cut_incentive !== "") totCut += fmtNum(r.cut_incentive);
+        });
+        document.getElementById("footCharges").textContent      = fmt(totCharges);
+        document.getElementById("footGrandTotal").textContent   = fmt(totGrand);
+        document.getElementById("footCutIncentive").textContent = totCut > 0 ? fmt(totCut) : "";
+    }
+
+    generateBtn.addEventListener("click", function () {
+        var month = monthPicker.value.trim();
+        if (!month) {
+            alert("Please select a month.");
+            monthPicker.focus();
+            return;
+        }
+
+        placeholderMsg.style.display = "none";
+        tableSection.style.display   = "block";
+        showLoading(true);
+
+        var parts = month.split("-");
+        var monthName = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, 1)
+            .toLocaleString("en-US", { month: "long" });
+        reportHeading.textContent =
+            "Monthly Commission Sheet \u2014 " + monthName + " " + parts[0];
+
+        fetch("/reports/monthly-commission-sheet/data?month=" + encodeURIComponent(month))
+            .then(function (res) {
+                if (!res.ok) throw new Error("Server error: " + res.status);
+                return res.json();
+            })
+            .then(function (data) {
+                if (data && data.error) {
+                    alert("Error: " + data.error);
+                    return;
+                }
+
+                if (!Array.isArray(data) || data.length === 0) {
+                    if (dtInstance) { dtInstance.destroy(); dtInstance = null; }
+                    var tbody = document.querySelector("#commissionTable tbody");
+                    tbody.innerHTML =
+                        '<tr><td colspan="8" class="text-center text-muted py-4">' +
+                        '<i class="bi bi-inbox me-2"></i>' +
+                        'No bookings found for the selected month.' +
+                        '</td></tr>';
+                    ["footCharges", "footGrandTotal", "footCutIncentive"].forEach(function (id) {
+                        document.getElementById(id).textContent = "";
+                    });
+                    return;
+                }
+
+                initTable(data);
+            })
+            .catch(function (err) {
+                alert("Failed to load data. " + err.message);
+                console.error(err);
+            })
+            .finally(function () { showLoading(false); });
+    });
+
+}());
+</script>
+{% endblock %}

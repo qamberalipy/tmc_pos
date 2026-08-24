@@ -876,3 +876,129 @@ def update_doctor_report(report_id, data, user_id):
     db.session.commit()
 
     return {"message": "Report updated successfully.", "report_id": report_id}
+
+
+# ---------------------------------------------------------------------------
+# Monthly Commission Sheet
+# ---------------------------------------------------------------------------
+def get_monthly_commission_sheet(branch_id, month_str):
+    """
+    Return commission-sheet rows for a given branch and calendar month.
+
+    Parameters
+    ----------
+    branch_id : int
+    month_str : str  – "YYYY-MM"  (e.g. "2026-07")
+
+    Returns
+    -------
+    (list[dict], int)  –  (rows, http_status_code)
+
+    Row keys
+    --------
+    s_no, date, patient_name, ref_by_dr, investigations,
+    charges, grand_total, cut_incentive
+    """
+    try:
+        # ── 1. Parse month boundaries ─────────────────────────────────────
+        try:
+            month_start = datetime.strptime(month_str, "%Y-%m")
+        except (ValueError, TypeError):
+            return {"error": "Invalid month format. Use YYYY-MM."}, 400
+
+        # Calendar-month end: first second of the *next* month, exclusive
+        if month_start.month == 12:
+            month_end = month_start.replace(year=month_start.year + 1, month=1, day=1)
+        else:
+            month_end = month_start.replace(month=month_start.month + 1, day=1)
+
+        # ── 2. Alias Referred twice: once for referred_dr, once for referred_non_dr ──
+        ReferredDr    = aliased(Referred)
+        ReferredNonDr = aliased(Referred)
+
+        from app.models.referred import ReferralShare  # local import to avoid circular deps
+
+        # ── 3. Main query ─────────────────────────────────────────────────
+        rows = (
+            db.session.query(
+                TestBooking,
+                ReferredDr.name.label("ref_dr_name"),
+                ReferredNonDr.name.label("ref_non_dr_name"),
+                ReferralShare.share_amount.label("cut_incentive"),
+            )
+            .outerjoin(
+                ReferredDr,
+                and_(
+                    TestBooking.referred_dr != None,       # noqa: E711
+                    ReferredDr.id == TestBooking.referred_dr,
+                )
+            )
+            .outerjoin(
+                ReferredNonDr,
+                and_(
+                    TestBooking.referred_dr == None,       # noqa: E711
+                    ReferredNonDr.id == TestBooking.referred_non_dr,
+                )
+            )
+            .outerjoin(
+                ReferralShare,
+                ReferralShare.booking_id == TestBooking.id,
+            )
+            .filter(
+                TestBooking.branch_id == int(branch_id),
+                TestBooking.create_at >= month_start,
+                TestBooking.create_at < month_end,
+            )
+            .order_by(TestBooking.create_at.asc())
+            .all()
+        )
+
+        # ── 4. Build output rows ──────────────────────────────────────────
+        data = []
+        for idx, (booking, ref_dr_name, ref_non_dr_name, cut_incentive) in enumerate(rows, start=1):
+            # 4a. Investigations: fetch test names via TestBookingDetails
+            try:
+                test_names = [
+                    t[0]
+                    for t in db.session.query(Test_registration.test_name)
+                    .join(
+                        TestBookingDetails,
+                        Test_registration.id == TestBookingDetails.test_id,
+                    )
+                    .filter(TestBookingDetails.booking_id == booking.id)
+                    .all()
+                ]
+            except Exception:
+                test_names = []
+
+            investigations = " / ".join(test_names) if test_names else ""
+
+            # 4b. Referring doctor name: prefer referred_dr, fallback to referred_non_dr
+            ref_by_dr = ref_dr_name or ref_non_dr_name or ""
+
+            # 4c. Cut incentive: blank string when 0 or null
+            if cut_incentive and float(cut_incentive) != 0:
+                cut_incentive_val = float(cut_incentive)
+            else:
+                cut_incentive_val = ""
+
+            net = _to_float(booking.net_receivable)
+
+            data.append({
+                "s_no":          idx,
+                "date":          f"{booking.create_at.day}-{booking.create_at.strftime('%b-%Y')}"
+                                 if hasattr(booking.create_at, "strftime")
+                                 else "",
+                "patient_name":  booking.patient_name or "",
+                "ref_by_dr":     ref_by_dr,
+                "investigations": investigations,
+                "charges":       net,
+                "grand_total":   net,
+                "cut_incentive": cut_incentive_val,
+            })
+
+        return data, 200
+
+    except Exception as exc:
+        print(f"Error in monthly_commission_sheet: {str(exc)}")
+        return {"error": str(exc)}, 500
