@@ -22,6 +22,15 @@
 
   {% block stylesheets %}
   {% endblock %}
+  <style>
+    @media (max-width: 575.98px) {
+      .header .logo img { width: 130px; height: auto; }
+      #shiftUIContainer { padding: 4px !important; gap: 2px; }
+      #shiftTimerBadge { padding: 4px 6px !important; margin-right: 4px !important; }
+      #btnStartShift, #btnEndShift { min-width: 34px; display: flex !important; align-items: center; justify-content: center; }
+      .header-nav .nav-profile span { display: none !important; }
+    }
+  </style>
 </head>
 
 <body>
@@ -66,15 +75,15 @@
             
             <div id="shiftTimerBadge" class="d-none align-items-center bg-success bg-opacity-10 border border-success rounded px-2 py-1 me-2" title="Shift Active">
               <span class="spinner-grow spinner-grow-sm text-success me-2" style="width: 0.6rem; height: 0.6rem;" role="status"></span>
-              <span class="fw-bold text-success me-2" style="font-size: 0.75rem;">ACTIVE SHIFT:</span>
+              <span class="fw-bold text-success me-2 d-none d-sm-inline" style="font-size: 0.75rem;">ACTIVE SHIFT:</span>
               <span id="shiftTimer" class="fw-bold text-success font-monospace" style="font-size: 0.85rem;">00:00:00</span>
             </div>
 
-            <button id="btnStartShift" class="btn btn-sm btn-primary fw-bold d-none shadow-sm px-3">
-              <i class="bi bi-play-circle me-1"></i> Start Shift
+            <button id="btnStartShift" class="btn btn-sm btn-primary fw-bold d-none shadow-sm px-2 px-sm-3">
+              <i class="bi bi-play-circle me-0 me-sm-1"></i><span class="d-none d-sm-inline">Start Shift</span>
             </button>
-            <button id="btnEndShift" class="btn btn-sm btn-danger fw-bold d-none shadow-sm px-3">
-              <i class="bi bi-stop-circle me-1"></i> End Shift
+            <button id="btnEndShift" class="btn btn-sm btn-danger fw-bold d-none shadow-sm px-2 px-sm-3">
+              <i class="bi bi-stop-circle me-0 me-sm-1"></i><span class="d-none d-sm-inline">End Shift</span>
             </button>
           </div>
 
