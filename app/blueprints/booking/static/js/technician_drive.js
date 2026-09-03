@@ -288,6 +288,12 @@ function setupUppyMultipartEngine() {
         showProgressDetails: true, hideUploadButton: true,
         theme: 'light', proudlyDisplayPoweredByUppy: false
     })
+    .use(Uppy.DropTarget, {
+        target: document.getElementById('workspacePanel'),
+        onDragOver: () => document.getElementById('workspacePanel').classList.add('drag-active'),
+        onDragLeave: () => document.getElementById('workspacePanel').classList.remove('drag-active'),
+        onDrop: () => document.getElementById('workspacePanel').classList.remove('drag-active')
+    })
     .use(Uppy.Webcam, { // NEW: Camera Integration Enabled
         target: Uppy.Dashboard, modes: ['video-audio', 'video-only', 'audio-only', 'picture'],
         mirror: true, facingMode: 'environment'
