@@ -12,7 +12,7 @@ class Test_registration(db.Model):
     sample_collection = db.Column(db.String(50))
 
     department_id = db.Column(db.Integer)
-    category = db.Column(db.String(50), nullable=False, default="Other", index=True)
+    category = db.Column(db.String(50), nullable=True, default="Other", index=True)
     charges = db.Column(db.Float, nullable=False)
     report_charges = db.Column(db.Float, default=0.0)
 
