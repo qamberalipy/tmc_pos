@@ -1,6 +1,7 @@
 from flask import session
 from app.extensions import db
 from app.models import Expense_head, Branch, User ,Referred,Test_registration
+from app.models.test_registration import CATEGORY_CHOICES
 from werkzeug.security import generate_password_hash
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -300,6 +301,7 @@ def _format_test_registration(t, branch_name=None, created_by_name=None):
         "test_name": t.test_name,
         "sample_collection": t.sample_collection,
         "department_id": t.department_id,
+        "category": t.category,
         "charges": t.charges,
         "report_charges": t.report_charges,  # <--- Add this
         "required_days": t.required_days,
@@ -326,6 +328,7 @@ def create_test_registration(data):
             test_name=data["test_name"],
             sample_collection=data.get("sample_collection"),
             department_id=data.get("department_id"),
+            category=data.get("category") if data.get("category") in CATEGORY_CHOICES else "Other",
             charges=data["charges"],
             report_charges=data.get("report_charges", 0.0),  # <--- Add this
             required_days=data["required_days"],
@@ -430,6 +433,8 @@ def update_test_registration(test_id, data):
             else:
                 # If empty string "", set to None (NULL in database)
                 t.department_id = None
+        if "category" in data:
+            t.category = data["category"] if data["category"] in CATEGORY_CHOICES else "Other"
         if "charges" in data:
             t.charges = data["charges"]
         if "report_charges" in data:           # <--- Add this block

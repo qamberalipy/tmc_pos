@@ -32,6 +32,7 @@ function getAllTestRegistrations() {
                     t.test_name || "-",
                     t.sample_collection || "-",
                     t.department_id || "-",
+                    t.category || "Other",
                     t.charges || "-",
                     t.report_charges || "0", // <--- NEW: Report Charges Column
                     t.required_days == "0" ? "Same day" : (t.required_days || "-"),
@@ -64,6 +65,7 @@ $(document).on("click", ".edit-testReg", function () {
             $("#test_name").val(t.test_name);
             $("#sample_collection").val(t.sample_collection);
             $("#department_name").val(t.department_id); 
+            $("#test_category").val(t.category || "Other");
             $("#charge").val(t.charges);
             $("#report_charges").val(t.report_charges || 0); // <--- NEW: Fill report charges
             $("#required_days").val(t.required_days);
@@ -94,6 +96,7 @@ $(document).on("click", "#update_testReg", function () {
         test_name: $("#test_name").val().trim(),
         sample_collection: $("#sample_collection").val().trim(),
         department_id: $("#department_name").val(),
+        category: $("#test_category").val(),
         charges: $("#charge").val(),
         report_charges: $("#report_charges").val(), // <--- NEW: Send updated report charges
         required_days: $("#required_days").val(),

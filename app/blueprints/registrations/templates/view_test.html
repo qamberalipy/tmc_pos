@@ -28,6 +28,7 @@
                     <th>Test Name</th>
                     <th>Sample Collection</th>
                     <th>Department</th>
+                    <th>Category</th>
                     <th>Charges</th>
                     <th>Report Charges</th> <th>Required Days</th>
                     <th>Seq No</th>
@@ -63,6 +64,14 @@
               <option value="">Select Department</option>
               <option value="department1">Department 1</option>
               <option value="department2">Department 2</option>
+            </select>
+
+            <label class="my-2">Category</label>
+            <select class="form-select" id="test_category" name="category" required>
+                <option value="Contrast">Contrast</option>
+                <option value="Full Study">Full Study</option>
+                <option value="Screening">Screening</option>
+                <option value="Other" selected>Other</option>
             </select>
            
             <label class="my-2">Charge</label>

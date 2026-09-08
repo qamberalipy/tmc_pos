@@ -7,7 +7,7 @@ from datetime import datetime, date, time, timezone
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import aliased
 from app.models.test_booking import TestFilmUsage, TestBooking, FilmInventoryTransaction
-from app.models.test_registration import Test_registration
+from app.models.test_registration import Test_registration, CATEGORY_CHOICES
 from app.models.doctor_reporting_details import DoctorReportingdetails, DoctorReportData
 from app.models.user import User
 from app.models.expenses import Expenses
@@ -132,7 +132,7 @@ def get_daily_films_report(branch_id: int, start_utc, end_utc, shift_ranges=None
         raise e
     
 
-def get_daily_test_report(branch_id, start_utc, end_utc, shift_ranges=None, user_id=None):
+def get_daily_test_report(branch_id, start_utc, end_utc, shift_ranges=None, user_id=None, filters=None):
     try:
         query = (
             db.session.query(
@@ -144,6 +144,9 @@ def get_daily_test_report(branch_id, start_utc, end_utc, shift_ranges=None, user
             .join(Test_registration, TestBookingDetails.test_id == Test_registration.id)
             .filter(TestBooking.branch_id == branch_id)
         )
+
+        if filters and filters.get('category'):
+            query = query.filter(Test_registration.category == filters['category'])
 
         if shift_ranges:
             shift_conditions = [and_(TestBooking.create_at >= s, TestBooking.create_at <= e) for s, e in shift_ranges]
