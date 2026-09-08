@@ -31,6 +31,14 @@
               <option value="department2">Department 2</option>
             </select>
             
+            <label class="my-2">Category</label>
+            <select class="form-select" id="test_category" name="category" required>
+                <option value="Contrast">Contrast</option>
+                <option value="Full Study">Full Study</option>
+                <option value="Screening">Screening</option>
+                <option value="Other" selected>Other</option>
+            </select>
+
             <label class="my-2">Charge</label>
             <input type="text" class="form-control" id="charge" name="charge">
             
@@ -71,6 +79,7 @@
             test_name: $("#test_name").val().trim(),
             sample_collection: $("#sample_collection").val().trim(),
             department_id: $("#department_name").val() || null,
+            category: $("#test_category").val(),
             charges: $("#charge").val().trim(),
             report_charges: $("#report_charges").val().trim() || 0, // <--- Add this
             required_days: $("#required_days").val().trim(),

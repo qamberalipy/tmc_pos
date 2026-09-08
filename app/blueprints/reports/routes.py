@@ -381,7 +381,27 @@ def radiologist_report(doctor_id):
         # Log the actual error in your server logs
         print(f"Error generating report: {str(e)}")
         return jsonify({"error": "Internal Server Error", "message": str(e)}), 500
-    
+
+
+@reports_bp.route('/doctor-reporting-logs', methods=['GET'])
+def view_doctor_reporting_logs():
+    try:
+        return render_template('doctor_reporting_logs.html')
+    except Exception as e:
+        print(f"Error in view_doctor_reporting_logs: {str(e)}")
+        return render_template("error.html", message="An error occurred while loading the doctor reporting logs page.")
+
+@reports_bp.route('/doctor-reporting-logs/<int:doctor_id>', methods=['GET'])
+def doctor_reporting_logs_data(doctor_id):
+    try:
+        start_date_str = request.args.get('start_date')
+        end_date_str = request.args.get('end_date')
+        data = report_services.get_doctor_reporting_logs(doctor_id, start_date_str, end_date_str)
+        return jsonify({"status": "success", "data": data}), 200
+    except Exception as e:
+        print(f"Error generating doctor reporting logs: {str(e)}")
+        return jsonify({"error": "Internal Server Error", "message": str(e)}), 500
+
 
 
 @reports_bp.route("/api/save-report", methods=["POST"])

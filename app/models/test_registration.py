@@ -2,6 +2,8 @@ from app.extensions import db
 from sqlalchemy import JSON
 from datetime import datetime, timezone
 
+CATEGORY_CHOICES = ["Contrast", "Full Study", "Screening", "Other"]
+
 class Test_registration(db.Model):
     __tablename__ = "test_registration"
 
@@ -10,6 +12,7 @@ class Test_registration(db.Model):
     sample_collection = db.Column(db.String(50))
 
     department_id = db.Column(db.Integer)
+    category = db.Column(db.String(50), nullable=True, default="Other", index=True)
     charges = db.Column(db.Float, nullable=False)
     report_charges = db.Column(db.Float, default=0.0)
 

@@ -7,7 +7,7 @@ from datetime import datetime, date, time, timezone
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import aliased
 from app.models.test_booking import TestFilmUsage, TestBooking, FilmInventoryTransaction
-from app.models.test_registration import Test_registration
+from app.models.test_registration import Test_registration, CATEGORY_CHOICES
 from app.models.doctor_reporting_details import DoctorReportingdetails, DoctorReportData
 from app.models.user import User
 from app.models.expenses import Expenses
@@ -132,7 +132,7 @@ def get_daily_films_report(branch_id: int, start_utc, end_utc, shift_ranges=None
         raise e
     
 
-def get_daily_test_report(branch_id, start_utc, end_utc, shift_ranges=None, user_id=None):
+def get_daily_test_report(branch_id, start_utc, end_utc, shift_ranges=None, user_id=None, filters=None):
     try:
         query = (
             db.session.query(
@@ -144,6 +144,9 @@ def get_daily_test_report(branch_id, start_utc, end_utc, shift_ranges=None, user
             .join(Test_registration, TestBookingDetails.test_id == Test_registration.id)
             .filter(TestBooking.branch_id == branch_id)
         )
+
+        if filters and filters.get('category'):
+            query = query.filter(Test_registration.category == filters['category'])
 
         if shift_ranges:
             shift_conditions = [and_(TestBooking.create_at >= s, TestBooking.create_at <= e) for s, e in shift_ranges]
@@ -1002,3 +1005,84 @@ def get_monthly_commission_sheet(branch_id, month_str):
     except Exception as exc:
         print(f"Error in monthly_commission_sheet: {str(exc)}")
         return {"error": str(exc)}, 500
+
+
+def get_doctor_reporting_logs(doctor_id, start_date_str=None, end_date_str=None):
+    """
+    Category-pivoted doctor reporting log (mirrors get_radiologist_performance_data).
+    Returns one row per day with counts broken down by CATEGORY_CHOICES
+    (Contrast, Full Study, Screening, Other) plus summary totals.
+    """
+    from_date = datetime.strptime(start_date_str, "%Y-%m-%d")
+    to_date = datetime.strptime(end_date_str, "%Y-%m-%d").replace(hour=23, minute=59, second=59)
+
+    # 1. Assigned cases pivoted by category
+    query = db.session.query(
+        func.date(DoctorReportingdetails.report_at).label('report_date'),
+        User.name.label('radiologist_name'),
+        Test_registration.category,
+        DoctorReportingdetails.status,
+        TestBookingDetails.no_of_films
+    ).select_from(DoctorReportingdetails)\
+    .join(User, cast(User.id, String) == DoctorReportingdetails.doctor_id)\
+    .join(Test_registration, Test_registration.id == DoctorReportingdetails.test_id)\
+    .outerjoin(TestBookingDetails,
+        (cast(TestBookingDetails.booking_id, String) == DoctorReportingdetails.booking_id) &
+        (TestBookingDetails.test_id == DoctorReportingdetails.test_id)
+    ).filter(
+        DoctorReportingdetails.doctor_id == str(doctor_id),
+        DoctorReportingdetails.report_at >= from_date,
+        DoctorReportingdetails.report_at <= to_date
+    )
+    results = query.all()
+
+    grouped = {}
+    for row in results:
+        date_str = str(row.report_date)
+        key = date_str
+        if key not in grouped:
+            grouped[key] = {
+                "date": date_str,
+                "radiologist_name": row.radiologist_name,
+                "Contrast": 0,
+                "Full Study": 0,
+                "Screening": 0,
+                "Other": 0,
+                "total_case": 0,
+                "films_issued": 0,
+                "reports_made": 0,
+                "not_sent": 0
+            }
+        cat = row.category if row.category in CATEGORY_CHOICES else "Other"
+        grouped[key][cat] += 1
+        grouped[key]["total_case"] += 1
+        if row.no_of_films:
+            grouped[key]["films_issued"] += row.no_of_films
+        if row.status == "Reported":
+            grouped[key]["reports_made"] += 1
+
+    # 2. "Case Not Sent to Dr" = booking tests in this date range never assigned to ANY doctor
+    not_sent_q = db.session.query(
+        func.date(TestBooking.create_at).label('d'),
+        func.count(TestBookingDetails.id)
+    ).select_from(TestBookingDetails)\
+    .join(TestBooking, TestBooking.id == TestBookingDetails.booking_id)\
+    .outerjoin(DoctorReportingdetails,
+        (DoctorReportingdetails.booking_id == cast(TestBooking.id, String)) &
+        (DoctorReportingdetails.test_id == TestBookingDetails.test_id)
+    ).filter(
+        TestBooking.create_at >= from_date,
+        TestBooking.create_at <= to_date,
+        DoctorReportingdetails.id.is_(None)
+    ).group_by(func.date(TestBooking.create_at)).all()
+
+    not_sent_map = {str(d): c for d, c in not_sent_q}
+    for key in grouped:
+        grouped[key]["not_sent"] = not_sent_map.get(key, 0)
+
+    final = []
+    for i, key in enumerate(sorted(grouped.keys()), 1):
+        d = grouped[key]
+        d["s_no"] = i
+        final.append(d)
+    return final
