@@ -709,7 +709,7 @@ def get_radiologist_performance_data(doctor_id, start_date_str=None, end_date_st
     query = db.session.query(
         func.date(DoctorReportingdetails.report_at).label('report_date'),
         User.name.label('radiologist_name'),
-        Test_registration.test_name,
+        Test_registration.category,
         DoctorReportingdetails.status,
         TestBookingDetails.no_of_films,
         # --- NEW FIELD: Fetch the charge for this test ---
@@ -734,7 +734,7 @@ def get_radiologist_performance_data(doctor_id, start_date_str=None, end_date_st
     for row in results:
         date_str = str(row.report_date)
         doctor = row.radiologist_name
-        test_name = row.test_name
+        category = row.category if row.category in CATEGORY_CHOICES else "Other"
         
         # Determine price (Default to 0 if null)
         price = row.report_charges if row.report_charges else 0.0
@@ -745,15 +745,15 @@ def get_radiologist_performance_data(doctor_id, start_date_str=None, end_date_st
             grouped_data[key] = {
                 "date": date_str,
                 "radiologist_name": doctor,
-                "tests_counts": defaultdict(int),
+                "tests_counts": {"Contrast": 0, "Full Study": 0, "Screening": 0, "Other": 0},
                 "total_tests": 0,
                 "reports_made": 0,
                 "films_issued": 0,
                 "total_revenue": 0.0  # <--- Initialize Total
             }
 
-        # Count the test
-        grouped_data[key]["tests_counts"][test_name] += 1
+        # Count the category
+        grouped_data[key]["tests_counts"][category] += 1
         grouped_data[key]["total_tests"] += 1
         
         # Add price to daily total

@@ -106,7 +106,7 @@ $(document).ready(function () {
                 '<tr>' +
                 '<th>S.No</th><th>Date</th><th>Dr. Name</th>' +
                 '<th>Contrast</th><th>Full Study</th><th>Screening</th><th>Other</th>' +
-                '<th>Total Case</th><th>Film Issued</th><th>Reports Made</th><th>Case Not Sent to Dr.</th>' +
+                '<th>Total Case</th><th>Films Used</th><th>Reports Made</th><th>Case Not Sent to Dr.</th>' +
                 '</tr>' +
                 '</thead><tbody></tbody><tfoot></tfoot>'
             );
@@ -124,7 +124,7 @@ $(document).ready(function () {
             { title: "Screening",          data: "Screening",   className: "fw-bold" },
             { title: "Other",              data: "Other",       className: "fw-bold" },
             { title: "Total Case",         data: "total_case",  className: "fw-bold text-primary" },
-            { title: "Film Issued",        data: "films_issued" },
+            { title: "Films Used",         data: "films_issued" },
             { title: "Reports Made",       data: "reports_made" },
             { title: "Case Not Sent to Dr.", data: "not_sent", className: "text-danger fw-bold" }
         ];
@@ -142,8 +142,16 @@ $(document).ready(function () {
             dom: 'Bfrtip',
             order: [[1, 'asc']],
             buttons: [
-                { extend: 'excelHtml5', text: '<i class="bi bi-file-earmark-excel"></i> Excel', className: 'btn btn-success btn-sm', footer: true },
-                { extend: 'pdfHtml5',   text: '<i class="bi bi-file-earmark-pdf"></i> PDF',   className: 'btn btn-danger btn-sm',  orientation: 'landscape', pageSize: 'A3', footer: true }
+                { extend: 'excelHtml5', text: '<i class="bi bi-file-earmark-excel"></i> Excel', className: 'btn btn-success btn-sm', footer: true, exportOptions: { columns: ':visible' } },
+                {
+                    extend: 'pdfHtml5', text: '<i class="bi bi-file-earmark-pdf"></i> PDF', className: 'btn btn-danger btn-sm',
+                    orientation: 'landscape', pageSize: 'A4', footer: true,
+                    exportOptions: { columns: ':visible' },
+                    customize: function (doc) {
+                        doc.pageOrientation = 'landscape';
+                        doc.pageMargins = [20, 20, 20, 20];
+                    }
+                }
             ],
             language: { emptyTable: "No data available" },
 
