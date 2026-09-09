@@ -463,3 +463,31 @@ def api_monthly_commission_sheet():
     except Exception as exc:
         print(f"Error in monthly_commission_sheet: {str(exc)}")
         return jsonify({"error": str(exc)}), 500
+
+
+@reports_bp.route('/monthly-case-logs', methods=['GET'])
+@login_required
+def view_monthly_case_logs():
+    return render_template('monthly_case_logs.html')
+
+
+@reports_bp.route('/monthly-case-logs/data', methods=['GET'])
+@login_required
+def api_monthly_case_logs():
+    from_date = request.args.get('from_date')
+    to_date = request.args.get('to_date')
+    referred_dr_id = request.args.get('referred_dr_id')
+    referred_non_dr_id = request.args.get('referred_non_dr_id')
+    branch_id = session.get('branch_id')
+
+    if not from_date or not to_date:
+        return jsonify({"error": "from_date and to_date are required"}), 400
+
+    try:
+        data = report_services.get_monthly_case_logs(
+            branch_id, from_date, to_date, referred_dr_id, referred_non_dr_id
+        )
+        return jsonify({"status": "success", "data": data}), 200
+    except Exception as exc:
+        print(f"Error in api_monthly_case_logs: {str(exc)}")
+        return jsonify({"error": str(exc)}), 500

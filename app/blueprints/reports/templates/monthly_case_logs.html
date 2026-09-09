@@ -70,7 +70,7 @@
       align-items: center;
       margin-bottom: 1rem;
   }
-  
+
   /* Table styling */
   #report_table th {
       background-color: #f8f9fa;
@@ -83,15 +83,9 @@
       text-align: center;
       vertical-align: middle;
   }
-  
-  /* Align amount column to right */
   #report_table td.text-end, #report_table th.text-end {
       text-align: right !important;
   }
-
-  /* --- GRAND TOTAL ROW STYLING --- */
-  /* This ensures the footer is visible and styled even in scroll mode */
-
 </style>
 {% endblock stylesheets %}
 
@@ -101,7 +95,7 @@
 <div class="container-fluid py-3 rounded bg-white shadow-sm border-0">
 
     <div class="report-header">
-        <h4 class="fw-bold text-dark m-0">Radiologist Performance Report</h4>
+        <h4 class="fw-bold text-dark m-0">Monthly Case Logs</h4>
         <div id="exportButtons"></div>
     </div>
 
@@ -112,12 +106,7 @@
             <button class="range-btn" data-range="30">Last 30 Days</button>
         </div>
 
-        <div class="d-flex align-items-end gap-2">
-            <div class="me-2" style="min-width: 200px;">
-                <label class="form-label small mb-1">Radiologist</label>
-                <select id="doctor_select" class="form-select"></select>
-            </div>
-
+        <div class="d-flex align-items-end gap-2 flex-wrap">
             <div class="me-2">
                 <label class="form-label small mb-1">From</label>
                 <input type="date" id="from_date" class="form-control">
@@ -126,6 +115,20 @@
             <div class="me-2">
                 <label class="form-label small mb-1">To</label>
                 <input type="date" id="to_date" class="form-control">
+            </div>
+
+            <div class="me-2" style="min-width: 180px;">
+                <label class="form-label small mb-1">Referred Doctor</label>
+                <select id="referred_dr_filter" class="form-select">
+                    <option value="">-- All --</option>
+                </select>
+            </div>
+
+            <div class="me-2" style="min-width: 180px;">
+                <label class="form-label small mb-1">Referred Non-Doctor</label>
+                <select id="referred_non_dr_filter" class="form-select">
+                    <option value="">-- All --</option>
+                </select>
             </div>
 
             <div class="d-flex align-items-end gap-2">
@@ -138,7 +141,21 @@
 
     <div class="table-responsive">
         <table id="report_table" class="table table-bordered table-hover w-100" cellspacing="0" width="100%">
-            <thead></thead> 
+            <thead>
+                <tr>
+                    <th>S.No</th>
+                    <th>Booking ID</th>
+                    <th>Date</th>
+                    <th>Patient Name</th>
+                    <th>MR No</th>
+                    <th>Referred Dr</th>
+                    <th>Referred Non-Dr</th>
+                    <th class="text-end">Charge</th>
+                    <th class="text-end">Discount</th>
+                    <th class="text-end">Paid</th>
+                    <th class="text-end">Due</th>
+                </tr>
+            </thead>
             <tbody></tbody>
             <tfoot></tfoot>
         </table>
@@ -156,5 +173,5 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/vfs_fonts.min.js"></script>
 <script src="https://cdn.datatables.net/buttons/1.6.5/js/buttons.html5.min.js"></script>
 
-<script src="{{ url_for('reports.static', filename='js/radiologist_logs.js') }}"></script>
+<script src="{{ url_for('reports.static', filename='js/monthly_case_logs.js') }}"></script>
 {% endblock %}

@@ -106,14 +106,8 @@ $(document).ready(function () {
             $('#report_table').empty().append('<thead></thead><tbody></tbody><tfoot></tfoot>'); 
         }
 
-        // Identify Dynamic Columns (Test Names)
-        let uniqueTests = new Set();
-        data.forEach(row => {
-            if (row.test_breakdown) {
-                Object.keys(row.test_breakdown).forEach(testName => uniqueTests.add(testName));
-            }
-        });
-        const dynamicColumns = Array.from(uniqueTests).sort();
+        // Fixed category columns — mirrors Internal Reporting Logs pattern
+        const FIXED_CATEGORIES = ["Contrast", "Full Study", "Screening", "Other"];
 
         // Define Columns
         let columnsConfig = [
@@ -122,14 +116,14 @@ $(document).ready(function () {
             { title: "Radiologist Name", data: "radiologist_name" }
         ];
 
-        // Add dynamic columns
-        dynamicColumns.forEach(testName => {
+        // Add fixed category columns
+        FIXED_CATEGORIES.forEach(cat => {
             columnsConfig.push({
-                title: testName, 
-                data: null, 
+                title: cat,
+                data: null,
+                className: "text-center fw-bold",
                 render: function (data, type, row) {
-                    const count = (row.test_breakdown && row.test_breakdown[testName]) 
-                        ? row.test_breakdown[testName] : 0;
+                    const count = (row.test_breakdown && row.test_breakdown[cat]) ? row.test_breakdown[cat] : 0;
                     return count !== 0 ? `<b>${count}</b>` : "0";
                 }
             });
@@ -165,8 +159,16 @@ $(document).ready(function () {
             dom: 'Bfrtip',
             order: [[1, 'asc']], 
             buttons: [
-                { extend: 'excelHtml5', text: '<i class="bi bi-file-earmark-excel"></i> Excel', className: 'btn btn-success btn-sm', footer: true },
-                { extend: 'pdfHtml5', text: '<i class="bi bi-file-earmark-pdf"></i> PDF', className: 'btn btn-danger btn-sm', orientation: 'landscape', pageSize: 'A3', footer: true }
+                { extend: 'excelHtml5', text: '<i class="bi bi-file-earmark-excel"></i> Excel', className: 'btn btn-success btn-sm', footer: true, exportOptions: { columns: ':visible' } },
+                {
+                    extend: 'pdfHtml5', text: '<i class="bi bi-file-earmark-pdf"></i> PDF', className: 'btn btn-danger btn-sm',
+                    orientation: 'landscape', pageSize: 'A4', footer: true,
+                    exportOptions: { columns: ':visible' },
+                    customize: function (doc) {
+                        doc.pageOrientation = 'landscape';
+                        doc.pageMargins = [20, 20, 20, 20];
+                    }
+                }
             ],
             language: { emptyTable: "No data available" },
             
