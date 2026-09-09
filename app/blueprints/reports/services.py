@@ -1086,3 +1086,60 @@ def get_doctor_reporting_logs(doctor_id, start_date_str=None, end_date_str=None)
         d["s_no"] = i
         final.append(d)
     return final
+
+
+def get_monthly_case_logs(branch_id, from_date_str, to_date_str, referred_dr_id=None, referred_non_dr_id=None):
+    """
+    Returns one row per booking (flat case sheet) filtered by date range and
+    optional referred-doctor / referred-non-doctor.  Uses the double-alias
+    Referred join pattern shared with the commission-sheet service.
+    """
+    from sqlalchemy.orm import aliased
+    from app.models.test_booking import TestBooking
+
+    ReferredDr = aliased(Referred)
+    ReferredNonDr = aliased(Referred)
+
+    from_date = datetime.strptime(from_date_str, "%Y-%m-%d")
+    to_date = datetime.strptime(to_date_str, "%Y-%m-%d").replace(hour=23, minute=59, second=59)
+
+    query = db.session.query(
+        TestBooking.id.label("booking_id"),
+        TestBooking.create_at,
+        TestBooking.patient_name,
+        TestBooking.mr_no,
+        ReferredDr.name.label("referred_dr_name"),
+        ReferredNonDr.name.label("referred_non_dr_name"),
+        TestBooking.net_receivable,
+        TestBooking.discount_value,
+        TestBooking.paid_amount,
+        TestBooking.due_amount
+    ).outerjoin(ReferredDr, and_(ReferredDr.id == TestBooking.referred_dr, ReferredDr.is_doctor == True))\
+     .outerjoin(ReferredNonDr, ReferredNonDr.id == TestBooking.referred_non_dr)\
+     .filter(
+         TestBooking.branch_id == branch_id,
+         TestBooking.create_at >= from_date,
+         TestBooking.create_at <= to_date
+     )
+
+    if referred_dr_id:
+        query = query.filter(TestBooking.referred_dr == referred_dr_id)
+    if referred_non_dr_id:
+        query = query.filter(TestBooking.referred_non_dr == referred_non_dr_id)
+
+    query = query.order_by(TestBooking.create_at.desc())
+    rows = query.all()
+
+    return [{
+        "s_no": i,
+        "booking_id": r.booking_id,
+        "date": r.create_at.strftime("%Y-%m-%d") if r.create_at else "",
+        "patient_name": r.patient_name or "",
+        "mr_no": r.mr_no or "",
+        "referred_dr": r.referred_dr_name or "-",
+        "referred_non_dr": r.referred_non_dr_name or "-",
+        "charge": float(r.net_receivable or 0),
+        "discount": float(r.discount_value or 0),
+        "paid": float(r.paid_amount or 0),
+        "due": float(r.due_amount or 0)
+    } for i, r in enumerate(rows, 1)]
