@@ -3,7 +3,7 @@
 // -------------------------------
 const bookingState = {
     tests: [],   // {id, name, rate, qty, days, sample, films}
-    discount: { type: "None", value: 0 },
+    discount: { type: "Amount", value: 0 },
     totals: { tests: 0, amount: 0, net: 0, reportingDate: "", films: 0 }
 };
 
@@ -20,9 +20,31 @@ $(document).ready(function () {
     });
 
     // Bind discount changes
-    $("#discount_type, #discount_value").on("input change", function () {
+    $("#discount_type").on("change", function () {
+        const newType = $(this).val();
+        const oldType = bookingState.discount.type;
+        let val = parseFloat($("#discount_value").val()) || 0;
+        const gross = bookingState.totals.amount || 0;
+
+        if (oldType !== newType && gross > 0) {
+            if (oldType === "Amount" && newType === "Percentage") {
+                val = Math.min(100, Math.max(0, (val / gross) * 100));
+            } else if (oldType === "Percentage" && newType === "Amount") {
+                val = (val / 100) * gross;
+            }
+        }
+        bookingState.discount.type = newType;
+        bookingState.discount.value = val;
+        $("#discount_value").val(val.toFixed(2));
+        validateDiscountValue();
+        recalcState();
+        renderBooking();
+    });
+
+    $("#discount_value").on("input", function () {
         bookingState.discount.type = $("#discount_type").val();
-        bookingState.discount.value = parseFloat($("#discount_value").val()) || 0;
+        bookingState.discount.value = parseFloat($(this).val()) || 0;
+        validateDiscountValue();
         recalcState();
         renderBooking();
     });
@@ -386,7 +408,8 @@ function recalcState() {
 
     let net = totalAmount;
     if (bookingState.discount.type === "Percentage") {
-        net -= totalAmount * bookingState.discount.value / 100;
+        const pct = Math.min(100, Math.max(0, bookingState.discount.value));
+        net -= totalAmount * pct / 100;
     } else if (bookingState.discount.type === "Amount") {
         net -= bookingState.discount.value;
     }
@@ -546,6 +569,7 @@ $(document).on("click", "#submit_booking", async function () {
 
             discount_type: $("#discount_type").val(),
             discount_value: parseFloat($("#discount_value").val()) || 0,
+            total_amount: bookingState.totals.amount,
             
             net_receivable: bookingState.totals.net, 
             // --- 🔥 FIX END ---
@@ -653,13 +677,27 @@ function capitalizeFirstLetter(str) {
     return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
 }
 
+function validateDiscountValue() {
+    const $input = $("#discount_value");
+    const type = $("#discount_type").val();
+    const val = parseFloat($input.val()) || 0;
+    $(".discount-error").remove();
+    if (type === "Percentage" && (val < 0 || val > 100)) {
+        $input.addClass("input-error");
+        $input.after('<div class="text-danger small discount-error">Percentage must be between 0 and 100</div>');
+        return false;
+    }
+    $input.removeClass("input-error");
+    return true;
+}
+
 function resetBookingForm() {
     // Clear MR No so backend generates a new one for next patient
     $("#mr_ref_no").val(""); 
     
     $("#patient_name, #age, #contact_no, #discount_value, #net_receivable, #dues").val("");
     $("#gender").val("male");
-    $("#discount_type").val("None");
+    $("#discount_type").val("Amount");
     $("#payment_type").val("Cash");
     $("input[name='shareType'][value='nobody']").prop("checked", true);
 
@@ -675,7 +713,7 @@ function resetBookingForm() {
     $("#gender").val("male");
     $("#patient_title").val("mr"); // Reset Title
     $("#age_type").val("years");   // Reset Age Type to default
-    $("#discount_type").val("None");
+    $("#discount_type").val("Amount");
     $("#payment_type").val("Cash");
 
     // 3. Referred Dropdowns (Doctor & Non-Doctor)

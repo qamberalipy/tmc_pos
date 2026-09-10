@@ -24,6 +24,7 @@ class TestBooking(db.Model):
         default="None"
     )
     discount_value = db.Column(db.Numeric(10, 2), default=0)
+    total_amount = db.Column(db.Numeric(10, 2), nullable=True)
 
     net_receivable = db.Column(db.Numeric(10, 2), nullable=False)
 

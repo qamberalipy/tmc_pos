@@ -142,7 +142,7 @@ h2,p{margin:0;padding:0}
         <div class="summary">
           <div class="summary-box">
             <div class="sec-label" style="margin-top:2px">Payment Summary</div>
-            <div class="row"><span>Total Amount</span><span>{{ "{:,.0f}".format(booking.financials.net_payable) }}</span></div>
+            <div class="row"><span>Total Amount</span><span>{{ "{:,.0f}".format(booking.financials.gross_total) }}</span></div>
             <div class="row"><span>Discount</span><span>{{ booking.financials.discount_value }}</span></div>
             <div class="row net"><span>Total Payable</span><span>{{ "{:,.0f}".format(booking.financials.net_payable) }}</span></div>
             <div class="row"><span>Received</span><span>{{ "{:,.0f}".format(booking.financials.received) }}</span></div>
