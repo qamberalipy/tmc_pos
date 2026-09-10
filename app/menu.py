@@ -72,9 +72,6 @@ MENU = {
             "css_class": "nav-group-reports",
             "children": [
                 {"label": "Daily Report", "icon": "bi-journal-text", "endpoint": "reports.view_daily_reports"},
-                # {"label": "Test Wise Report", "icon": "bi-file-earmark-bar-graph", "endpoint": "#"},
-                # {"label": "Doctor Wise Report", "icon": "bi-file-earmark-bar-graph", "endpoint": "#"},
-                # {"label": "Expense Report", "icon": "bi-file-earmark-bar-graph", "endpoint": "#"},
                 {"label": "Radiologist Logs", "icon": "bi-file-earmark-bar-graph", "endpoint": "reports.view_radiologist_logs"},
                 {"label": "Internal Reporting Logs", "icon": "bi-file-earmark-bar-graph", "endpoint": "reports.view_doctor_reporting_logs"},
                 {"label":"Commision Report", "icon":"bi-file-earmark-bar-graph", "endpoint":"reports.view_monthly_commission_sheet"},
@@ -142,12 +139,9 @@ MENU = {
             "css_class": "nav-group-reports",
             "children": [
                 {"label": "Daily Report", "icon": "bi-journal-text", "endpoint": "reports.view_daily_reports"},
-                {"label": "Test Wise Report", "icon": "bi-file-earmark-bar-graph", "endpoint": "#"},
-                {"label": "Doctor Wise Report", "icon": "bi-file-earmark-bar-graph", "endpoint": "#"},
-                {"label": "Expense Report", "icon": "bi-file-earmark-bar-graph", "endpoint": "#"},
                 {"label": "Radiologist Logs", "icon": "bi-file-earmark-bar-graph", "endpoint": "reports.view_radiologist_logs"},
-                {"label": "Doctor Reporting Logs", "icon": "bi-file-earmark-bar-graph", "endpoint": "reports.view_doctor_reporting_logs"},
-                 {"label":"Commision Report", "icon":"bi-file-earmark-bar-graph", "endpoint":"reports.view_monthly_commission_sheet"},
+                {"label": "Internal Reporting Logs", "icon": "bi-file-earmark-bar-graph", "endpoint": "reports.view_doctor_reporting_logs"},
+                {"label":"Commision Report", "icon":"bi-file-earmark-bar-graph", "endpoint":"reports.view_monthly_commission_sheet"},
                 {"label": "Monthly Case Logs", "icon": "bi-file-earmark-bar-graph", "endpoint": "reports.view_monthly_case_logs"}
             ]
         },
