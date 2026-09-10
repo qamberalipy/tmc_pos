@@ -3,8 +3,6 @@
 {% block stylesheets %}
 <link rel="stylesheet"
       href="https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min.css">
-<link rel="stylesheet"
-      href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.bootstrap5.min.css">
 
 <style>
     .filter-card {
@@ -86,7 +84,10 @@
     <div id="tableSection" style="display: none;">
         <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
             <h6 class="mb-0 fw-bold text-secondary" id="reportHeading"></h6>
-            <div class="d-flex gap-2" id="dtButtonContainer"></div>
+            <div class="d-flex gap-2" id="dtButtonContainer">
+                <button class="btn btn-danger btn-sm shadow-sm" id="btnPrintPdf"><i class="bi bi-file-earmark-pdf me-1"></i> PDF</button>
+                <button class="btn btn-success btn-sm shadow-sm" id="btnExportExcel"><i class="bi bi-file-earmark-excel me-1"></i> Excel</button>
+            </div>
         </div>
 
         <div class="table-wrapper">
@@ -134,13 +135,7 @@
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.8/js/dataTables.bootstrap5.min.js"></script>
-<script src="https://cdn.datatables.net/buttons/2.4.2/js/dataTables.buttons.min.js"></script>
-<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.bootstrap5.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/pdfmake.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/vfs_fonts.js"></script>
-<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.html5.min.js"></script>
-<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.print.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
 <script>
 (function () {
@@ -174,11 +169,7 @@
     }
 
     function initTable(rows) {
-        if (dtInstance) {
-            dtInstance.destroy();
-            dtInstance = null;
-            $("#dtButtonContainer").empty();
-        }
+        $("#dtButtonContainer").find('button').prop('disabled', false);
 
         const tableData = rows.map(function (r) {
             return [
@@ -196,32 +187,7 @@
         dtInstance = $("#commissionTable").DataTable({
             data: tableData,
             destroy: true,
-            dom: "Bfrtip",
-            buttons: [
-                {
-                    extend: "excelHtml5",
-                    text: '<i class="bi bi-file-earmark-excel me-1"></i> Export Excel',
-                    className: "btn btn-success btn-sm shadow-sm",
-                    title: reportHeading.textContent,
-                    exportOptions: { columns: ":visible" }
-                },
-                {
-                    extend: "pdfHtml5",
-                    text: '<i class="bi bi-file-earmark-pdf me-1"></i> Export PDF',
-                    className: "btn btn-danger btn-sm shadow-sm",
-                    title: reportHeading.textContent,
-                    orientation: "landscape",
-                    pageSize: "A4",
-                    exportOptions: { columns: ":visible" }
-                },
-                {
-                    extend: "print",
-                    text: '<i class="bi bi-printer me-1"></i> Print',
-                    className: "btn btn-secondary btn-sm shadow-sm",
-                    title: reportHeading.textContent,
-                    exportOptions: { columns: ":visible" }
-                }
-            ],
+            dom: "frtip",
             paging:   false,
             ordering: false,
             info:     false,
@@ -236,14 +202,10 @@
                             : "";
                     }
                 }
-            ],
-            initComplete: function () {
-                var btns = $(this.api().buttons().container());
-                $("#dtButtonContainer").append(btns);
-            }
+            ]
         });
 
-        // Footer totals
+        // Footer totals — kept for on-screen tfoot
         let totCharges = 0, totGrand = 0, totCut = 0;
         rows.forEach(function (r) {
             totCharges += fmtNum(r.charges);
@@ -253,6 +215,70 @@
         document.getElementById("footCharges").textContent      = fmt(totCharges);
         document.getElementById("footGrandTotal").textContent   = fmt(totGrand);
         document.getElementById("footCutIncentive").textContent = totCut > 0 ? fmt(totCut) : "";
+
+        // --- Export Handlers (use closure over rows/totals) ---
+
+        document.getElementById('btnPrintPdf').onclick = function () {
+            const heading = reportHeading.textContent;
+            let bodyRows = rows.map(function (r, i) {
+                return '<tr>' +
+                    '<td>' + (i + 1) + '</td>' +
+                    '<td>' + r.date + '</td>' +
+                    '<td>' + r.patient_name + '</td>' +
+                    '<td>' + r.ref_by_dr + '</td>' +
+                    '<td>' + r.investigations + '</td>' +
+                    '<td>' + (r.charges !== '' ? parseFloat(r.charges).toLocaleString('en-PK', { maximumFractionDigits: 0 }) : '') + '</td>' +
+                    '<td>' + (r.grand_total !== '' ? parseFloat(r.grand_total).toLocaleString('en-PK', { maximumFractionDigits: 0 }) : '') + '</td>' +
+                    '<td>' + (r.cut_incentive !== '' ? parseFloat(r.cut_incentive).toLocaleString('en-PK', { maximumFractionDigits: 0 }) : '') + '</td>' +
+                    '</tr>';
+            }).join('');
+            let footerRow = '<tr style="font-weight:bold;"><td colspan="5">GRAND TOTAL</td>' +
+                '<td>' + fmt(totCharges) + '</td>' +
+                '<td>' + fmt(totGrand) + '</td>' +
+                '<td>' + (totCut > 0 ? fmt(totCut) : '') + '</td></tr>';
+            const win = window.open('', '_blank');
+            win.document.write(
+                '<html><head><title>' + heading + '</title>' +
+                '<style>' +
+                '@page { size: landscape; margin: 12mm; }' +
+                'body { font-family: Arial, sans-serif; padding: 16px; }' +
+                'h3 { margin-bottom: 16px; }' +
+                'table { width:100%; border-collapse: collapse; font-size: 0.85rem; }' +
+                'th, td { border: 1px solid #999; padding: 6px 8px; text-align: center; }' +
+                'thead { background: #f1f1f1; }' +
+                '</style></head><body>' +
+                '<h3>' + heading + '</h3>' +
+                '<table><thead><tr>' +
+                '<th>S.No</th><th>Date</th><th>Patient Name</th><th>Ref. Dr</th><th>Investigations</th><th>Charges</th><th>Grand Total</th><th>Cut/Incentive</th>' +
+                '</tr></thead><tbody>' + bodyRows + footerRow + '</tbody></table>' +
+                '</body></html>'
+            );
+            win.document.close();
+            win.onload = function () { win.print(); };
+        };
+
+        document.getElementById('btnExportExcel').onclick = function () {
+            const heading = reportHeading.textContent;
+            const header = ["S.No", "Date", "Patient Name", "Ref. Dr", "Investigations", "Charges", "Grand Total", "Cut/Incentive"];
+            const data = [
+                [heading],
+                [],
+                header,
+                ...rows.map(function (r, i) {
+                    return [
+                        i + 1, r.date, r.patient_name, r.ref_by_dr, r.investigations,
+                        r.charges !== '' ? parseFloat(r.charges) : '',
+                        r.grand_total !== '' ? parseFloat(r.grand_total) : '',
+                        r.cut_incentive !== '' ? parseFloat(r.cut_incentive) : ''
+                    ];
+                }),
+                ["", "", "", "", "GRAND TOTAL", totCharges, totGrand, totCut > 0 ? totCut : '']
+            ];
+            const ws = XLSX.utils.aoa_to_sheet(data);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Commission Report");
+            XLSX.writeFile(wb, 'Commission_Report_' + monthPicker.value + '.xlsx');
+        };
     }
 
     generateBtn.addEventListener("click", function () {

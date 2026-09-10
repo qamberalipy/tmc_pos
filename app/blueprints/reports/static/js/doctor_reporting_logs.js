@@ -139,20 +139,7 @@ $(document).ready(function () {
             scrollX: true,
             scrollY: "60vh",
             scrollCollapse: true,
-            dom: 'Bfrtip',
             order: [[1, 'asc']],
-            buttons: [
-                { extend: 'excelHtml5', text: '<i class="bi bi-file-earmark-excel"></i> Excel', className: 'btn btn-success btn-sm', footer: true, exportOptions: { columns: ':visible' } },
-                {
-                    extend: 'pdfHtml5', text: '<i class="bi bi-file-earmark-pdf"></i> PDF', className: 'btn btn-danger btn-sm',
-                    orientation: 'landscape', pageSize: 'A4', footer: true,
-                    exportOptions: { columns: ':visible' },
-                    customize: function (doc) {
-                        doc.pageOrientation = 'landscape';
-                        doc.pageMargins = [20, 20, 20, 20];
-                    }
-                }
-            ],
             language: { emptyTable: "No data available" },
 
             // --- GRAND TOTAL LOGIC ---
@@ -204,11 +191,7 @@ $(document).ready(function () {
             }
         });
 
-        // Move buttons to the custom container
-        try {
-            const btnContainer = reportTable.buttons().container();
-            $("#exportButtons").empty().append(btnContainer);
-        } catch (e) { console.warn(e); }
+
     }
 
     function formatDate(dateObj) {
@@ -217,4 +200,78 @@ $(document).ready(function () {
         const day = ("0" + d.getDate()).slice(-2);
         return d.getFullYear() + "-" + month + "-" + day;
     }
+
+    // --- Export Helpers ---
+
+    function buildReportRows() {
+        const rows = reportTable.rows({ search: 'applied' }).data().toArray();
+        const cats = ["Contrast", "Full Study", "Screening", "Other"];
+        const totals = { total_case: 0, films_issued: 0, reports_made: 0, not_sent: 0, cats: { Contrast: 0, "Full Study": 0, Screening: 0, Other: 0 } };
+        rows.forEach(r => {
+            totals.total_case    += Number(r.total_case    || 0);
+            totals.films_issued  += Number(r.films_issued  || 0);
+            totals.reports_made  += Number(r.reports_made  || 0);
+            totals.not_sent      += Number(r.not_sent      || 0);
+            cats.forEach(c => totals.cats[c] += Number(r[c] || 0));
+        });
+        return { rows, totals, cats };
+    }
+
+    $(document).on('click', '#btnPrintPdf', function () {
+        if (!reportTable) { showToastMessage('error', 'No data loaded yet.'); return; }
+        const { rows, totals, cats } = buildReportRows();
+        const doctorName = $('#doctor_select option:selected').text();
+        const from = $('#from_date').val(), to = $('#to_date').val();
+        let bodyRows = rows.map((r, i) =>
+            `<tr><td>${i + 1}</td><td>${r.date}</td><td>${r.radiologist_name}</td>` +
+            cats.map(c => `<td>${r[c] || 0}</td>`).join('') +
+            `<td>${r.total_case}</td><td>${r.films_issued}</td><td>${r.reports_made}</td><td>${r.not_sent}</td></tr>`
+        ).join('');
+        let footerRow = `<tr style="font-weight:bold;"><td colspan="3">GRAND TOTAL</td>` +
+            cats.map(c => `<td>${totals.cats[c]}</td>`).join('') +
+            `<td>${totals.total_case}</td><td>${totals.films_issued}</td><td>${totals.reports_made}</td><td>${totals.not_sent}</td></tr>`;
+        const win = window.open('', '_blank');
+        win.document.write(`
+            <html><head><title>Internal Reporting Logs</title>
+            <style>
+                @page { size: landscape; margin: 12mm; }
+                body { font-family: Arial, sans-serif; padding: 16px; }
+                h3 { margin-bottom: 4px; } .meta { color:#555; margin-bottom:16px; font-size: 0.9rem; }
+                table { width:100%; border-collapse: collapse; font-size: 0.85rem; }
+                th, td { border: 1px solid #999; padding: 6px 8px; text-align: center; }
+                thead { background: #f1f1f1; }
+            </style></head><body>
+            <h3>Internal Reporting Logs</h3>
+            <div class="meta">Doctor: ${doctorName} &nbsp;|&nbsp; Period: ${from} to ${to}</div>
+            <table><thead><tr><th>S.No</th><th>Date</th><th>Dr. Name</th>${cats.map(c => `<th>${c}</th>`).join('')}<th>Total Case</th><th>Films Used</th><th>Reports Made</th><th>Case Not Sent to Dr.</th></tr></thead>
+            <tbody>${bodyRows}${footerRow}</tbody></table>
+            </body></html>`);
+        win.document.close();
+        win.onload = () => win.print();
+    });
+
+    $(document).on('click', '#btnExportExcel', function () {
+        if (!reportTable) { showToastMessage('error', 'No data loaded yet.'); return; }
+        const { rows, totals, cats } = buildReportRows();
+        const doctorName = $('#doctor_select option:selected').text();
+        const from = $('#from_date').val(), to = $('#to_date').val();
+        const header = ["S.No", "Date", "Dr. Name", ...cats, "Total Case", "Films Used", "Reports Made", "Case Not Sent to Dr."];
+        const data = [
+            ["Internal Reporting Logs"],
+            [`Doctor: ${doctorName}`, `Period: ${from} to ${to}`],
+            [],
+            header,
+            ...rows.map((r, i) => [
+                i + 1, r.date, r.radiologist_name,
+                ...cats.map(c => r[c] || 0),
+                r.total_case, r.films_issued, r.reports_made, r.not_sent
+            ]),
+            ["", "", "GRAND TOTAL", ...cats.map(c => totals.cats[c]), totals.total_case, totals.films_issued, totals.reports_made, totals.not_sent]
+        ];
+        const ws = XLSX.utils.aoa_to_sheet(data);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Internal Reporting Logs");
+        XLSX.writeFile(wb, `Internal_Reporting_Logs_${from}_to_${to}.xlsx`);
+    });
+
 });

@@ -129,20 +129,7 @@ $(document).ready(function () {
             scrollX: true,
             scrollY: "60vh",
             scrollCollapse: true,
-            dom: 'Bfrtip',
             order: [[2, 'desc']],
-            buttons: [
-                { extend: 'excelHtml5', text: '<i class="bi bi-file-earmark-excel"></i> Excel', className: 'btn btn-success btn-sm', footer: true, exportOptions: { columns: ':visible' } },
-                {
-                    extend: 'pdfHtml5', text: '<i class="bi bi-file-earmark-pdf"></i> PDF', className: 'btn btn-danger btn-sm',
-                    orientation: 'landscape', pageSize: 'A4', footer: true,
-                    exportOptions: { columns: ':visible' },
-                    customize: function (doc) {
-                        doc.pageOrientation = 'landscape';
-                        doc.pageMargins = [20, 20, 20, 20];
-                    }
-                }
-            ],
             language: { emptyTable: "No data available" },
 
             // --- GRAND TOTAL FOOTER ---
@@ -186,11 +173,7 @@ $(document).ready(function () {
             }
         });
 
-        // Move buttons to custom container
-        try {
-            const btnContainer = reportTable.buttons().container();
-            $("#exportButtons").empty().append(btnContainer);
-        } catch (e) { console.warn(e); }
+
     }
 
     function formatDate(dateObj) {
@@ -199,4 +182,78 @@ $(document).ready(function () {
         const day   = ("0" + d.getDate()).slice(-2);
         return d.getFullYear() + "-" + month + "-" + day;
     }
+
+    // --- Export Helpers ---
+
+    function buildReportRows() {
+        const rows = reportTable.rows({ search: 'applied' }).data().toArray();
+        const totals = { charge: 0, discount: 0, paid: 0, due: 0 };
+        rows.forEach(r => {
+            totals.charge   += Number(r.charge   || 0);
+            totals.discount += Number(r.discount || 0);
+            totals.paid     += Number(r.paid     || 0);
+            totals.due      += Number(r.due      || 0);
+        });
+        return { rows, totals };
+    }
+
+    $(document).on('click', '#btnPrintPdf', function () {
+        if (!reportTable) { showToastMessage('error', 'No data loaded yet.'); return; }
+        const { rows, totals } = buildReportRows();
+        const refDr    = $('#referred_dr_filter option:selected').text();
+        const refNonDr = $('#referred_non_dr_filter option:selected').text();
+        const from = $('#from_date').val(), to = $('#to_date').val();
+        const fmtMoney = n => 'Rs. ' + Number(n).toLocaleString(undefined, { minimumFractionDigits: 2 });
+        let bodyRows = rows.map((r, i) =>
+            `<tr><td>${i + 1}</td><td>${r.booking_id}</td><td>${r.date}</td><td>${r.patient_name}</td>` +
+            `<td>${r.mr_no}</td><td>${r.referred_dr || ''}</td><td>${r.referred_non_dr || ''}</td>` +
+            `<td>${fmtMoney(r.charge)}</td><td>${fmtMoney(r.discount)}</td><td>${fmtMoney(r.paid)}</td><td>${fmtMoney(r.due)}</td></tr>`
+        ).join('');
+        let footerRow = `<tr style="font-weight:bold;"><td colspan="7">GRAND TOTAL</td>` +
+            `<td>${fmtMoney(totals.charge)}</td><td>${fmtMoney(totals.discount)}</td><td>${fmtMoney(totals.paid)}</td><td>${fmtMoney(totals.due)}</td></tr>`;
+        const win = window.open('', '_blank');
+        win.document.write(`
+            <html><head><title>Monthly Case Logs</title>
+            <style>
+                @page { size: landscape; margin: 12mm; }
+                body { font-family: Arial, sans-serif; padding: 16px; }
+                h3 { margin-bottom: 4px; } .meta { color:#555; margin-bottom:16px; font-size: 0.9rem; }
+                table { width:100%; border-collapse: collapse; font-size: 0.85rem; }
+                th, td { border: 1px solid #999; padding: 6px 8px; text-align: center; }
+                thead { background: #f1f1f1; }
+            </style></head><body>
+            <h3>Monthly Case Logs</h3>
+            <div class="meta">Referred Dr: ${refDr} &nbsp;|&nbsp; Referred Non-Dr: ${refNonDr} &nbsp;|&nbsp; Period: ${from} to ${to}</div>
+            <table><thead><tr><th>S.No</th><th>Booking ID</th><th>Date</th><th>Patient Name</th><th>MR No</th><th>Referred Dr</th><th>Referred Non-Dr</th><th>Charge</th><th>Discount</th><th>Paid</th><th>Due</th></tr></thead>
+            <tbody>${bodyRows}${footerRow}</tbody></table>
+            </body></html>`);
+        win.document.close();
+        win.onload = () => win.print();
+    });
+
+    $(document).on('click', '#btnExportExcel', function () {
+        if (!reportTable) { showToastMessage('error', 'No data loaded yet.'); return; }
+        const { rows, totals } = buildReportRows();
+        const refDr    = $('#referred_dr_filter option:selected').text();
+        const refNonDr = $('#referred_non_dr_filter option:selected').text();
+        const from = $('#from_date').val(), to = $('#to_date').val();
+        const header = ["S.No", "Booking ID", "Date", "Patient Name", "MR No", "Referred Dr", "Referred Non-Dr", "Charge", "Discount", "Paid", "Due"];
+        const data = [
+            ["Monthly Case Logs"],
+            [`Referred Dr: ${refDr}`, `Referred Non-Dr: ${refNonDr}`, `Period: ${from} to ${to}`],
+            [],
+            header,
+            ...rows.map((r, i) => [
+                i + 1, r.booking_id, r.date, r.patient_name, r.mr_no,
+                r.referred_dr || '', r.referred_non_dr || '',
+                Number(r.charge), Number(r.discount), Number(r.paid), Number(r.due)
+            ]),
+            ["", "", "", "", "", "", "GRAND TOTAL", totals.charge, totals.discount, totals.paid, totals.due]
+        ];
+        const ws = XLSX.utils.aoa_to_sheet(data);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Monthly Case Logs");
+        XLSX.writeFile(wb, `Monthly_Case_Logs_${from}_to_${to}.xlsx`);
+    });
+
 });

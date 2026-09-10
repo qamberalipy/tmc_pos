@@ -50,6 +50,7 @@ def create_test_booking(data):
             discount_value = to_decimal(data.get("discount_value", 0), "discount_value")
             paid_amount = to_decimal(data.get("paid_amount", 0), "paid_amount")
             due_amount = to_decimal(data.get("due_amount", 0), "due_amount")
+            total_amount = to_decimal(data.get("total_amount", net_receivable), "total_amount")
 
             # --- 3. Booking Object Creation ---
             booking = TestBooking(
@@ -64,6 +65,7 @@ def create_test_booking(data):
                 branch_id=data["branch_id"],
                 discount_type=data.get("discount_type", "None"),
                 discount_value=discount_value,
+                total_amount=total_amount,
                 net_receivable=net_receivable,
                 payment_type=data.get("payment_type", "Cash"),
                 paid_amount=paid_amount,
@@ -372,7 +374,7 @@ def get_due_receipt_details(transaction_id):
             "gender": booking.gender,
 
             # Financials
-            "total_booking_amount": float(booking.net_receivable),
+            "total_booking_amount": float(booking.total_amount) if getattr(booking, 'total_amount', None) is not None else float((booking.net_receivable or 0) + (booking.discount_value or 0)),
             "remaining_due": float(booking.due_amount),
             
             # Branch/System Info
@@ -878,6 +880,7 @@ def get_booking_details(booking_id: int):
             "financials": {
                 "discount_type": booking.discount_type,
                 "discount_value": float(booking.discount_value or 0),
+                "gross_total": float(booking.total_amount) if getattr(booking, 'total_amount', None) is not None else float((booking.net_receivable or 0) + (booking.discount_value or 0)),
                 "net_payable": float(booking.net_receivable or 0),
                 "received": float(booking.paid_amount or 0),
                 "balance": float(booking.due_amount or 0),
@@ -907,10 +910,10 @@ def _format_test_booking(row):
         # This contains: [{"id": 12, "test_name": "xyz", "film_issued": False}, ...]
         "test_booking_details": row.test_booking_details,  
         "technician_comments": row.technician_comments,
-        "total_amount": float(row.net_receivable or 0),
+        "total_amount": float(row.total_amount) if getattr(row, 'total_amount', None) is not None else float((row.net_receivable or 0) + (row.discount_value or 0)),
         "total_films": row.total_no_of_films_used,
         "discount": float(row.discount_value or 0),
-        "net_amount": float((row.net_receivable or 0) - (row.discount_value or 0)),
+        "net_amount": float(row.net_receivable or 0),
         "received": float(row.paid_amount or 0),
         "balance": float(row.due_amount or 0),
         "branch": row.branch_name,
@@ -940,6 +943,7 @@ def get_all_test_bookings(branch_id=None, from_date=None, to_date=None):
                 TestBooking.mr_no,
                 Referred.name.label("referred_dr"),
                 TestBooking.net_receivable,
+                TestBooking.total_amount,
                 TestBooking.discount_value,
                 TestBooking.is_transferred_in,
                 TestBooking.paid_amount,
