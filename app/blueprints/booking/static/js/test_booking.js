@@ -13,6 +13,10 @@ const bookingState = {
 $(document).ready(function () {
     loadDropdowns();
 
+    $("#age").on("input", function () {
+        if (parseFloat($(this).val()) < 0) $(this).val(0);
+    });
+
     // Bind add test button
     $("#add_test_btn").on("click", function () {
         let testId = $("#select_test").val();
@@ -682,6 +686,11 @@ function validateDiscountValue() {
     const type = $("#discount_type").val();
     const val = parseFloat($input.val()) || 0;
     $(".discount-error").remove();
+    if (val < 0) {
+        $input.addClass("input-error");
+        $input.after('<div class="text-danger small discount-error">Discount cannot be negative</div>');
+        return false;
+    }
     if (type === "Percentage" && (val < 0 || val > 100)) {
         $input.addClass("input-error");
         $input.after('<div class="text-danger small discount-error">Percentage must be between 0 and 100</div>');
