@@ -153,6 +153,7 @@ h2,p{margin:0;padding:0}
 
       <div class="footer">
         <div style="font-weight:600">
+          {{ booking.branch.name }} |
           {{ booking.branch.address }} |
           Phone: {{ booking.branch.contact }}{% if booking.branch.additional_contact %} | {{ booking.branch.additional_contact }}{% endif %}
         </div>
