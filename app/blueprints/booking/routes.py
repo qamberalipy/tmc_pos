@@ -39,6 +39,15 @@ def view_films_inventory_audit():
     except Exception as e:
         print(f"Error in view_films_inventory_audit: {str(e)}")
         return redirect(url_for('main.error_page'))
+
+@booking_bp.route('/view/film-usage-log')
+@login_required
+def view_film_usage_log():
+    try:
+        return render_template('film_usage_log.html')
+    except Exception as e:
+        print(f"Error in view_film_usage_log: {str(e)}")
+        return redirect(url_for('main.error_page'))
 @booking_bp.route('/view/booking-result')
 @login_required
 def view_booking_result():

@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block stylesheets %}
+<style>
+    /* Quick Range Buttons */
+    .range-btn {
+        border: 1px solid #198754;
+        background: #fff;
+        color: #198754;
+        padding: 6px 15px;
+        border-radius: 30px;
+        font-size: 14px;
+        transition: 0.2s ease;
+    }
+
+    .range-btn:hover {
+        background: #198754;
+        color: #fff;
+    }
+</style>
+{% endblock stylesheets %}
+
+{% block content %}
+{% endblock %}
+{% block user_page %}
+<div class="container-fluid py-3 rounded bg-white border-0 shadow-sm border-left">
+
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 class="fw-bold text-dark m-0">Film Usage Log</h4>
+    </div>
+
+    <!-- Date Range -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-6">
+            <label class="form-label fw-semibold">From Date</label>
+            <input type="date" class="form-control shadow-sm" id="from_date">
+        </div>
+
+        <div class="col-md-6">
+            <label class="form-label fw-semibold">To Date</label>
+            <div class="d-flex">
+                <input type="date" class="form-control shadow-sm" id="to_date" placeholder="dd/mm/yyyy - dd/mm/yyyy">
+                <button class="btn btn-dark ms-2" id="searchBtn">
+                    <i class="bi bi-search"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="d-flex justify-content-end mb-2 gap-2">
+        <button class="btn btn-success" id="exportExcel">
+            <i class="bi bi-file-earmark-excel"></i> Excel
+        </button>
+
+        <button class="btn btn-danger" id="exportPDF">
+            <i class="bi bi-file-earmark-pdf"></i> PDF
+        </button>
+    </div>
+
+    <table id="inventory_report" class="table table-bordered table-hover table-striped display nowrap">
+        <thead class="bg-dark text-white">
+            <tr>
+                <th>Date</th>
+                <th>Opening Films</th>
+                <th>Closing Films</th>
+                <th>Balance</th>
+                <th>Used Films</th>
+                <th>Total Film Use</th>
+            </tr>
+        </thead>
+        <tbody id="inventory_body"></tbody>
+    </table>
+</div>
+
+{% endblock %}
+
+{% block javascript %}
+<!-- Excel (SheetJS) -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+
+<!-- jsPDF + autoTable -->
+<!-- jsPDF -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<!-- jsPDF AutoTable Plugin -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+
+<script src="{{ url_for('booking.static', filename='js/film_usage_log.js') }}"></script>
+
+{% endblock %}

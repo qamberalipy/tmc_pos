@@ -49,7 +49,8 @@ MENU = {
             "css_class": "nav-group-registration",
             "children": [
                 {"label": "Inventory Audit", "icon": "bi-file-earmark-post", "endpoint": "booking.view_films_inventory_audit"},
-                {"label": "Films Usage", "icon": "bi-file-earmark-text", "endpoint": "booking.view_films_usage"},
+                {"label": "Films Usage", "icon": "bi-file-earmark-text", "endpoint": "booking.view_films_usage"}
+               
             ]
         },
         # --- TRANSACTIONS (Expanded for Admin) ---
@@ -75,7 +76,8 @@ MENU = {
                 {"label": "Radiologist Logs", "icon": "bi-file-earmark-bar-graph", "endpoint": "reports.view_radiologist_logs"},
                 {"label": "Internal Reporting Logs", "icon": "bi-file-earmark-bar-graph", "endpoint": "reports.view_doctor_reporting_logs"},
                 {"label":"Commision Report", "icon":"bi-file-earmark-bar-graph", "endpoint":"reports.view_monthly_commission_sheet"},
-                {"label": "Monthly Case Logs", "icon": "bi-file-earmark-bar-graph", "endpoint": "reports.view_monthly_case_logs"}
+                {"label": "Monthly Case Logs", "icon": "bi-file-earmark-bar-graph", "endpoint": "reports.view_monthly_case_logs"},
+                {"label": "Film Usage Log", "icon": "bi-file-earmark-text", "endpoint": "booking.view_film_usage_log"},
             ]
         },
     ],
@@ -119,7 +121,7 @@ MENU = {
             "css_class": "nav-group-registration",
             "children": [
                 {"label": "Inventory Audit", "icon": "bi-file-earmark-post", "endpoint": "booking.view_films_inventory_audit"},
-                {"label": "Films Usage", "icon": "bi-file-earmark-text", "endpoint": "booking.view_films_usage"},
+                {"label": "Films Usage", "icon": "bi-file-earmark-text", "endpoint": "booking.view_films_usage"}
             ]
         },
         {
@@ -142,7 +144,8 @@ MENU = {
                 {"label": "Radiologist Logs", "icon": "bi-file-earmark-bar-graph", "endpoint": "reports.view_radiologist_logs"},
                 {"label": "Internal Reporting Logs", "icon": "bi-file-earmark-bar-graph", "endpoint": "reports.view_doctor_reporting_logs"},
                 {"label":"Commision Report", "icon":"bi-file-earmark-bar-graph", "endpoint":"reports.view_monthly_commission_sheet"},
-                {"label": "Monthly Case Logs", "icon": "bi-file-earmark-bar-graph", "endpoint": "reports.view_monthly_case_logs"}
+                {"label": "Monthly Case Logs", "icon": "bi-file-earmark-bar-graph", "endpoint": "reports.view_monthly_case_logs"},
+                {"label": "Film Usage Log", "icon": "bi-file-earmark-text", "endpoint": "booking.view_film_usage_log"},
             ]
         },
     ],

@@ -85,6 +85,12 @@
                   <option value="mrs">Mrs.</option>
                   <option value="ms">Ms.</option>
                   <option value="miss">Miss</option>
+                  <option value="master">Master</option>
+                  <option value="baby">Baby</option>
+                  <option value="baby_of">Baby of</option>
+                  <option value="dr">Dr.</option>
+                  <option value="capt">Capt.</option>
+                  <option value="prof">Prof.</option>
                 </select>
               </div>
               <div class="col-9 ps-2">
@@ -106,7 +112,7 @@
             <label for="age" class="mb-1">Age:</label>
             <div class="d-flex">
               <div class="col-7">
-                <input type="number" id="age" name="age" placeholder="Age" class="form-control">
+                <input type="number" id="age" name="age" placeholder="Age" class="form-control" min="0">
               </div>
               <div class="col-5 ps-2">
                 <select id="age_type" name="age_type" class="form-select">
@@ -226,7 +232,7 @@
                   <option value="Percentage">Percentage</option>
                   <option value="Amount" selected>Amount</option>
                 </select>
-                <input type="number" id="discount_value" class="form-control" placeholder="Discount Amount">
+                <input type="number" id="discount_value" class="form-control" placeholder="Discount Amount" min="0">
               </div>
             </div>
 

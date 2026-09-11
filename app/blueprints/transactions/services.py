@@ -44,7 +44,7 @@ def create_expense(data):
             return {"error": f"Invalid payment method. Allowed: {ALLOWED_PAYMENT_METHODS}"}, 400
 
         # Start Atomic Transaction
-        with db.session.begin():
+        with db.session.begin_nested():
             # 1. Create the Expense record
             exp = Expenses(
                 branch_id=int(data["Branch_id"]),
@@ -74,6 +74,7 @@ def create_expense(data):
             )
             db.session.add(transaction)
 
+        db.session.commit()
         return {"message": "Expense created and transaction recorded successfully", "id": exp.id}, 201
 
     except SQLAlchemyError as e:
