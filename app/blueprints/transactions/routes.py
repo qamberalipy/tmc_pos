@@ -40,9 +40,10 @@ def fetch_expenses():
     # --- NEW: Get Params ---
     from_date = request.args.get('from_date')
     to_date = request.args.get('to_date')
+    expense_head_id = request.args.get('expense_head_id')
 
     # Pass them to service
-    result, status = transactions_services.get_all_expenses(branch_id_str, from_date, to_date)
+    result, status = transactions_services.get_all_expenses(branch_id_str, from_date, to_date, expense_head_id=expense_head_id)
     return jsonify(result), status
 
 

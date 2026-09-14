@@ -163,7 +163,7 @@ def toggle_expense_deleted(expense_id, is_deleted):
         return {"error": str(e.__dict__.get("orig", e))}, 500
 
 
-def get_all_expenses(branch_id_str=None, from_date=None, to_date=None):
+def get_all_expenses(branch_id_str=None, from_date=None, to_date=None, expense_head_id=None):
     try:
         # 1. Date Validation & Setup
         start_dt = None
@@ -206,6 +206,9 @@ def get_all_expenses(branch_id_str=None, from_date=None, to_date=None):
         # 3. Apply Filters
         if branch_id_str:
             query = query.filter(Expenses.branch_id == int(branch_id_str))
+
+        if expense_head_id:
+            query = query.filter(Expenses.expense_head_id == int(expense_head_id))
 
         if start_dt and end_dt:
             query = query.filter(
