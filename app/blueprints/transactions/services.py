@@ -163,7 +163,7 @@ def toggle_expense_deleted(expense_id, is_deleted):
         return {"error": str(e.__dict__.get("orig", e))}, 500
 
 
-def get_all_expenses(branch_id_str=None, from_date=None, to_date=None):
+def get_all_expenses(branch_id_str=None, from_date=None, to_date=None, expense_head_id=None):
     try:
         # 1. Date Validation & Setup
         start_dt = None
@@ -206,6 +206,9 @@ def get_all_expenses(branch_id_str=None, from_date=None, to_date=None):
         # 3. Apply Filters
         if branch_id_str:
             query = query.filter(Expenses.branch_id == int(branch_id_str))
+
+        if expense_head_id:
+            query = query.filter(Expenses.expense_head_id == int(expense_head_id))
 
         if start_dt and end_dt:
             query = query.filter(
@@ -251,3 +254,82 @@ def get_expense_by_id(expense_id):
         return _format_expense(e, branch_name, created_by_name, expense_head_name), 200
     except SQLAlchemyError as e:
         return {"error": str(e.__dict__.get("orig", e))}, 500
+
+
+def get_monthly_expense_log(branch_id, month_str):
+    """Build a full monthly expense log: summary cards, head breakdown, and day-grouped detail."""
+    from calendar import monthrange
+
+    year, mon = map(int, month_str.split("-"))
+    start_dt = datetime.datetime(year, mon, 1)
+    end_dt = datetime.datetime(year, mon, monthrange(year, mon)[1], 23, 59, 59)
+
+    branch = db.session.query(Branch.branch_name).filter(Branch.id == branch_id).scalar()
+
+    rows = (
+        db.session.query(
+            Expenses,
+            Expense_head.name.label("head_name"),
+            User.name.label("created_by_name")
+        )
+        .join(Expense_head, Expense_head.id == Expenses.expense_head_id)
+        .join(User, User.id == Expenses.created_by)
+        .filter(
+            Expenses.branch_id == branch_id,
+            Expenses.is_deleted == False,
+            Expenses.created_at >= start_dt,
+            Expenses.created_at <= end_dt
+        )
+        .order_by(Expenses.created_at.asc())
+        .all()
+    )
+
+    days = {}
+    head_summary = {}
+    grand_total = 0
+
+    for e, head_name, created_by_name in rows:
+        d = e.created_at.strftime("%Y-%m-%d")
+        days.setdefault(d, {"rows": [], "total": 0})
+        days[d]["rows"].append({
+            "date": d,
+            "expense_head": head_name,
+            "detail": e.description or "-",
+            "amount": float(e.amount),
+            "paid_to": e.paid_to or "-",
+            "authorized_by": f"{created_by_name} @ {e.created_at.strftime('%I:%M%p')}"
+        })
+        days[d]["total"] += float(e.amount)
+
+        head_summary.setdefault(head_name, {"count": 0, "total": 0})
+        head_summary[head_name]["count"] += 1
+        head_summary[head_name]["total"] += float(e.amount)
+
+        grand_total += float(e.amount)
+
+    active_days = len(days) or 1
+
+    head_breakdown = [
+        {
+            "head": h,
+            "count": v["count"],
+            "total": v["total"],
+            "pct": round(v["total"] / grand_total * 100, 1) if grand_total else 0,
+            "avg": round(v["total"] / active_days, 2)
+        }
+        for h, v in head_summary.items()
+    ]
+
+    return {
+        "branch": branch,
+        "month": month_str,
+        "total_expenses": grand_total,
+        "daily_average": round(grand_total / active_days, 2),
+        "total_transactions": len(rows),
+        "active_days": active_days,
+        "head_breakdown": head_breakdown,
+        "days": [
+            {"date": d, "rows": v["rows"], "total": v["total"]}
+            for d, v in sorted(days.items())
+        ]
+    }

@@ -25,9 +25,16 @@ function loadExpenseHeads() {
             // Clear and set default first option
             $select.html('<option value="">--Select Expense Head--</option>');
 
+            // Also populate the filter dropdown
+            const $filter = $("#filter_expense_head");
+            $filter.html('<option value="">All</option>');
+
             // Populate options
             data.forEach(function (item) {
                 $select.append(
+                    `<option value="${item.id}">${item.name}</option>`
+                );
+                $filter.append(
                     `<option value="${item.id}">${item.name}</option>`
                 );
             });
@@ -47,18 +54,20 @@ function getAllExpenses() {
     // --- NEW: Prepare Params ---
     const params = {
         from_date: $("#from_date").val(),
-        to_date: $("#to_date").val()
+        to_date: $("#to_date").val(),
+        expense_head_id: $("#filter_expense_head").val()
     };
 
     return axios.get(`${baseUrl}/transactions/expenses`, { params: params })
         .then(res => {
             let data = res.data;
+            window.__lastExpenseData = data;
             let dtable = $("#expense_table").DataTable({
                 pageLength: 14,
                 lengthChange: false,
                 destroy: true,
                 responsive: true,
-                order: [[0, "desc"]] // Sort by ID descending by default
+                order: [[8, "desc"]] // Sort by Created At (column 8 after inserting Description)
             });
             dtable.clear().draw();
             console.log(data);
@@ -80,6 +89,7 @@ function getAllExpenses() {
                     exp.expense_head || "-",
                     exp.amount || "-",
                     exp.paid_to || "-",
+                    exp.description || "-",
                     exp.payment_method || "-",
                     exp.branch || "-",
                     exp.created_by || "-",
@@ -216,4 +226,89 @@ $(document).ready(function () {
 
     loadExpenseHeads();
     getAllExpenses();
+});
+
+// =============== PDF (Print View) ===============
+$(document).on("click", "#btnPrintPdf", function () {
+    if (!window.__lastExpenseData || window.__lastExpenseData.length === 0) {
+        showToastMessage("error", "No data loaded yet.");
+        return;
+    }
+    const rows = window.__lastExpenseData;
+    const from = $("#from_date").val() || "All", to = $("#to_date").val() || "All";
+    const branch = rows[0]?.branch || "All Branches";
+    const total = rows.reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
+
+    let bodyRows = rows.map((r, i) => `
+        <tr><td>${i + 1}</td><td>${r.expense_head || "-"}</td><td style="text-align:right">${Number(r.amount || 0).toLocaleString(undefined,{minimumFractionDigits:2})}</td>
+        <td>${r.paid_to || "-"}</td><td>${r.description || "-"}</td><td>${r.payment_method || "-"}</td>
+        <td>${r.branch || "-"}</td><td>${r.created_by || "-"}</td><td>${formatDateOnly(r.created_at) || "-"}</td></tr>
+    `).join("");
+
+    const win = window.open("", "_blank");
+    win.document.write(`<html><head><title>Expense Report</title>
+    <style>
+        @page { size: landscape; margin: 10mm; }
+        body { font-family: Arial, sans-serif; padding: 12px; font-size: 12px; }
+        h2 { margin: 0 0 2px; text-align: center; }
+        .meta { text-align: center; color: #555; margin-bottom: 14px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #999; padding: 5px 7px; text-align: center; }
+        thead th { background: #f1f1f1; }
+        .grand-row td { background: #1e3a5f; color: #fff; font-weight: bold; }
+    </style></head><body>
+    <h2>EXPENSE REPORT &mdash; ${branch}</h2>
+    <div class="meta">From: ${from} &nbsp;|&nbsp; To: ${to}</div>
+    <table><thead><tr><th>S.No</th><th>Expense Head</th><th>Amount</th><th>Paid To</th><th>Description</th><th>Payment Method</th><th>Branch</th><th>Created By</th><th>Created At</th></tr></thead>
+    <tbody>${bodyRows}
+    <tr class="grand-row"><td colspan="2" style="text-align:right;">Grand Total</td><td style="text-align:right;">${total.toLocaleString(undefined,{minimumFractionDigits:2})}</td><td colspan="6"></td></tr>
+    </tbody></table>
+    <script>window.onload = () => window.print();<` + `/script>
+    </body></html>`);
+    win.document.close();
+});
+
+// =============== EXCEL (SheetJS) ===============
+$(document).on("click", "#btnExportExcel", function () {
+    if (!window.__lastExpenseData || window.__lastExpenseData.length === 0) {
+        showToastMessage("error", "No data loaded yet.");
+        return;
+    }
+    const rows = window.__lastExpenseData;
+    const from = $("#from_date").val() || "All", to = $("#to_date").val() || "All";
+    const branch = rows[0]?.branch || "All Branches";
+    const total = rows.reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
+    const aoa = [];
+
+    // Title & meta
+    aoa.push(["EXPENSE REPORT — " + branch]);
+    aoa.push(["From: " + from + "  |  To: " + to]);
+    aoa.push([]);
+
+    // Header
+    aoa.push(["S.No", "Expense Head", "Amount", "Paid To", "Description", "Payment Method", "Branch", "Created By", "Created At"]);
+
+    // Data rows
+    rows.forEach((r, i) => {
+        aoa.push([
+            i + 1,
+            r.expense_head || "-",
+            parseFloat(r.amount) || 0,
+            r.paid_to || "-",
+            r.description || "-",
+            r.payment_method || "-",
+            r.branch || "-",
+            r.created_by || "-",
+            formatDateOnly(r.created_at) || "-"
+        ]);
+    });
+
+    // Grand total
+    aoa.push([]);
+    aoa.push(["", "Grand Total", total, "", "", "", "", "", ""]);
+
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Expenses");
+    XLSX.writeFile(wb, `Expense_Report_${from}_to_${to}.xlsx`);
 });

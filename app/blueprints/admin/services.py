@@ -1,7 +1,10 @@
 from venv import logger
+from datetime import datetime, timedelta, timezone
 from app.extensions import db
-from app.models import Branch, Role,User,Department
-from sqlalchemy import cast, Integer # Add this import
+from app.models import Branch, Role, User, Department, TestBooking, TestBookingDetails, Referred, Test_registration
+from app.models.referred import ReferralShare
+from app.models.expenses import Expenses
+from sqlalchemy import cast, Integer, func
 from sqlalchemy.exc import SQLAlchemyError
 
 def create_branch(data):
@@ -162,3 +165,93 @@ def get_all_department_service():
     except Exception as e:
         print(f"Unexpected error in get_all_departments_service: {str(e)}")
         raise
+
+
+def get_dashboard_summary(branch_id):
+    today = datetime.now(timezone.utc).date()
+    month_start = today.replace(day=1)
+
+    todays_bookings = TestBooking.query.filter(
+        TestBooking.branch_id == branch_id,
+        func.date(TestBooking.create_at) == today
+    ).count()
+
+    todays_collection = db.session.query(
+        func.coalesce(func.sum(TestBooking.paid_amount), 0)
+    ).filter(
+        TestBooking.branch_id == branch_id,
+        func.date(TestBooking.create_at) == today
+    ).scalar()
+
+    total_due = db.session.query(
+        func.coalesce(func.sum(TestBooking.due_amount), 0)
+    ).filter(
+        TestBooking.branch_id == branch_id,
+        TestBooking.due_amount > 0
+    ).scalar()
+
+    month_expenses = db.session.query(
+        func.coalesce(func.sum(Expenses.amount), 0)
+    ).filter(
+        Expenses.branch_id == branch_id,
+        Expenses.is_deleted == False,
+        Expenses.created_at >= month_start
+    ).scalar()
+
+    # Last 14 days revenue trend
+    trend_rows = db.session.query(
+        func.date(TestBooking.create_at).label('d'),
+        func.sum(TestBooking.paid_amount)
+    ).filter(
+        TestBooking.branch_id == branch_id,
+        TestBooking.create_at >= today - timedelta(days=13)
+    ).group_by('d').order_by('d').all()
+
+    # Test category breakdown (this month)
+    category_rows = db.session.query(
+        Test_registration.category,
+        func.count(TestBookingDetails.id)
+    ).join(
+        TestBookingDetails, TestBookingDetails.test_id == Test_registration.id
+    ).join(
+        TestBooking, TestBooking.id == TestBookingDetails.booking_id
+    ).filter(
+        TestBooking.branch_id == branch_id,
+        TestBooking.create_at >= month_start
+    ).group_by(Test_registration.category).all()
+
+    # Top referring doctors (this month)
+    top_doctors = db.session.query(
+        Referred.name,
+        func.count(ReferralShare.id)
+    ).join(
+        ReferralShare, ReferralShare.referred_id == Referred.id
+    ).join(
+        TestBooking, TestBooking.id == ReferralShare.booking_id
+    ).filter(
+        TestBooking.branch_id == branch_id,
+        TestBooking.create_at >= month_start
+    ).group_by(Referred.name).order_by(func.count(ReferralShare.id).desc()).limit(5).all()
+
+    recent = TestBooking.query.filter(
+        TestBooking.branch_id == branch_id
+    ).order_by(TestBooking.create_at.desc()).limit(6).all()
+
+    return {
+        "todays_bookings": todays_bookings,
+        "todays_collection": float(todays_collection),
+        "total_due": float(total_due),
+        "month_expenses": float(month_expenses),
+        "trend": [{"date": str(r.d), "amount": float(r[1])} for r in trend_rows],
+        "categories": [{"label": c[0] or "Other", "count": c[1]} for c in category_rows],
+        "top_doctors": [{"name": d[0], "count": d[1]} for d in top_doctors],
+        "recent_bookings": [
+            {
+                "patient": b.patient_name,
+                "amount": float(b.net_receivable or 0),
+                "date": b.create_at.strftime("%d-%b-%Y"),
+                "status": "Paid" if (b.due_amount or 0) == 0 else "Due"
+            }
+            for b in recent
+        ]
+    }

@@ -62,7 +62,8 @@ MENU = {
             "children": [
                 {"label": "Payment", "icon": "bi-cash-stack", "endpoint": "#"},
                 {"label": "Expense", "icon": "bi-wallet2", "endpoint": "transactions.view_expenses"},
-                {"label": "Referral Share", "icon": "bi-cash-stack", "endpoint": "transactions.view_referral_share"}
+                {"label": "Referral Share", "icon": "bi-cash-stack", "endpoint": "transactions.view_referral_share"},
+                {"label": "Monthly Expense Log", "icon": "bi-journal-text", "endpoint": "transactions.view_monthly_expense_log"}
             ]
         },
         # --- REPORTS (Expanded for Admin) ---
@@ -78,6 +79,7 @@ MENU = {
                 {"label":"Commision Report", "icon":"bi-file-earmark-bar-graph", "endpoint":"reports.view_monthly_commission_sheet"},
                 {"label": "Monthly Case Logs", "icon": "bi-file-earmark-bar-graph", "endpoint": "reports.view_monthly_case_logs"},
                 {"label": "Film Usage Log", "icon": "bi-file-earmark-text", "endpoint": "booking.view_film_usage_log"},
+                {"label": "Monthly Expense Log", "icon": "bi-journal-text", "endpoint": "transactions.view_monthly_expense_log"}
             ]
         },
     ],
@@ -146,6 +148,7 @@ MENU = {
                 {"label":"Commision Report", "icon":"bi-file-earmark-bar-graph", "endpoint":"reports.view_monthly_commission_sheet"},
                 {"label": "Monthly Case Logs", "icon": "bi-file-earmark-bar-graph", "endpoint": "reports.view_monthly_case_logs"},
                 {"label": "Film Usage Log", "icon": "bi-file-earmark-text", "endpoint": "booking.view_film_usage_log"},
+                {"label": "Monthly Expense Log", "icon": "bi-journal-text", "endpoint": "transactions.view_monthly_expense_log"}
             ]
         },
     ],

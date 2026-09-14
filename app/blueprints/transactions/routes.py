@@ -40,9 +40,10 @@ def fetch_expenses():
     # --- NEW: Get Params ---
     from_date = request.args.get('from_date')
     to_date = request.args.get('to_date')
+    expense_head_id = request.args.get('expense_head_id')
 
     # Pass them to service
-    result, status = transactions_services.get_all_expenses(branch_id_str, from_date, to_date)
+    result, status = transactions_services.get_all_expenses(branch_id_str, from_date, to_date, expense_head_id=expense_head_id)
     return jsonify(result), status
 
 
@@ -70,4 +71,21 @@ def toggle_expense_deleted(expense_id):
         return jsonify({"error": "is_deleted is required"}), 400
     result, status = transactions_services.toggle_expense_deleted(expense_id, data.get("is_deleted"))
     return jsonify(result), status
+
+
+@transaction_bp.route('/monthly-expense-log', methods=['GET'])
+@login_required
+def view_monthly_expense_log():
+    return render_template('monthly_expense_log.html')
+
+
+@transaction_bp.route('/monthly-expense-log/data', methods=['GET'])
+@login_required
+def api_monthly_expense_log():
+    branch_id = session.get('branch_id')
+    month = request.args.get('month')  # format YYYY-MM
+    if not month:
+        return jsonify({"error": "month parameter is required (YYYY-MM)"}), 400
+    data = transactions_services.get_monthly_expense_log(branch_id, month)
+    return jsonify(data), 200
 
