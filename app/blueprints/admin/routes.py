@@ -97,3 +97,8 @@ def get_all_departments():
     except Exception as e:
         print(f"Error fetching departments: {str(e)}")
         return jsonify({"status": "error", "message": "Something went wrong"}), 500
+
+@admin_bp.route("/dashboard/summary", methods=["GET"])
+@login_required
+def dashboard_summary():
+    return jsonify(admin_services.get_dashboard_summary(session.get("branch_id"))), 200

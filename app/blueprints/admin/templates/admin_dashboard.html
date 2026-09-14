@@ -1,139 +1,139 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 {% block stylesheets %}
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  body { font-family: Arial, sans-serif; background-color: #f8f9fc; }
 
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background-color: #f8f9fc;
-    }
-    .card {
-      border: none;
-      border-radius: 0.5rem;
-      box-shadow: 0 0.15rem 1rem rgba(58,59,69,0.15);
-      transition: transform 0.2s;
-    }
-    .card:hover { transform: translateY(-5px); }
-    .card-header {
-      background: #fff;
-      border-bottom: 1px solid #e3e6f0;
-      font-weight: 600;
-    }
-    .stat-card .icon {
-      position: absolute;
-      top: 1rem;
-      right: 1rem;
-      font-size: 2.5rem;
-      opacity: 0.2;
-    }
-    .chart-container { height: 300px; }
-    .footer {
-      background: #fff;
-      box-shadow: 0 -1px 5px rgba(0,0,0,0.1);
-    }
-  </style>
+  /* Stat Cards */
+  .stat-card {
+    border: none;
+    border-radius: 0.6rem;
+    box-shadow: 0 0.15rem 1rem rgba(58,59,69,.12);
+    transition: transform .2s, box-shadow .2s;
+    overflow: hidden;
+  }
+  .stat-card:hover { transform: translateY(-4px); box-shadow: 0 0.4rem 1.4rem rgba(58,59,69,.18); }
+  .stat-card .card-body { padding: 1.2rem 1.4rem; }
+  .stat-card .label { font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; margin-bottom: .25rem; }
+  .stat-card .value { font-size: 1.6rem; font-weight: 700; line-height: 1.1; }
+  .stat-card .icon-wrap { font-size: 2.4rem; opacity: .18; }
+
+  /* Chart Cards */
+  .chart-card {
+    border: none;
+    border-radius: 0.6rem;
+    box-shadow: 0 0.15rem 1rem rgba(58,59,69,.12);
+  }
+  .chart-card .card-header {
+    background: #fff;
+    border-bottom: 1px solid #e3e6f0;
+    font-weight: 600;
+    font-size: .88rem;
+    padding: .8rem 1.2rem;
+    border-radius: .6rem .6rem 0 0 !important;
+  }
+  .chart-container {
+    position: relative;
+    max-height: 280px;
+    padding: 1rem;
+  }
+  .chart-container canvas { max-height: 260px; }
+
+  /* Table Card */
+  .table-card {
+    border: none;
+    border-radius: 0.6rem;
+    box-shadow: 0 0.15rem 1rem rgba(58,59,69,.12);
+  }
+  .table-card .card-header {
+    background: #fff;
+    border-bottom: 1px solid #e3e6f0;
+    font-weight: 600;
+    font-size: .88rem;
+    padding: .8rem 1.2rem;
+    border-radius: .6rem .6rem 0 0 !important;
+  }
+  .badge-paid { background: #d1fae5; color: #065f46; font-size: .72rem; font-weight: 700; padding: .25em .6em; border-radius: .35rem; }
+  .badge-due  { background: #fee2e2; color: #991b1b; font-size: .72rem; font-weight: 700; padding: .25em .6em; border-radius: .35rem; }
+
+  /* Skeleton */
+  .skeleton { background: linear-gradient(90deg, #e0e0e0 25%, #f0f0f0 50%, #e0e0e0 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite; border-radius: .4rem; }
+  @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+  .skel-line { height: 1rem; margin-bottom: .5rem; }
+  .skel-val  { height: 2rem; width: 60%; }
+
+  /* Empty state */
+  .empty-state { text-align: center; padding: 2.5rem 1rem; color: #aaa; font-size: .9rem; }
+  .empty-state i { font-size: 2rem; display: block; margin-bottom: .5rem; }
+</style>
 {% endblock stylesheets %}
 
-{% block content %}
-{% endblock %}
-{% block user_page %} 
-  <div class="container-fluid px-4">
-    <!-- Heading -->
-    
+{% block content %}{% endblock %}
+{% block user_page %}
+<div class="container-fluid px-3 px-md-4 py-3">
 
-    <!-- Stats -->
-    <div class="row">
-      <div class="col-xl-3 col-md-6 mb-4">
-        <div class="card shadow h-100 py-2 stat-card">
-          <div class="card-body d-flex justify-content-between align-items-center">
-            <div>
-              <div class="text-xs fw-bold text-primary text-uppercase mb-1">Total Revenue</div>
-              <div class="h5 fw-bold">$45,231</div>
-              <div class="text-xs text-success mt-2"><i class="fas fa-arrow-up"></i> 12% since last month</div>
-            </div>
-            <i class="fas fa-dollar-sign fa-2x text-gray-300 icon"></i>
-          </div>
-        </div>
-      </div>
-
-      <div class="col-xl-3 col-md-6 mb-4">
-        <div class="card shadow h-100 py-2 stat-card">
-          <div class="card-body d-flex justify-content-between align-items-center">
-            <div>
-              <div class="text-xs fw-bold text-success text-uppercase mb-1">Sales</div>
-              <div class="h5 fw-bold">1,234</div>
-              <div class="text-xs text-success mt-2"><i class="fas fa-arrow-up"></i> 8% since last month</div>
-            </div>
-            <i class="fas fa-shopping-cart fa-2x text-gray-300 icon"></i>
-          </div>
-        </div>
-      </div>
-
-      <div class="col-xl-3 col-md-6 mb-4">
-        <div class="card shadow h-100 py-2 stat-card">
-          <div class="card-body d-flex justify-content-between align-items-center">
-            <div>
-              <div class="text-xs fw-bold text-warning text-uppercase mb-1">Profit</div>
-              <div class="h5 fw-bold">$18,450</div>
-              <div class="text-xs text-success mt-2"><i class="fas fa-arrow-up"></i> 15% since last month</div>
-            </div>
-            <i class="fas fa-chart-line fa-2x text-gray-300 icon"></i>
-          </div>
-        </div>
-      </div>
-
-      <div class="col-xl-3 col-md-6 mb-4">
-        <div class="card shadow h-100 py-2 stat-card">
-          <div class="card-body d-flex justify-content-between align-items-center">
-            <div>
-              <div class="text-xs fw-bold text-danger text-uppercase mb-1">Active Users</div>
-              <div class="h5 fw-bold">1,256</div>
-              <div class="text-xs text-danger mt-2"><i class="fas fa-arrow-down"></i> 3% since last hour</div>
-            </div>
-            <i class="fas fa-users fa-2x text-gray-300 icon"></i>
-          </div>
+  <!-- Stat Cards -->
+  <div class="row g-3 mb-4" id="statRow">
+    {% for _ in range(4) %}
+    <div class="col-6 col-xl-3">
+      <div class="stat-card card h-100">
+        <div class="card-body">
+          <div class="skeleton skel-line" style="width:55%"></div>
+          <div class="skeleton skel-val mt-2"></div>
         </div>
       </div>
     </div>
+    {% endfor %}
+  </div>
 
-    <!-- Charts -->
-    <div class="row">
-      <div class="col-xl-8 col-lg-7 mb-4">
-        <div class="card">
-          <div class="card-header">Revenue & Profit Overview</div>
-          <div class="card-body"><canvas id="revenueProfitChart"></canvas></div>
-        </div>
-      </div>
-      <div class="col-xl-4 col-lg-5 mb-4">
-        <div class="card">
-          <div class="card-header">Sales by Category</div>
-          <div class="card-body"  style="    max-height: 184px; width:100%;"><canvas id="salesCategoryChart"></canvas></div>
+  <!-- Charts Row 1: Trend + Doughnut -->
+  <div class="row g-3 mb-4">
+    <div class="col-12 col-lg-8">
+      <div class="chart-card card h-100">
+        <div class="card-header">14-Day Collection Trend</div>
+        <div class="chart-container" id="trendWrap">
+          <canvas id="revenueProfitChart"></canvas>
         </div>
       </div>
     </div>
-
-    <!-- User Activity + Sales -->
-    <div class="row">
-      <div class="col-lg-6 mb-4">
-        <div class="card">
-          <div class="card-header">User Activity</div>
-          <div class="card-body"><canvas id="userActivityChart"></canvas></div>
+    <div class="col-12 col-lg-4">
+      <div class="chart-card card h-100">
+        <div class="card-header">Tests by Category (This Month)</div>
+        <div class="chart-container" id="catWrap">
+          <canvas id="salesCategoryChart"></canvas>
         </div>
       </div>
-      <div class="col-lg-6 mb-4">
-        <div class="card">
-          <div class="card-header">Recent Sales</div>
-          <div class="card-body">
-            <table class="table table-borderless">
-              <thead>
-                <tr><th>Customer</th><th>Product</th><th>Date</th><th>Amount</th></tr>
+    </div>
+  </div>
+
+  <!-- Charts Row 2: Top Doctors + Recent Bookings -->
+  <div class="row g-3 mb-2">
+    <div class="col-12 col-lg-5">
+      <div class="chart-card card h-100">
+        <div class="card-header">Top Referring Doctors (This Month)</div>
+        <div class="chart-container" id="doctorWrap">
+          <canvas id="userActivityChart"></canvas>
+        </div>
+      </div>
+    </div>
+    <div class="col-12 col-lg-7">
+      <div class="table-card card h-100">
+        <div class="card-header">Recent Bookings</div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-borderless table-hover mb-0 align-middle">
+              <thead class="table-light" style="font-size:.78rem;">
+                <tr>
+                  <th class="ps-3">Patient</th>
+                  <th>Amount</th>
+                  <th>Date</th>
+                  <th>Status</th>
+                </tr>
               </thead>
-              <tbody>
-                <tr><td>John Smith</td><td>Premium Package</td><td>04/15/2025</td><td class="text-success">$299</td></tr>
-                <tr><td>Sarah Johnson</td><td>Basic Plan</td><td>04/14/2025</td><td class="text-success">$99</td></tr>
-                <tr><td>Mike Davis</td><td>Enterprise Suite</td><td>04/14/2025</td><td class="text-success">$1,299</td></tr>
-                <tr><td>Emily Wilson</td><td>Standard Package</td><td>04/13/2025</td><td class="text-success">$199</td></tr>
-                <tr><td>Robert Brown</td><td>Premium Package</td><td>04/13/2025</td><td class="text-success">$299</td></tr>
+              <tbody id="recentTbody">
+                <tr><td colspan="4" class="skeleton skel-line" style="height:2rem;"></td></tr>
+                <tr><td colspan="4" class="skeleton skel-line" style="height:2rem;"></td></tr>
+                <tr><td colspan="4" class="skeleton skel-line" style="height:2rem;"></td></tr>
               </tbody>
             </table>
           </div>
@@ -141,59 +141,162 @@
       </div>
     </div>
   </div>
+
+</div>
 {% endblock %}
 
-{% block javascript %}  
-  <script>
-    // Revenue & Profit Chart
+{% block javascript %}
+<script>
+(function () {
+  var PALETTE = ['#4e73df','#1cc88a','#f6c23e','#e74a3b','#36b9cc','#858796'];
+
+  function fmtMoney(n) {
+    return 'Rs. ' + Number(n).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  }
+
+  function renderStatCards(d) {
+    var cards = [
+      {label: "Today's Collection",    value: fmtMoney(d.todays_collection), color: '#4e73df', icon: 'bi-cash-stack'},
+      {label: "Today's Bookings",      value: d.todays_bookings,             color: '#1cc88a', icon: 'bi-clipboard2-pulse'},
+      {label: 'Outstanding Due',       value: fmtMoney(d.total_due),         color: '#e74a3b', icon: 'bi-exclamation-triangle'},
+      {label: "This Month's Expenses", value: fmtMoney(d.month_expenses),    color: '#f6c23e', icon: 'bi-receipt'}
+    ];
+    var row = document.getElementById('statRow');
+    row.innerHTML = cards.map(function(c) {
+      return '<div class="col-6 col-xl-3">' +
+        '<div class="stat-card card h-100" style="border-left:4px solid ' + c.color + '">' +
+        '<div class="card-body d-flex justify-content-between align-items-center">' +
+        '<div><div class="label" style="color:' + c.color + '">' + c.label + '</div>' +
+        '<div class="value">' + c.value + '</div></div>' +
+        '<i class="bi ' + c.icon + ' icon-wrap" style="color:' + c.color + '"></i>' +
+        '</div></div></div>';
+    }).join('');
+  }
+
+  function renderTrendChart(trend) {
+    var wrap = document.getElementById('trendWrap');
+    if (!trend || trend.length === 0) {
+      wrap.innerHTML = '<div class="empty-state"><i class="bi bi-bar-chart-line"></i>No trend data yet</div>';
+      return;
+    }
+    wrap.innerHTML = '<canvas id="revenueProfitChart"></canvas>';
     new Chart(document.getElementById('revenueProfitChart'), {
       type: 'line',
       data: {
-        labels: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
-        datasets: [
-          {label:'Revenue',data:[4000,6000,8500,5500,7000,9000,10500,12000,11500,13000,15000,17000],borderColor:'#4e73df',backgroundColor:'rgba(78,115,223,0.1)',fill:true,tension:0.3},
-          {label:'Profit',data:[1500,2500,3500,2000,3000,4000,5000,6000,5500,7000,8000,9000],borderColor:'#1cc88a',backgroundColor:'rgba(28,200,138,0.1)',fill:true,tension:0.3}
-        ]
+        labels: trend.map(function(r){ return r.date; }),
+        datasets: [{
+          label: 'Collection (Rs.)',
+          data: trend.map(function(r){ return r.amount; }),
+          borderColor: '#4e73df',
+          backgroundColor: 'rgba(78,115,223,0.1)',
+          fill: true,
+          tension: 0.35,
+          pointRadius: 4,
+          pointHoverRadius: 6
+        }]
       },
-      options:{responsive:true,maintainAspectRatio:false}
-    });
-
-    // Sales by Category
-new Chart(document.getElementById('salesCategoryChart'), {
-  type: 'doughnut',
-  data: {
-    labels: ['Electronics', 'Clothing', 'Home & Garden', 'Books', 'Other'],
-    datasets: [{
-      data: [35, 20, 15, 10, 20],
-      backgroundColor: ['#4e73df','#1cc88a','#36b9cc','#f6c23e','#e74a3b'],
-      borderWidth: 2,
-      borderColor: '#fff',
-      hoverOffset: 8
-    }]
-  },
-  options: {
-    responsive: true,
-    maintainAspectRatio: false, // 👈 important to let it stretch
-    cutout: '70%',
-    plugins: {
-      legend: {
-        position: 'bottom'
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          y: { beginAtZero: true, ticks: { callback: function(v){ return 'Rs.' + v.toLocaleString(); } } }
+        }
       }
-    }
+    });
   }
-});
 
+  function renderCategoryChart(categories) {
+    var wrap = document.getElementById('catWrap');
+    if (!categories || categories.length === 0) {
+      wrap.innerHTML = '<div class="empty-state"><i class="bi bi-pie-chart"></i>No category data yet</div>';
+      return;
+    }
+    wrap.innerHTML = '<canvas id="salesCategoryChart"></canvas>';
+    new Chart(document.getElementById('salesCategoryChart'), {
+      type: 'doughnut',
+      data: {
+        labels: categories.map(function(c){ return c.label; }),
+        datasets: [{
+          data: categories.map(function(c){ return c.count; }),
+          backgroundColor: PALETTE,
+          borderWidth: 2,
+          borderColor: '#fff',
+          hoverOffset: 8
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '65%',
+        plugins: { legend: { position: 'bottom', labels: { font: { size: 11 } } } }
+      }
+    });
+  }
 
-
-    // User Activity
+  function renderDoctorsChart(doctors) {
+    var wrap = document.getElementById('doctorWrap');
+    if (!doctors || doctors.length === 0) {
+      wrap.innerHTML = '<div class="empty-state"><i class="bi bi-person-badge"></i>No referral data yet</div>';
+      return;
+    }
+    wrap.innerHTML = '<canvas id="userActivityChart"></canvas>';
     new Chart(document.getElementById('userActivityChart'), {
       type: 'bar',
       data: {
-        labels:['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],
-        datasets:[{label:'Active Users',data:[850,1100,950,1200,1350,900,800],backgroundColor:'#36b9cc'}]
+        labels: doctors.map(function(d){ return d.name; }),
+        datasets: [{
+          label: 'Referrals',
+          data: doctors.map(function(d){ return d.count; }),
+          backgroundColor: PALETTE.slice(0, doctors.length),
+          borderRadius: 4
+        }]
       },
-      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}}}
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } } }
+      }
     });
-  </script>
+  }
 
+  function renderRecentBookings(bookings) {
+    var tbody = document.getElementById('recentTbody');
+    if (!bookings || bookings.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="4" class="empty-state"><i class="bi bi-inbox"></i>No recent bookings</td></tr>';
+      return;
+    }
+    tbody.innerHTML = bookings.map(function(b) {
+      var badgeClass = b.status === 'Paid' ? 'badge-paid' : 'badge-due';
+      return '<tr style="font-size:.83rem;">' +
+        '<td class="ps-3 fw-semibold">' + b.patient + '</td>' +
+        '<td>' + fmtMoney(b.amount) + '</td>' +
+        '<td class="text-muted">' + b.date + '</td>' +
+        '<td><span class="' + badgeClass + '">' + b.status + '</span></td>' +
+        '</tr>';
+    }).join('');
+  }
+
+  /* Fetch & Render */
+  fetch('/admin/dashboard/summary')
+    .then(function(r) {
+      if (!r.ok) throw new Error('Network response was not ok');
+      return r.json();
+    })
+    .then(function(d) {
+      renderStatCards(d);
+      renderTrendChart(d.trend);
+      renderCategoryChart(d.categories);
+      renderDoctorsChart(d.top_doctors);
+      renderRecentBookings(d.recent_bookings);
+    })
+    .catch(function(err) {
+      console.error('Dashboard fetch failed:', err);
+      document.getElementById('statRow').innerHTML =
+        '<div class="col-12"><div class="alert alert-danger">Failed to load dashboard data. Please refresh.</div></div>';
+    });
+})();
+</script>
 {% endblock %}
