@@ -1,0 +1,426 @@
+{% extends "base.html" %}
+
+{% block stylesheets %}
+<style>
+  /* ── Typography & base ── */
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: #f0f2f5; }
+
+  /* ── Section headings ── */
+  .sd-section-title {
+    font-size: .72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .07em;
+    color: #6c757d;
+    margin-bottom: .6rem;
+  }
+
+  /* ── Cards ── */
+  .sd-card {
+    background: #fff;
+    border-radius: .75rem;
+    box-shadow: 0 2px 12px rgba(0,0,0,.07);
+    padding: 1.1rem 1.2rem;
+    height: 100%;
+    transition: box-shadow .2s;
+  }
+  .sd-card:hover { box-shadow: 0 4px 20px rgba(0,0,0,.12); }
+  .sd-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: .75rem;
+  }
+  .sd-card-title {
+    font-size: .82rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: #495057;
+    margin: 0;
+  }
+  .sd-card-link {
+    font-size: .74rem;
+    color: #4e73df;
+    text-decoration: none;
+    font-weight: 600;
+  }
+  .sd-card-link:hover { text-decoration: underline; }
+
+  /* ── Big metric figure ── */
+  .sd-big-num {
+    font-size: 2rem;
+    font-weight: 800;
+    line-height: 1.1;
+    color: #212529;
+  }
+  .sd-big-sub {
+    font-size: .75rem;
+    color: #6c757d;
+    margin-top: .15rem;
+  }
+
+  /* ── Due / expense accent bars ── */
+  .sd-accent-bar {
+    height: 4px;
+    border-radius: 2px;
+    margin-bottom: .6rem;
+  }
+
+  /* ── List rows ── */
+  .sd-list { list-style: none; padding: 0; margin: 0; }
+  .sd-list li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: .45rem 0;
+    border-bottom: 1px solid #f1f3f5;
+    font-size: .82rem;
+    gap: .5rem;
+  }
+  .sd-list li:last-child { border-bottom: none; }
+  .sd-list .patient { font-weight: 600; color: #212529; flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sd-list .meta { color: #868e96; font-size: .74rem; white-space: nowrap; }
+  .sd-list .amount { font-weight: 700; color: #e74a3b; white-space: nowrap; }
+  .sd-list .amount.paid { color: #1cc88a; }
+
+  /* ── Status badges ── */
+  .badge-paid { background: #d1fae5; color: #065f46; font-size: .7rem; font-weight: 700; padding: .2em .55em; border-radius: .3rem; white-space: nowrap; }
+  .badge-due  { background: #fee2e2; color: #991b1b; font-size: .7rem; font-weight: 700; padding: .2em .55em; border-radius: .3rem; white-space: nowrap; }
+
+  /* ── Quick action buttons ── */
+  .qa-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: .45rem;
+    border-radius: .75rem;
+    font-weight: 700;
+    text-decoration: none;
+    transition: transform .15s, box-shadow .15s, filter .15s;
+    border: none;
+    cursor: pointer;
+    color: #fff;
+  }
+  .qa-btn:hover { transform: translateY(-3px); box-shadow: 0 6px 20px rgba(0,0,0,.18); color: #fff; text-decoration: none; }
+  .qa-btn:active { transform: translateY(0); filter: brightness(.93); }
+  .qa-btn i { font-size: 1.7rem; }
+  .qa-btn span { font-size: .8rem; letter-spacing: .04em; }
+
+  /* big buttons */
+  .qa-btn-lg {
+    padding: 1.5rem 1rem;
+    font-size: .88rem;
+  }
+  /* medium buttons */
+  .qa-btn-md {
+    padding: 1rem .75rem;
+    font-size: .8rem;
+  }
+  .qa-btn-md i { font-size: 1.3rem; }
+
+  /* colour variants */
+  .qa-blue   { background: linear-gradient(135deg, #4e73df 0%, #2c52c7 100%); }
+  .qa-green  { background: linear-gradient(135deg, #1cc88a 0%, #13855c 100%); }
+  .qa-orange { background: linear-gradient(135deg, #f6c23e 0%, #d4920a 100%); }
+  .qa-teal   { background: linear-gradient(135deg, #36b9cc 0%, #1a6e79 100%); }
+  .qa-indigo { background: linear-gradient(135deg, #6f42c1 0%, #4b2a87 100%); }
+  .qa-red    { background: linear-gradient(135deg, #e74a3b 0%, #a81f13 100%); }
+
+  /* ── Films card ── */
+  .films-num { font-size: 2.4rem; font-weight: 800; color: #4e73df; line-height: 1; }
+  .films-label { font-size: .75rem; color: #6c757d; margin-top: .2rem; }
+  .films-packet { font-size: .78rem; color: #6c757d; margin-top: .5rem; }
+  .films-packet i { color: #f6c23e; }
+
+  /* ── Skeleton ── */
+  .skeleton { background: linear-gradient(90deg, #e9ecef 25%, #f5f6fa 50%, #e9ecef 75%); background-size: 200% 100%; animation: shimmer 1.3s infinite; border-radius: .4rem; }
+  @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+  .skel-line { height: .85rem; margin-bottom: .45rem; }
+
+  /* ── Empty state ── */
+  .sd-empty { text-align: center; color: #adb5bd; font-size: .82rem; padding: 1.2rem 0; }
+  .sd-empty i { display: block; font-size: 1.6rem; margin-bottom: .35rem; }
+
+  /* ── Responsive tweaks ── */
+  @media (max-width: 576px) {
+    .sd-big-num { font-size: 1.6rem; }
+    .qa-btn-lg { padding: 1.1rem .6rem; }
+    .films-num { font-size: 1.8rem; }
+  }
+</style>
+{% endblock stylesheets %}
+
+{% block content %}{% endblock %}
+
+{% block user_page %}
+<div class="container-fluid px-3 px-md-4 py-3">
+
+  <!-- ══════════════════════════════════════════
+       ROW 1: Outstanding Dues  |  Today's Expenses
+  ═══════════════════════════════════════════ -->
+  <div class="row g-3 mb-3">
+
+    <!-- Outstanding Dues -->
+    <div class="col-12 col-lg-7">
+      <div class="sd-card">
+        <div class="sd-card-header">
+          <span class="sd-card-title"><i class="bi bi-cash-stack me-1 text-danger"></i> Outstanding Dues</span>
+          <a href="{{ url_for('booking.view_dues') }}" class="sd-card-link">View All →</a>
+        </div>
+        <div id="duesAccent" class="sd-accent-bar" style="background:#e74a3b;"></div>
+        <ul class="sd-list" id="duesList">
+          {% for _ in range(4) %}
+          <li><div class="skeleton skel-line" style="width:100%"></div></li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+
+    <!-- Today's Expenses -->
+    <div class="col-12 col-lg-5">
+      <div class="sd-card">
+        <div class="sd-card-header">
+          <span class="sd-card-title"><i class="bi bi-wallet2 me-1 text-warning"></i> Today's Expenses</span>
+          <a href="{{ url_for('transactions.view_expenses') }}" class="sd-card-link">View →</a>
+        </div>
+        <div class="sd-accent-bar" style="background:#f6c23e;"></div>
+        <div id="expenseTotal" class="sd-big-num skeleton" style="height:2.4rem; width:60%;"></div>
+        <div class="sd-big-sub" id="expenseDate">Loading…</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       ROW 2: Quick Actions BIG
+  ═══════════════════════════════════════════ -->
+  <div class="sd-section-title">Quick Actions</div>
+  <div class="row g-3 mb-3">
+    <div class="col-6 col-md-3">
+      <a href="{{ url_for('booking.view_test_booking') }}" class="qa-btn qa-btn-lg qa-blue d-flex w-100">
+        <i class="bi bi-clipboard-plus-fill"></i>
+        <span>Test Booking</span>
+      </a>
+    </div>
+    <div class="col-6 col-md-3">
+      <a href="{{ url_for('transactions.view_expenses') }}" class="qa-btn qa-btn-lg qa-orange d-flex w-100">
+        <i class="bi bi-wallet2"></i>
+        <span>Expense</span>
+      </a>
+    </div>
+    <!-- Row 3 medium buttons in same row on mobile → break on md -->
+    <div class="col-6 col-md-3">
+      <a href="{{ url_for('transactions.view_referral_share') }}" class="qa-btn qa-btn-md qa-indigo d-flex w-100 h-100">
+        <i class="bi bi-person-check-fill"></i>
+        <span>Referral Share</span>
+      </a>
+    </div>
+    <div class="col-6 col-md-3">
+      <a href="{{ url_for('booking.view_view_booking') }}" class="qa-btn qa-btn-md qa-teal d-flex w-100 h-100">
+        <i class="bi bi-list-check"></i>
+        <span>View Booking</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       ROW 3: Films Condition  |  Book Results shortcut
+  ═══════════════════════════════════════════ -->
+  <div class="row g-3 mb-3">
+
+    <!-- Films Condition -->
+    <div class="col-12 col-md-4">
+      <div class="sd-card">
+        <div class="sd-card-header">
+          <span class="sd-card-title"><i class="bi bi-file-medical me-1 text-primary"></i> Films Condition</span>
+        </div>
+        <div class="sd-accent-bar" style="background:#4e73df;"></div>
+        <div class="films-num" id="filmsBalance">—</div>
+        <div class="films-label">Sheets in Printer (Today)</div>
+        <div class="films-packet" id="filmsPacket"></div>
+      </div>
+    </div>
+
+    <!-- Book Results shortcut -->
+    <div class="col-12 col-md-4">
+      <div class="sd-card">
+        <div class="sd-card-header">
+          <span class="sd-card-title"><i class="bi bi-file-earmark-medical me-1 text-success"></i> Book Results</span>
+          <a href="{{ url_for('booking.view_booking_result') }}" class="sd-card-link">Open →</a>
+        </div>
+        <div class="sd-accent-bar" style="background:#1cc88a;"></div>
+        <ul class="sd-list" id="resultsList">
+          {% for _ in range(3) %}
+          <li><div class="skeleton skel-line" style="width:100%"></div></li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+
+    <!-- Daily Report shortcut -->
+    <div class="col-12 col-md-4">
+      <div class="sd-card d-flex flex-column justify-content-between">
+        <div class="sd-card-header mb-2">
+          <span class="sd-card-title"><i class="bi bi-journal-text me-1 text-secondary"></i> Daily Report</span>
+        </div>
+        <div class="sd-accent-bar" style="background:#858796;"></div>
+        <div class="text-center py-2">
+          <i class="bi bi-bar-chart-steps" style="font-size:2.8rem; color:#858796; opacity:.6;"></i>
+          <div class="mt-2">
+            <a href="{{ url_for('reports.view_daily_reports') }}" class="qa-btn qa-btn-md qa-red d-inline-flex px-4">
+              <i class="bi bi-graph-up-arrow me-1"></i>
+              <span>Open Daily Report</span>
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       ROW 4: Recent Bookings (Today)
+  ═══════════════════════════════════════════ -->
+  <div class="row g-3 mb-3">
+    <div class="col-12">
+      <div class="sd-card">
+        <div class="sd-card-header">
+          <span class="sd-card-title"><i class="bi bi-clock-history me-1"></i> Recent Bookings (Today)</span>
+          <a href="{{ url_for('booking.view_view_booking') }}" class="sd-card-link">View All →</a>
+        </div>
+        <div class="sd-accent-bar" style="background:#4e73df;"></div>
+        <div class="table-responsive">
+          <table class="table table-borderless table-hover mb-0 align-middle" style="font-size:.82rem;">
+            <thead class="table-light" style="font-size:.74rem;">
+              <tr>
+                <th class="ps-2">MR#</th>
+                <th>Patient</th>
+                <th>Amount</th>
+                <th>Time</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="recentBookingsTbody">
+              <tr><td colspan="5"><div class="skeleton skel-line"></div></td></tr>
+              <tr><td colspan="5"><div class="skeleton skel-line"></div></td></tr>
+              <tr><td colspan="5"><div class="skeleton skel-line"></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block javascript %}
+<script>
+(function () {
+  'use strict';
+
+  function fmtMoney(n) {
+    return 'Rs. ' + Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  }
+
+  // ── Dues list ──
+  function renderDues(dues) {
+    var el = document.getElementById('duesList');
+    if (!dues || dues.length === 0) {
+      el.innerHTML = '<li><div class="sd-empty"><i class="bi bi-check-circle"></i>No outstanding dues</div></li>';
+      return;
+    }
+    el.innerHTML = dues.map(function (d) {
+      return '<li>' +
+        '<span class="patient" title="' + (d.patient_name || '') + '">' + (d.patient_name || '—') + '</span>' +
+        '<span class="meta">' + (d.mr_no || '') + ' &bull; ' + (d.date || '') + '</span>' +
+        '<span class="amount">' + fmtMoney(d.due_amount) + '</span>' +
+        '</li>';
+    }).join('');
+  }
+
+  // ── Today's expenses ──
+  function renderExpenses(total) {
+    var el = document.getElementById('expenseTotal');
+    el.className = 'sd-big-num';
+    el.textContent = fmtMoney(total);
+    var today = new Date();
+    document.getElementById('expenseDate').textContent =
+      today.toLocaleDateString('en-PK', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' });
+  }
+
+  // ── Films ──
+  function renderFilms(balance, lastPacket) {
+    document.getElementById('filmsBalance').textContent = balance !== null && balance !== undefined ? balance : '—';
+    var pkt = document.getElementById('filmsPacket');
+    if (lastPacket) {
+      pkt.innerHTML = '<i class="bi bi-box-seam-fill"></i> Last packet inserted: ' + lastPacket;
+    } else {
+      pkt.innerHTML = '<i class="bi bi-info-circle"></i> No packet inserted today';
+    }
+  }
+
+  // ── Results list ──
+  function renderResults(results) {
+    var el = document.getElementById('resultsList');
+    if (!results || results.length === 0) {
+      el.innerHTML = '<li><div class="sd-empty"><i class="bi bi-inbox"></i>No recent results</div></li>';
+      return;
+    }
+    el.innerHTML = results.map(function (r) {
+      return '<li>' +
+        '<span class="patient" title="' + (r.patient_name || '') + '">' + (r.patient_name || '—') + '</span>' +
+        '<span class="meta">' + (r.mr_no || '') + '</span>' +
+        '<span class="meta">' + (r.updated_at || '') + '</span>' +
+        '</li>';
+    }).join('');
+  }
+
+  // ── Recent bookings table ──
+  function renderRecentBookings(bookings) {
+    var tbody = document.getElementById('recentBookingsTbody');
+    if (!bookings || bookings.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" class="sd-empty"><i class="bi bi-inbox"></i>No bookings today yet</td></tr>';
+      return;
+    }
+    tbody.innerHTML = bookings.map(function (b) {
+      var badge = b.status === 'Paid'
+        ? '<span class="badge-paid">Paid</span>'
+        : '<span class="badge-due">Due</span>';
+      return '<tr>' +
+        '<td class="ps-2 text-muted">' + (b.mr_no || '—') + '</td>' +
+        '<td class="fw-semibold">' + (b.patient_name || '—') + '</td>' +
+        '<td>' + fmtMoney(b.net_amount) + '</td>' +
+        '<td class="text-muted">' + (b.date || '') + '</td>' +
+        '<td>' + badge + '</td>' +
+        '</tr>';
+    }).join('');
+  }
+
+  // ── Fetch summary ──
+  fetch('/admin/staff/dashboard/summary')
+    .then(function (r) {
+      if (!r.ok) throw new Error('Network error: ' + r.status);
+      return r.json();
+    })
+    .then(function (d) {
+      renderDues(d.dues);
+      renderExpenses(d.today_expense_total);
+      renderFilms(d.films_balance, d.last_packet_date);
+      renderResults(d.recent_results);
+      renderRecentBookings(d.recent_bookings);
+    })
+    .catch(function (err) {
+      console.error('Staff dashboard fetch failed:', err);
+      ['duesList', 'resultsList'].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el) el.innerHTML = '<li><div class="sd-empty" style="color:#e74a3b;"><i class="bi bi-exclamation-triangle"></i>Failed to load</div></li>';
+      });
+      var expEl = document.getElementById('expenseTotal');
+      if (expEl) { expEl.className = 'sd-big-num text-danger'; expEl.textContent = 'Error'; }
+    });
+})();
+</script>
+{% endblock %}
