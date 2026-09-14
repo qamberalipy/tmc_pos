@@ -86,15 +86,15 @@ MENU = {
     
     "staff": [
         {
-            "label": "Dashboard", 
-            "icon": "bi-house-door-fill", 
-            "endpoint": "admin.view_admin_dashboard", 
+            "label": "Dashboard",
+            "icon": "bi-house-door-fill",
+            "endpoint": "admin.view_staff_dashboard",
             "css_class": ""
         },
         {
-            "label": "Registration", 
-            "icon": "bi-bank2", 
-            "endpoint": None, 
+            "label": "Registration",
+            "icon": "bi-bank2",
+            "endpoint": None,
             "css_class": "nav-group-registration",
             "children": [
                 {"label": "Test Reg", "icon": "bi-bag-plus-fill", "endpoint": "registrations.test_registration"},

@@ -24,6 +24,22 @@ def view_admin_dashboard():
         print(f"Error in dashboard: {str(e)}")
         return redirect(url_for('main.error_page'))
     
+@admin_bp.route('/staff/dashboard')
+@login_required
+def view_staff_dashboard():
+    try:
+        return render_template('staff_dashboard.html')
+    except Exception as e:
+        print(f"Error in view_staff_dashboard: {str(e)}")
+        return redirect(url_for('main.error_page'))
+
+@admin_bp.route('/staff/dashboard/summary')
+@login_required
+def staff_dashboard_summary():
+    branch_id = session.get('branch_id')
+    data = admin_services.get_staff_dashboard_summary(branch_id)
+    return jsonify(data), 200
+
 @admin_bp.route('/switch-branch', methods=['POST'])
 @login_required
 def switch_branch():

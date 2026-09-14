@@ -255,3 +255,127 @@ def get_dashboard_summary(branch_id):
             for b in recent
         ]
     }
+
+
+def get_staff_dashboard_summary(branch_id):
+    """Lightweight summary for the Staff Dashboard."""
+    import datetime
+    from app.blueprints.transactions import services as transaction_services
+    from app.blueprints.booking import services as booking_services
+
+    today = datetime.datetime.now(timezone.utc).date()
+    today_str = str(today)
+
+    # --- Outstanding dues (all-time unpaid, most recent first, capped to 10) ---
+    outstanding_dues = db.session.query(
+        TestBooking.id,
+        TestBooking.mr_no,
+        TestBooking.patient_name,
+        TestBooking.due_amount,
+        TestBooking.create_at,
+    ).filter(
+        TestBooking.branch_id == branch_id,
+        TestBooking.due_amount > 0
+    ).order_by(TestBooking.create_at.desc()).limit(10).all()
+
+    dues_data = [
+        {
+            "booking_id": b.id,
+            "mr_no": b.mr_no,
+            "patient_name": b.patient_name,
+            "due_amount": float(b.due_amount or 0),
+            "date": b.create_at.strftime("%d-%b-%Y") if b.create_at else None,
+        }
+        for b in outstanding_dues
+    ]
+
+    # --- Today's expenses (reuse transaction service) ---
+    expenses_result, _status = transaction_services.get_all_expenses(
+        branch_id_str=str(branch_id),
+        from_date=today_str,
+        to_date=today_str
+    )
+    if isinstance(expenses_result, list):
+        today_expense_total = sum(float(e.get("amount", 0)) for e in expenses_result)
+    else:
+        today_expense_total = 0.0
+
+    # --- Films balance (today's closing from inventory report; reuse booking service) ---
+    films_balance = 0
+    last_packet_date = None
+    try:
+        film_report, _fstatus = booking_services.get_film_inventory_report(
+            branch_id=branch_id,
+            from_date=today_str,
+            to_date=today_str
+        )
+        report_rows = film_report.get("data", []) if isinstance(film_report, dict) else []
+        normal_rows = [r for r in report_rows if r.get("type") == "normal"]
+        if normal_rows:
+            films_balance = normal_rows[-1].get("closing", 0)
+        packet_rows = [r for r in report_rows if r.get("type") == "packet"]
+        if packet_rows:
+            last_packet_date = packet_rows[-1].get("date")
+    except Exception:
+        films_balance = 0
+
+    # --- Recent bookings today (latest 5, direct query) ---
+    recent_rows = db.session.query(
+        TestBooking.id,
+        TestBooking.mr_no,
+        TestBooking.patient_name,
+        TestBooking.net_receivable,
+        TestBooking.due_amount,
+        TestBooking.create_at,
+    ).filter(
+        TestBooking.branch_id == branch_id,
+        func.date(TestBooking.create_at) == today
+    ).order_by(TestBooking.create_at.desc()).limit(5).all()
+
+    recent_bookings = [
+        {
+            "booking_id": b.id,
+            "mr_no": b.mr_no,
+            "patient_name": b.patient_name,
+            "net_amount": float(b.net_receivable or 0),
+            "due_amount": float(b.due_amount or 0),
+            "status": "Paid" if (b.due_amount or 0) == 0 else "Due",
+            "date": b.create_at.strftime("%d-%b %I:%M %p") if b.create_at else None,
+        }
+        for b in recent_rows
+    ]
+
+    # --- Recent results (bookings sent to doctor, latest 5) ---
+    from app.models.doctor_reporting_details import DoctorReportingdetails
+    reported_ids_subq = db.session.query(
+        db.cast(DoctorReportingdetails.booking_id, db.Integer)
+    ).filter(DoctorReportingdetails.is_active == True).subquery()
+
+    result_rows = db.session.query(
+        TestBooking.id,
+        TestBooking.mr_no,
+        TestBooking.patient_name,
+        TestBooking.update_at,
+    ).filter(
+        TestBooking.branch_id == branch_id,
+        TestBooking.id.in_(reported_ids_subq)
+    ).order_by(TestBooking.update_at.desc()).limit(5).all()
+
+    recent_results = [
+        {
+            "booking_id": b.id,
+            "mr_no": b.mr_no,
+            "patient_name": b.patient_name,
+            "updated_at": b.update_at.strftime("%d-%b %I:%M %p") if b.update_at else None,
+        }
+        for b in result_rows
+    ]
+
+    return {
+        "dues": dues_data,
+        "today_expense_total": today_expense_total,
+        "films_balance": films_balance,
+        "last_packet_date": last_packet_date,
+        "recent_bookings": recent_bookings,
+        "recent_results": recent_results,
+    }
