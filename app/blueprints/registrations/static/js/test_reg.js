@@ -34,7 +34,6 @@ function getAllTestRegistrations() {
                     t.department_id || "-",
                     t.category || "Other",
                     t.charges || "-",
-                    t.report_charges || "0", // <--- NEW: Report Charges Column
                     t.required_days == "0" ? "Same day" : (t.required_days || "-"),
                     t.sequence_no || "-",
                     t.description || "-",
@@ -67,7 +66,6 @@ $(document).on("click", ".edit-testReg", function () {
             $("#department_name").val(t.department_id); 
             $("#test_category").val(t.category || "Other");
             $("#charge").val(t.charges);
-            $("#report_charges").val(t.report_charges || 0); // <--- NEW: Fill report charges
             $("#required_days").val(t.required_days);
             $("#sequence").val(t.sequence_no);
             $("#no_of_films").val(t.no_of_films);
@@ -98,7 +96,6 @@ $(document).on("click", "#update_testReg", function () {
         department_id: $("#department_name").val(),
         category: $("#test_category").val(),
         charges: $("#charge").val(),
-        report_charges: $("#report_charges").val(), // <--- NEW: Send updated report charges
         required_days: $("#required_days").val(),
         sequence_no: $("#sequence").val(),
         no_of_films: $("#no_of_films").val(),

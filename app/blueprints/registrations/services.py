@@ -303,7 +303,6 @@ def _format_test_registration(t, branch_name=None, created_by_name=None):
         "department_id": t.department_id,
         "category": t.category,
         "charges": t.charges,
-        "report_charges": t.report_charges,  # <--- Add this
         "required_days": t.required_days,
         "sequence_no": t.sequence_no,
         "no_of_films": t.no_of_films,
@@ -330,7 +329,6 @@ def create_test_registration(data):
             department_id=data.get("department_id"),
             category=data.get("category") if data.get("category") in CATEGORY_CHOICES else "Other",
             charges=data["charges"],
-            report_charges=data.get("report_charges", 0.0),  # <--- Add this
             required_days=data["required_days"],
             sequence_no=data["sequence_no"],
             no_of_films=data.get("no_of_films"),
@@ -437,8 +435,6 @@ def update_test_registration(test_id, data):
             t.category = data["category"] if data["category"] in CATEGORY_CHOICES else "Other"
         if "charges" in data:
             t.charges = data["charges"]
-        if "report_charges" in data:           # <--- Add this block
-            t.report_charges = data["report_charges"]
         if "required_days" in data:
             t.required_days = data["required_days"]
         if "sequence_no" in data:

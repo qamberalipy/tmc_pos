@@ -9,6 +9,9 @@ function createMode() {
     $("#user_password").val("");
     $("#user_role").val("");
     $("#user_branch").val("");
+    // Reset radiologist rate fields
+    $(".radiologist-rates").hide();
+    $("#rate_Contrast, #rate_Full_Study, #rate_Screening, #rate_Other").val("");
 }
 
 function updateMode() {
@@ -22,6 +25,9 @@ function updateMode() {
     $("#user_password").val("");
     $("#user_role").val("");
     $("#user_branch").val("");
+    // Reset radiologist rate fields
+    $(".radiologist-rates").hide();
+    $("#rate_Contrast, #rate_Full_Study, #rate_Screening, #rate_Other").val("");
 }
 
 $(document).on('click', "#trigger_add_user", function() {
@@ -115,6 +121,11 @@ function getAllUsers() {
 
 
 
+// Toggle radiologist rate inputs when role changes
+$(document).on('change', '#user_role', function () {
+    $('.radiologist-rates').toggle($(this).val() == '4');
+});
+
 $(document).on('change', '.status-toggle', function () {
     let userId = $(this).data('id');
     let newStatus = $(this).is(':checked');
@@ -171,14 +182,25 @@ $(document).on('click', "#create_user", function (e) {
         return;
     }
 
-    // Send request
-    axios.post(baseUrl + '/users/user', {
+    // Build payload
+    let createPayload = {
         name: user_name,
         email: user_email,
         password: user_password,
         role_id: user_role,
         branch_id: user_branch
-    })
+    };
+    if (user_role == '4') {
+        createPayload.category_rates = {
+            "Contrast": parseFloat($('#rate_Contrast').val()) || 0,
+            "Full Study": parseFloat($('#rate_Full_Study').val()) || 0,
+            "Screening": parseFloat($('#rate_Screening').val()) || 0,
+            "Other": parseFloat($('#rate_Other').val()) || 0
+        };
+    }
+
+    // Send request
+    axios.post(baseUrl + '/users/user', createPayload)
     .then(res => {
         if (res.status === 201) {
             showToastMessage('success', res.data.message);
@@ -214,6 +236,13 @@ $(document).on('click', '.edit-user', function () {
             $('#user_role').val(user.role_id);
             $('#user_branch').val(user.branch_id);
             $('#user_is_active').prop('checked', user.is_active);
+            // Trigger role change to show/hide rates panel, then populate rates
+            $('#user_role').trigger('change');
+            if (user.role_id == 4 && user.category_rates) {
+                Object.entries(user.category_rates).forEach(([cat, val]) => {
+                    $(`#rate_${cat.replace(' ', '_')}`).val(val);
+                });
+            }
 
             // Show the modal
             $("#adduserModal").modal("show");
@@ -250,6 +279,14 @@ $(document).on('click', '#update_user', function (e) {
         role_id: userRole,
         branch_id: userBranch
     };
+    if (userRole == '4') {
+        requestData.category_rates = {
+            "Contrast": parseFloat($('#rate_Contrast').val()) || 0,
+            "Full Study": parseFloat($('#rate_Full_Study').val()) || 0,
+            "Screening": parseFloat($('#rate_Screening').val()) || 0,
+            "Other": parseFloat($('#rate_Other').val()) || 0
+        };
+    }
     
     if (userPassword) {
     requestData.password = userPassword;
