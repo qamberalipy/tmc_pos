@@ -55,6 +55,11 @@ function initSystemComponents() {
             },
             dataSrc: function (json) {
                 const rows = json.data || json || [];
+                // Index rows by booking id for workspace test-chip lookup
+                window.driveRowsById = window.driveRowsById || {};
+                rows.forEach(function(data) {
+                    window.driveRowsById[data.booking_id || data.id] = data;
+                });
                 const params = new URLSearchParams(window.location.search);
                 const deepLinkId = params.get('booking_id');
                 if (deepLinkId && !window.__deepLinkHandled) {
@@ -131,12 +136,28 @@ window.mountWorkspaceScope = function(rowElement, bookingId, patientName, mrNo, 
     $('#wsBookingId').text(`B#${bookingId}`);
     $('#wsMrNo').text(`MR: ${mrNo}`);
     $('#wsAgeGender').text(`${age} Yrs | ${gender}`);
+    renderWorkspaceTests(bookingId);
     $('#filmUsageInput').val(filmsCount || 0);
     $('#chatMessageInput').val('');
     
     resetUploadState();
 
     syncChatTimelineData(bookingId);
+};
+
+window.renderWorkspaceTests = function(bookingId) {
+    const rec = (window.driveRowsById || {})[bookingId];
+    const tests = (rec && rec.tests) || [];
+    const $box = $('#wsTests');
+    if (!tests.length) {
+        $box.html('<span class="text-muted" style="font-size:0.72rem;">No tests recorded</span>');
+        return;
+    }
+    $box.html(tests.map(t => `
+        <span class="test-chip" title="${t.category}${t.films ? ' \u2022 ' + t.films + ' film(s)' : ''}">
+            <span class="test-chip-name">${t.test_name}</span>
+            <span class="test-chip-meta">${t.category}${t.films ? ' \u00b7 ' + t.films + 'f' : ''}</span>
+        </span>`).join(''));
 };
 
 window.closeMobileWorkspace = function() {
