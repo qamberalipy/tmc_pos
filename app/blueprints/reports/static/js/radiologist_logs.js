@@ -135,13 +135,17 @@ $(document).ready(function () {
             { title: "Reports Made", data: "reports_made" },
             { title: "Films Issued", data: "films_issued" },
             { 
-                title: "Total Amount", 
-                data: "total_amount", 
-                className: "text-end fw-bold text-success",
-                render: function(data) {
-                    return data 
-                        ? "Rs. " + parseFloat(data).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})
-                        : "Rs. 0.00";
+                title: "Report Charges", 
+                data: "report_charges", 
+                className: "text-end fw-bold",
+                render: function(data, type, row) {
+                    const amount = "Rs. " + parseFloat(data || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                    if (row.rate_missing) {
+                        return `<span class="text-danger" title="Rate not set by admin for one or more reported tests">
+                                    <i class="bi bi-exclamation-triangle-fill"></i> ${amount}
+                                </span>`;
+                    }
+                    return `<span class="text-success">${amount}</span>`;
                 }
             }
         );
@@ -197,7 +201,7 @@ $(document).ready(function () {
                             }
                         }, 0);
                         
-                        if (headerName.includes("Total Amount")) {
+                        if (headerName.includes("Report Charges")) {
                             let money = "Rs. " + sum.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
                             $row.append(`<th class="text-end text-success">${money}</th>`);
                         } else {
@@ -233,12 +237,13 @@ $(document).ready(function () {
     function buildReportRows() {
         const rows = reportTable.rows({ search: 'applied' }).data().toArray();
         const cats = ["Contrast", "Full Study", "Screening", "Other"];
-        const totals = { total_tests: 0, reports_made: 0, films_issued: 0, total_amount: 0, cats: { Contrast: 0, "Full Study": 0, Screening: 0, Other: 0 } };
+        const totals = { total_tests: 0, reports_made: 0, films_issued: 0, report_charges: 0, any_rate_missing: false, cats: { Contrast: 0, "Full Study": 0, Screening: 0, Other: 0 } };
         rows.forEach(r => {
             totals.total_tests  += Number(r.total_tests  || 0);
             totals.reports_made += Number(r.reports_made || 0);
             totals.films_issued += Number(r.films_issued || 0);
-            totals.total_amount += Number(r.total_amount || 0);
+            totals.report_charges += Number(r.report_charges || 0);
+            if (r.rate_missing) totals.any_rate_missing = true;
             cats.forEach(c => totals.cats[c] += Number((r.test_breakdown && r.test_breakdown[c]) || 0));
         });
         return { rows, totals, cats };
@@ -253,12 +258,12 @@ $(document).ready(function () {
             `<tr><td>${i + 1}</td><td>${r.date}</td><td>${r.radiologist_name}</td>` +
             cats.map(c => `<td>${(r.test_breakdown && r.test_breakdown[c]) || 0}</td>`).join('') +
             `<td>${r.total_tests}</td><td>${r.reports_made}</td><td>${r.films_issued}</td>` +
-            `<td>Rs. ${Number(r.total_amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td></tr>`
+            `<td${r.rate_missing ? ' style="color:red;"' : ''}>Rs. ${Number(r.report_charges).toLocaleString(undefined, { minimumFractionDigits: 2 })}${r.rate_missing ? ' \u26a0' : ''}</td></tr>`
         ).join('');
         let footerRow = `<tr style="font-weight:bold;"><td colspan="3">GRAND TOTAL</td>` +
             cats.map(c => `<td>${totals.cats[c]}</td>`).join('') +
             `<td>${totals.total_tests}</td><td>${totals.reports_made}</td><td>${totals.films_issued}</td>` +
-            `<td>Rs. ${totals.total_amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td></tr>`;
+            `<td${totals.any_rate_missing ? ' style="color:red;"' : ''}>Rs. ${totals.report_charges.toLocaleString(undefined, { minimumFractionDigits: 2 })}${totals.any_rate_missing ? ' \u26a0' : ''}</td></tr>`;
         const win = window.open('', '_blank');
         win.document.write(`
             <html><head><title>Radiologist Logs</title>
@@ -272,7 +277,7 @@ $(document).ready(function () {
             </style></head><body>
             <h3>Radiologist Logs</h3>
             <div class="meta">Radiologist: ${doctorName} &nbsp;|&nbsp; Period: ${from} to ${to}</div>
-            <table><thead><tr><th>S.No</th><th>Date</th><th>Radiologist</th>${cats.map(c => `<th>${c}</th>`).join('')}<th>Total Tests</th><th>Reports Made</th><th>Films Issued</th><th>Total Amount</th></tr></thead>
+            <table><thead><tr><th>S.No</th><th>Date</th><th>Radiologist</th>${cats.map(c => `<th>${c}</th>`).join('')}<th>Total Tests</th><th>Reports Made</th><th>Films Issued</th><th>Report Charges</th></tr></thead>
             <tbody>${bodyRows}${footerRow}</tbody></table>
             </body></html>`);
         win.document.close();
@@ -284,7 +289,7 @@ $(document).ready(function () {
         const { rows, totals, cats } = buildReportRows();
         const doctorName = $('#doctor_select option:selected').text();
         const from = $('#from_date').val(), to = $('#to_date').val();
-        const header = ["S.No", "Date", "Radiologist", ...cats, "Total Tests", "Reports Made", "Films Issued", "Total Amount"];
+        const header = ["S.No", "Date", "Radiologist", ...cats, "Total Tests", "Reports Made", "Films Issued", "Report Charges"];
         const data = [
             ["Radiologist Logs"],
             [`Radiologist: ${doctorName}`, `Period: ${from} to ${to}`],
@@ -293,9 +298,11 @@ $(document).ready(function () {
             ...rows.map((r, i) => [
                 i + 1, r.date, r.radiologist_name,
                 ...cats.map(c => (r.test_breakdown && r.test_breakdown[c]) || 0),
-                r.total_tests, r.reports_made, r.films_issued, Number(r.total_amount)
+                r.total_tests, r.reports_made, r.films_issued,
+                r.rate_missing ? `${Number(r.report_charges)} \u26a0` : Number(r.report_charges)
             ]),
-            ["", "", "GRAND TOTAL", ...cats.map(c => totals.cats[c]), totals.total_tests, totals.reports_made, totals.films_issued, totals.total_amount]
+            ["", "", "GRAND TOTAL", ...cats.map(c => totals.cats[c]), totals.total_tests, totals.reports_made, totals.films_issued,
+                totals.any_rate_missing ? `${totals.report_charges} \u26a0` : totals.report_charges]
         ];
         const ws = XLSX.utils.aoa_to_sheet(data);
         const wb = XLSX.utils.book_new();
