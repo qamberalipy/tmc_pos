@@ -42,9 +42,6 @@
             <label class="my-2">Charge</label>
             <input type="text" class="form-control" id="charge" name="charge">
             
-            <label class="my-2">Report Charges</label>
-            <input type="number" class="form-control" id="report_charges" name="report_charges" value="0">
-
             <label class="my-2">Required Days</label>
             <input type="number" class="form-control" id="required_days" name="required_days">
           </div>
@@ -81,7 +78,6 @@
             department_id: $("#department_name").val() || null,
             category: $("#test_category").val(),
             charges: $("#charge").val().trim(),
-            report_charges: $("#report_charges").val().trim() || 0, // <--- Add this
             required_days: $("#required_days").val().trim(),
             sequence_no: $("#sequence").val().trim(),
             no_of_films: $("#no_of_films").val().trim(),

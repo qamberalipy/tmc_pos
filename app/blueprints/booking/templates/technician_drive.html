@@ -289,12 +289,25 @@
         .app-footer { flex-wrap: wrap; gap: 6px; }
         .btn-action { padding: 6px 10px !important; }
         #patientsTable { font-size: 0.8rem; }
+        .ws-tests { max-height: 44px; }
+        .test-chip { font-size: 0.66rem; padding: 1px 7px; }
+        .test-chip-meta { display: none; }
     }
 
     @media (max-width: 400px) {
         .filter-header .row.g-2 .col-5 { flex: 0 0 100%; max-width: 100%; margin-bottom: 6px; }
         .filter-header .row.g-2 .col-2 { flex: 0 0 100%; max-width: 100%; }
     }
+
+    /* Test chips in workspace header */
+    .ws-tests { display: flex; flex-wrap: wrap; gap: 4px; max-height: 52px; overflow-y: auto; }
+    .test-chip {
+        display: inline-flex; align-items: baseline; gap: 5px;
+        background: var(--active-bg, #eef2ff); border: 1px solid var(--bs-primary);
+        color: var(--bs-primary); border-radius: 999px;
+        padding: 2px 9px; font-size: 0.72rem; line-height: 1.5; white-space: nowrap;
+    }
+    .test-chip-meta { opacity: 0.7; font-size: 0.65rem; }
 
     /* Drag-and-drop visual feedback for workspace panel */
     #workspacePanel.drag-active {
@@ -354,13 +367,14 @@
                     <button class="mobile-back-btn me-3 flex-shrink-0" onclick="closeMobileWorkspace()">
                         <i class="bi bi-chevron-left fs-5"></i>
                     </button>
-                    <div class="overflow-hidden">
+                    <div>
                         <h5 class="m-0 fw-bold text-dark patient-name-truncate" id="wsPatientName" style="letter-spacing: -0.5px;">---</h5>
                         <div class="small mt-1 fw-medium" style="color: var(--text-muted); white-space: nowrap;">
                             <span id="wsBookingId" style="color: var(--bs-primary);"></span> &bull; 
                             <span id="wsMrNo"></span> &bull; 
                             <span id="wsAgeGender"></span>
                         </div>
+                        <div id="wsTests" class="ws-tests mt-1"></div>
                     </div>
                 </div>
                 

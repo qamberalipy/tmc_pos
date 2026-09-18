@@ -18,6 +18,7 @@ from app.helper import get_lab_date_bounds
 from app.models.referred import Referred
 from werkzeug.exceptions import BadRequest, NotFound
 from app.models.expenses import PaymentTransaction
+from app.models.doctor_category_rate import DoctorCategoryRate
 
 def _to_float(value):
     if value is None:
@@ -712,8 +713,17 @@ def get_radiologist_performance_data(doctor_id, start_date_str=None, end_date_st
         Test_registration.category,
         DoctorReportingdetails.status,
         TestBookingDetails.no_of_films,
-        # --- NEW FIELD: Fetch the charge for this test ---
-        Test_registration.report_charges 
+        # Per-radiologist, per-category rate from DoctorCategoryRate
+        db.func.coalesce(
+            db.session.query(DoctorCategoryRate.rate)
+                .filter(
+                    DoctorCategoryRate.doctor_id == cast(DoctorReportingdetails.doctor_id, Integer),
+                    DoctorCategoryRate.category == Test_registration.category
+                )
+                .correlate(DoctorReportingdetails, Test_registration)
+                .scalar_subquery(),
+            0.0
+        ).label("report_charges")
     ).select_from(DoctorReportingdetails)\
     .join(User, cast(User.id, String) == DoctorReportingdetails.doctor_id)\
     .join(Test_registration, Test_registration.id == DoctorReportingdetails.test_id)\

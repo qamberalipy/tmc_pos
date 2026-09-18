@@ -1587,6 +1587,26 @@ def get_technician_dashboard_list(branch_id, from_date=None, to_date=None, searc
 
         records = query.order_by(TestBooking.create_at.desc()).limit(150).all()
 
+        # Batch-load test details for all bookings (avoids N+1)
+        booking_ids = [b.id for b in records]
+        tests_map = {}
+        if booking_ids:
+            test_rows = (db.session.query(
+                    TestBookingDetails.booking_id,
+                    Test_registration.test_name,
+                    Test_registration.category,
+                    TestBookingDetails.no_of_films
+                )
+                .join(Test_registration, Test_registration.id == TestBookingDetails.test_id)
+                .filter(TestBookingDetails.booking_id.in_(booking_ids))
+                .all())
+            for tr in test_rows:
+                tests_map.setdefault(tr.booking_id, []).append({
+                    "test_name": tr.test_name,
+                    "category": tr.category or "Other",
+                    "films": tr.no_of_films or 0
+                })
+
         data = []
         for b in records:
             # Quick check if comments exist so UI can show an icon
@@ -1606,7 +1626,9 @@ def get_technician_dashboard_list(branch_id, from_date=None, to_date=None, searc
                 "gender": b.gender,
                 "contact_no": b.contact_no,
                 "date": b.create_at.strftime("%Y-%m-%d %I:%M %p") if b.create_at else None,
-                "has_comments": has_comments
+                "has_comments": has_comments,
+                "tests": tests_map.get(b.id, []),
+                "test_count": len(tests_map.get(b.id, []))
             })
 
         return {"data": data}, 200

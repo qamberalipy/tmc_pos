@@ -15,8 +15,8 @@ def _format_user(user, role_name=None, branch_name=None):
         "branch": branch_name,
         "is_active": user.is_active
     }
-def _format_userwithID(user, role_id=None, branch_id=None):
-    return {
+def _format_userwithID(user, role_id=None, branch_id=None, category_rates=None):
+    result = {
         "id": user.id,
         "name": user.name,
         "email": user.email,
@@ -24,6 +24,9 @@ def _format_userwithID(user, role_id=None, branch_id=None):
         "branch_id": branch_id,
         "is_active": user.is_active
     }
+    if role_id == 4:
+        result["category_rates"] = category_rates or {}
+    return result
 # 1. Create User
 def create_user(data):
     try:
@@ -47,6 +50,15 @@ def create_user(data):
             branch_id=data["branch_id"]
         )
         db.session.add(user)
+        db.session.flush()  # populate user.id before adding rates
+
+        # If radiologist, save per-category rates
+        if int(data.get("role_id", 0)) == 4:
+            from app.models.doctor_category_rate import DoctorCategoryRate
+            rates = data.get("category_rates", {})
+            for cat, rate in rates.items():
+                db.session.add(DoctorCategoryRate(doctor_id=user.id, category=cat, rate=rate))
+
         db.session.commit()
 
         return {"message": "User created successfully", "id": user.id}, 201
@@ -80,6 +92,20 @@ def update_user(user_id, data):
 
         if data.get("branch_id"):
             user.branch_id = data["branch_id"]
+
+        db.session.flush()  # save user fields before upserting rates
+
+        # Upsert per-category rates if this is a radiologist update
+        if int(data.get("role_id", user.role_id or 0)) == 4 and data.get("category_rates"):
+            from app.models.doctor_category_rate import DoctorCategoryRate
+            for cat, rate in data["category_rates"].items():
+                existing = DoctorCategoryRate.query.filter_by(
+                    doctor_id=user_id, category=cat
+                ).first()
+                if existing:
+                    existing.rate = rate
+                else:
+                    db.session.add(DoctorCategoryRate(doctor_id=user_id, category=cat, rate=rate))
 
         db.session.commit()
         return {"message": "User updated successfully"}, 200
@@ -185,8 +211,16 @@ def get_user_by_id(user_id):
         if not result:
             return {"error": "User not found"}, 404
 
-        u, role_name, branch_name = result
-        return _format_userwithID(u, role_name, branch_name), 200
+        u, role_id, branch_id = result
+
+        # Build category_rates for doctors
+        category_rates = None
+        if role_id == 4:
+            from app.models.doctor_category_rate import DoctorCategoryRate
+            rates = DoctorCategoryRate.query.filter_by(doctor_id=u.id).all()
+            category_rates = {r.category: r.rate for r in rates}
+
+        return _format_userwithID(u, role_id, branch_id, category_rates), 200
     except SQLAlchemyError as e:
         return {"error": str(e.__dict__.get('orig', e))}, 500
 
