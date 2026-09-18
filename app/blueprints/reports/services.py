@@ -714,16 +714,14 @@ def get_radiologist_performance_data(doctor_id, start_date_str=None, end_date_st
         DoctorReportingdetails.status,
         TestBookingDetails.no_of_films,
         # Per-radiologist, per-category rate from DoctorCategoryRate
-        db.func.coalesce(
-            db.session.query(DoctorCategoryRate.rate)
-                .filter(
-                    DoctorCategoryRate.doctor_id == cast(DoctorReportingdetails.doctor_id, Integer),
-                    DoctorCategoryRate.category == Test_registration.category
-                )
-                .correlate(DoctorReportingdetails, Test_registration)
-                .scalar_subquery(),
-            0.0
-        ).label("report_charges")
+        db.session.query(DoctorCategoryRate.rate)
+            .filter(
+                DoctorCategoryRate.doctor_id == cast(DoctorReportingdetails.doctor_id, Integer),
+                DoctorCategoryRate.category == Test_registration.category
+            )
+            .correlate(DoctorReportingdetails, Test_registration)
+            .scalar_subquery()
+            .label("report_charges")
     ).select_from(DoctorReportingdetails)\
     .join(User, cast(User.id, String) == DoctorReportingdetails.doctor_id)\
     .join(Test_registration, Test_registration.id == DoctorReportingdetails.test_id)\
@@ -745,9 +743,6 @@ def get_radiologist_performance_data(doctor_id, start_date_str=None, end_date_st
         date_str = str(row.report_date)
         doctor = row.radiologist_name
         category = row.category if row.category in CATEGORY_CHOICES else "Other"
-        
-        # Determine price (Default to 0 if null)
-        price = row.report_charges if row.report_charges else 0.0
 
         key = (date_str, doctor)
 
@@ -759,18 +754,22 @@ def get_radiologist_performance_data(doctor_id, start_date_str=None, end_date_st
                 "total_tests": 0,
                 "reports_made": 0,
                 "films_issued": 0,
-                "total_revenue": 0.0  # <--- Initialize Total
+                "total_revenue": 0.0,
+                "rate_missing": False
             }
 
         # Count the category
         grouped_data[key]["tests_counts"][category] += 1
         grouped_data[key]["total_tests"] += 1
-        
-        # Add price to daily total
-        grouped_data[key]["total_revenue"] += price
 
         if row.status == "Reported":
             grouped_data[key]["reports_made"] += 1
+            if row.report_charges is None:
+                # Rate row absent in DoctorCategoryRate — flag for frontend warning
+                grouped_data[key]["rate_missing"] = True
+            else:
+                # Charge accrues only for completed reports, at that report's category rate
+                grouped_data[key]["total_revenue"] += float(row.report_charges)
 
         if row.no_of_films:
             grouped_data[key]["films_issued"] += row.no_of_films
@@ -792,7 +791,8 @@ def get_radiologist_performance_data(doctor_id, start_date_str=None, end_date_st
             "total_tests": data["total_tests"],
             "reports_made": data["reports_made"],
             "films_issued": data["films_issued"],
-            "total_amount": round(data["total_revenue"], 2) # <--- Final Total
+            "report_charges": round(data["total_revenue"], 2),
+            "rate_missing": data["rate_missing"]
         })
 
     return final_report
