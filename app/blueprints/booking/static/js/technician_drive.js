@@ -69,7 +69,7 @@ function initSystemComponents() {
                         setTimeout(() => {
                             mountWorkspaceScope(null, match.booking_id || match.id,
                                 match.patient_name || 'Unregistered', match.mr_no || '',
-                                match.age || '', match.gender || '', match.total_no_of_films_used || 0);
+                                match.age || '', match.gender || '', match.age_unit || 'Years', match.total_no_of_films_used || 0);
                             params.delete('booking_id');
                             history.replaceState({}, '', `${location.pathname}${params.toString() ? '?' + params : ''}`);
                         }, 0);
@@ -88,7 +88,7 @@ function initSystemComponents() {
                     const targetId = data.booking_id || data.id; 
                     return `
                         <div class="py-2 px-3" style="cursor:pointer;" 
-                             onclick="mountWorkspaceScope(this, ${targetId}, '${safeName}', '${data.mr_no || ''}', '${data.age || ''}', '${data.gender || ''}', ${data.total_no_of_films_used || 0})">
+                             onclick="mountWorkspaceScope(this, ${targetId}, '${safeName}', '${data.mr_no || ''}', '${data.age || ''}', '${data.gender || ''}', '${data.age_unit || 'Years'}', ${data.total_no_of_films_used || 0})">
                             <div class="fw-bold mb-1" style="color: var(--text-main); font-size: 0.95rem;">${data.patient_name || 'Unregistered'}</div>
                             <div class="small fw-medium" style="color: var(--text-muted);">
                                 <span style="color: var(--bs-primary);">B#${targetId}</span> &bull; MR: ${data.mr_no || 'N/A'}
@@ -104,7 +104,7 @@ function initSystemComponents() {
                     const targetId = data.booking_id || data.id; 
                     // Render the animated Chevron instead of the ugly blue button
                     return `
-                        <div onclick="mountWorkspaceScope(this.closest('tr'), ${targetId}, '${safeName}', '${data.mr_no || ''}', '${data.age || ''}', '${data.gender || ''}', ${data.total_no_of_films_used || 0})" style="cursor:pointer;">
+                        <div onclick="mountWorkspaceScope(this.closest('tr'), ${targetId}, '${safeName}', '${data.mr_no || ''}', '${data.age || ''}', '${data.gender || ''}', '${data.age_unit || 'Years'}', ${data.total_no_of_films_used || 0})" style="cursor:pointer;">
                             <i class="bi bi-chevron-right action-chevron"></i>
                         </div>
                     `;
@@ -118,7 +118,7 @@ function initSystemComponents() {
 // -------------------------------------------------------------
 // MOBILE & WORKSPACE ORCHESTRATION
 // -------------------------------------------------------------
-window.mountWorkspaceScope = function(rowElement, bookingId, patientName, mrNo, age, gender, filmsCount) {
+window.mountWorkspaceScope = function(rowElement, bookingId, patientName, mrNo, age, gender, ageUnit, filmsCount) {
     if (!bookingId) return;
     activeSessionBookingId = bookingId;
     
@@ -135,7 +135,7 @@ window.mountWorkspaceScope = function(rowElement, bookingId, patientName, mrNo, 
     $('#wsPatientName').text(patientName);
     $('#wsBookingId').text(`B#${bookingId}`);
     $('#wsMrNo').text(`MR: ${mrNo}`);
-    $('#wsAgeGender').text(`${age} Yrs | ${gender}`);
+    $('#wsAgeGender').text(`${age} ${ageUnit || 'Years'} | ${gender}`);
     renderWorkspaceTests(bookingId);
     $('#filmUsageInput').val(filmsCount || 0);
     $('#chatMessageInput').val('');
