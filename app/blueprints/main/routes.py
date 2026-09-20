@@ -90,7 +90,7 @@ def login():
                 role_landing_pages = {
                     'admin': 'admin.view_admin_dashboard',
                     'staff': 'admin.view_staff_dashboard',
-                    'doctor': 'reports.view_pending_cases',
+                    'doctor': 'reports.view_doctor_portal',
                     'techician': 'booking.view_technician_drive' # Matched your spelling from menu.py
                 }
                 

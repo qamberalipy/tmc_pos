@@ -465,7 +465,8 @@ def get_doctor_pending_bookings(doctor_id):
             "assigned_at": dr_detail.report_at.strftime("%Y-%m-%d %H:%M:%S") if dr_detail.report_at else None,
             "patient_name": booking.patient_name,
             "mr_no": booking.mr_no,
-            "age": booking.age,       
+            "age": booking.age,
+            "age_unit": booking.age_unit or "Years",
             "gender": booking.gender,
             "technician_comments": booking.technician_comments,
             "test_name": test_name, # The specific name for this assigned row
@@ -499,6 +500,7 @@ def get_doctor_reported_bookings(doctor_id):
             "patient_name": report.patient_name,
             "gender": report.gender,
             "age": report.age,
+            "age_unit": "Years",  # DoctorReportData doesn't store age_unit; default safe
 
             "assigned_by": user.name if hasattr(user, "name") else None,
             "assigned_at": details.report_at.strftime("%Y-%m-%d %H:%M:%S") if details.report_at else None,
