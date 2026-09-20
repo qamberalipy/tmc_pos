@@ -104,7 +104,7 @@ h2,p{margin:0;padding:0}
         <div class="cell"><div class="lbl">Patient Name</div><div class="v name">{{ booking.patient_name }}</div></div>
         <div class="cell"><div class="lbl">Gender</div><div class="v">{{ booking.gender }}</div></div>
         <div class="cell"><div class="lbl">MR No.</div><div class="v">{{ booking.mr_no }}</div></div>
-        <div class="cell"><div class="lbl">Age</div><div class="v">{{ booking.age }} Years</div></div>
+        <div class="cell"><div class="lbl">Age</div><div class="v">{{ booking.age }} {{ booking.age_unit or 'Years' }}</div></div>
         <div class="cell"><div class="lbl">Contact No.</div><div class="v">{{ booking.contact_no }}</div></div>
         <div class="cell"><div class="lbl">Referred By</div><div class="v">{{ booking.referred_by }}</div></div>
       </div>
@@ -180,6 +180,10 @@ h2,p{margin:0;padding:0}
         document.querySelector(".receipt").classList.add("dense");
       }
     })();
+
+    window.addEventListener('DOMContentLoaded', function () {
+        window.print();
+    });
   </script>
 </body>
 </html>

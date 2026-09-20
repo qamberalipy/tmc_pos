@@ -179,6 +179,11 @@ def view_reported_cases():
     except Exception as e:
         print(f"Error in reported_cases: {str(e)}")
         return render_template("error.html", message="An error occurred while loading pending cases.")
+
+@reports_bp.route("/doctor-portal", methods=["GET"])
+@login_required
+def view_doctor_portal():
+    return render_template("doctor_portal.html")
     
 @reports_bp.route("/assign-bookings", methods=["POST"])
 def assign_bookings():

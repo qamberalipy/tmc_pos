@@ -41,7 +41,7 @@ def create_test_booking(data):
 
             # --- 2. Required fields validation ---
             required = ["patient_name", "gender", "contact_no", "branch_id", "net_receivable", "create_by"]
-            missing = [f for f in required if not data.get(f)]
+            missing = [f for f in required if data.get(f) is None or data.get(f) == ""]
             if missing:
                 return {"error": f"Missing required fields: {', '.join(missing)}"}, 400
 
@@ -58,6 +58,7 @@ def create_test_booking(data):
                 patient_name=data["patient_name"],
                 gender=data["gender"],
                 age=data.get("age"),
+                age_unit=data.get("age_unit", "Years"),
                 contact_no=data["contact_no"],
                 referred_dr=data.get("referred_dr"),
                 referred_non_dr=data.get("referred_non_dr"),
@@ -869,6 +870,7 @@ def get_booking_details(booking_id: int):
             "technician_comments": technician_comments,
             "gender": booking.gender,
             "age": booking.age,
+            "age_unit": booking.age_unit or "Years",
             "contact_no": booking.contact_no,
             "referred_by": referred_name or "Self",
             "branch": {
@@ -904,6 +906,8 @@ def _format_test_booking(row):
         "patient_name": row.patient_name,
         "mr_no": row.mr_no,
         "date": row.create_at.strftime("%Y-%m-%d") if row.create_at else None,
+        "age": row.age,
+        "age_unit": row.age_unit or "Years",
         "referred_dr": row.referred_dr,
         "give_share_to": row.give_share_to,
         "sent_to_doctor": row.sent_to_doctor,
@@ -955,6 +959,8 @@ def get_all_test_bookings(branch_id=None, from_date=None, to_date=None):
                 Branch.branch_name.label("branch_name"),
                 User.name.label("created_by_name"),
                 TestBooking.give_share_to,
+                TestBooking.age,
+                TestBooking.age_unit,
                 exists().where(
                     DoctorReportingdetails.booking_id == db.cast(TestBooking.id, db.String),
                     DoctorReportingdetails.is_active == True
@@ -1570,8 +1576,8 @@ def get_technician_dashboard_list(branch_id, from_date=None, to_date=None, searc
 
         query = db.session.query(
             TestBooking.id, TestBooking.mr_no, TestBooking.patient_name,
-            TestBooking.age, TestBooking.gender, TestBooking.contact_no,
-            TestBooking.create_at, TestBooking.technician_comments
+            TestBooking.age, TestBooking.age_unit, TestBooking.gender, TestBooking.contact_no,
+            TestBooking.total_no_of_films_used, TestBooking.create_at, TestBooking.technician_comments
         ).filter(TestBooking.branch_id == branch_id)
 
         if start_utc and end_utc:
@@ -1623,8 +1629,10 @@ def get_technician_dashboard_list(branch_id, from_date=None, to_date=None, searc
                 "mr_no": b.mr_no,
                 "patient_name": b.patient_name,
                 "age": b.age,
+                "age_unit": b.age_unit or "Years",
                 "gender": b.gender,
                 "contact_no": b.contact_no,
+                "total_no_of_films_used": b.total_no_of_films_used or 0,
                 "date": b.create_at.strftime("%Y-%m-%d %I:%M %p") if b.create_at else None,
                 "has_comments": has_comments,
                 "tests": tests_map.get(b.id, []),

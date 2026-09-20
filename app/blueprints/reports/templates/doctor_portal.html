@@ -1,0 +1,868 @@
+{% extends "base.html" %}
+
+{% block stylesheets %}
+<link href="https://unpkg.com/vue@3/dist/vue.global.prod.js" rel="preload" as="script">
+<style>
+  [v-cloak] { display: none; }
+
+  /* STATS STRIP */
+  .stats-strip { display: flex; gap: 14px; margin-bottom: 24px; flex-wrap: wrap; }
+  .stat-card {
+    flex: 1; min-width: 140px; background: #fff; border-radius: 14px;
+    padding: 16px 20px; border: 1px solid #e2e8f0;
+    box-shadow: 0 1px 4px rgba(0,0,0,.05);
+  }
+  .stat-label { font-size: .72rem; font-weight: 600; text-transform: uppercase; letter-spacing: .6px; color: #64748b; }
+  .stat-value { font-size: 2rem; font-weight: 700; line-height: 1; margin-top: 4px; }
+  .stat-card.pending  .stat-value { color: #d97706; }
+  .stat-card.reported .stat-value { color: #16a34a; }
+  .stat-card.total    .stat-value { color: #021a71; }
+
+  /* CONTROLS */
+  .controls-bar {
+    background: #fff; border-radius: 14px;
+    border: 1px solid #e2e8f0; padding: 14px 18px;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    margin-bottom: 20px; box-shadow: 0 1px 4px rgba(0,0,0,.05);
+  }
+  .seg-control { display: flex; background: #f4f6fb; border-radius: 10px; padding: 3px; gap: 3px; }
+  .seg-btn {
+    padding: 7px 18px; border-radius: 8px; border: none; font-size: .85rem;
+    font-weight: 600; cursor: pointer; transition: all .2s;
+    background: transparent; color: #64748b;
+  }
+  .seg-btn.active { background: #fff; color: #021a71; box-shadow: 0 1px 6px rgba(0,0,0,.1); }
+  .count-badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 22px; height: 22px; border-radius: 11px;
+    font-size: .72rem; font-weight: 700; padding: 0 6px; margin-left: 5px;
+  }
+  .count-badge.pending  { background: #fef3c7; color: #92400e; }
+  .count-badge.reported { background: #dcfce7; color: #166534; }
+  .dp-search {
+    flex: 1; min-width: 180px; padding: 8px 14px; border-radius: 9px;
+    border: 1px solid #e2e8f0; font-size: .87rem; outline: none; transition: border-color .2s;
+  }
+  .dp-search:focus { border-color: #021a71; }
+  .dp-date {
+    padding: 7px 10px; border-radius: 9px; border: 1px solid #e2e8f0;
+    font-size: .83rem; outline: none; color: #1e293b;
+  }
+  .btn-refresh {
+    padding: 8px 16px; border-radius: 9px; background: #021a71;
+    color: #fff; border: none; font-size: .83rem; font-weight: 600; cursor: pointer;
+    display: flex; align-items: center; gap: 5px; transition: opacity .2s; white-space: nowrap;
+  }
+  .btn-refresh:hover { opacity: .88; }
+  .btn-refresh.spinning i { animation: dp-spin .7s linear infinite; }
+  @keyframes dp-spin { to { transform: rotate(360deg); } }
+
+  /* CASE CARDS */
+  .case-grid { display: flex; flex-direction: column; gap: 12px; }
+  .case-card {
+    background: #fff; border-radius: 14px;
+    border: 1px solid #e2e8f0; box-shadow: 0 1px 4px rgba(0,0,0,.05);
+    padding: 18px 20px; transition: box-shadow .2s, transform .15s;
+  }
+  .case-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.09); transform: translateY(-1px); }
+  .case-card-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  .patient-info { flex: 1; min-width: 0; }
+  .patient-name { font-size: 1.05rem; font-weight: 700; color: #1e293b; margin-bottom: 3px; }
+  .patient-meta { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 6px; }
+  .meta-chip { display: inline-flex; align-items: center; gap: 4px; font-size: .78rem; color: #64748b; font-weight: 500; }
+  .meta-chip i { font-size: .82rem; }
+  .status-pill { display: inline-flex; align-items: center; gap: 5px; padding: 4px 12px; border-radius: 20px; font-size: .78rem; font-weight: 700; }
+  .status-pill.pending  { background: #fef3c7; color: #92400e; }
+  .status-pill.reported { background: #dcfce7; color: #166534; }
+  .case-card-body {
+    margin-top: 12px; padding-top: 12px; border-top: 1px solid #e2e8f0;
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;
+  }
+  .test-tag {
+    background: #eff6ff; color: #021a71; border: 1px solid #bfdbfe;
+    border-radius: 6px; padding: 4px 12px; font-size: .82rem; font-weight: 600;
+  }
+  .assign-meta { font-size: .77rem; color: #64748b; }
+  .card-actions { display: flex; gap: 8px; }
+  .btn-action {
+    padding: 7px 16px; border-radius: 8px; border: none; font-size: .82rem;
+    font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 5px; transition: all .18s;
+  }
+  .btn-action.primary { background: #021a71; color: #fff; }
+  .btn-action.primary:hover { background: #1a3a9e; }
+  .btn-action.success { background: #16a34a; color: #fff; }
+  .btn-action.success:hover { background: #15803d; }
+  .btn-action.outline { background: transparent; color: #64748b; border: 1px solid #e2e8f0; }
+  .btn-action.outline:hover { background: #f4f6fb; color: #1e293b; }
+
+  /* PAGINATION */
+  .pagination-bar {
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    padding: 20px 0 8px;
+  }
+  .pagination-bar button {
+    padding: 6px 16px; border-radius: 8px; border: 1px solid #e2e8f0;
+    background: #fff; font-size: .83rem; font-weight: 600; cursor: pointer; transition: all .18s;
+  }
+  .pagination-bar button:hover:not(:disabled) { background: #021a71; color: #fff; border-color: #021a71; }
+  .pagination-bar button:disabled { opacity: .4; cursor: not-allowed; }
+  .page-info { font-size: .83rem; color: #64748b; font-weight: 500; }
+
+  /* EMPTY STATE */
+  .empty-state { text-align: center; padding: 60px 20px; color: #64748b; }
+  .empty-state i { font-size: 3rem; opacity: .4; }
+  .empty-state p { margin-top: 14px; font-size: .95rem; }
+
+  /* MODAL OVERLAY */
+  .dp-overlay {
+    position: fixed; inset: 0; z-index: 1050;
+    background: rgba(2,26,113,.4); backdrop-filter: blur(3px);
+    display: flex; align-items: center; justify-content: center; padding: 16px;
+    animation: dpFadeIn .18s ease;
+  }
+  @keyframes dpFadeIn { from { opacity: 0; } to { opacity: 1; } }
+  .dp-modal {
+    background: #fff; border-radius: 18px;
+    width: 100%; max-width: 780px; max-height: 90vh;
+    display: flex; flex-direction: column;
+    box-shadow: 0 20px 60px rgba(0,0,0,.25);
+    animation: dpSlideUp .22s ease; overflow: hidden;
+  }
+  @keyframes dpSlideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+  .dp-modal-header {
+    background: linear-gradient(135deg, #021a71 0%, #1a3a9e 100%);
+    color: #fff; padding: 18px 24px;
+    display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
+  }
+  .dp-modal-header h5 { margin: 0; font-weight: 700; font-size: 1.05rem; }
+  .dp-modal-close {
+    background: rgba(255,255,255,.18); border: none; color: #fff;
+    width: 32px; height: 32px; border-radius: 8px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; font-size: 1.1rem;
+    transition: background .18s;
+  }
+  .dp-modal-close:hover { background: rgba(255,255,255,.3); }
+
+  /* Patient banner */
+  .patient-banner {
+    background: linear-gradient(135deg, #eff6ff, #f0fdf4);
+    border-bottom: 1px solid #e2e8f0; padding: 14px 24px; flex-shrink: 0;
+  }
+  .pt-name { font-size: 1.1rem; font-weight: 700; }
+  .pt-chips { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 6px; }
+  .pt-chip { font-size: .8rem; color: #64748b; font-weight: 500; display: inline-flex; align-items: center; gap: 4px; }
+  .pt-chip i { color: #021a71; }
+
+  /* Modal inner tabs */
+  .dp-modal-tabs {
+    display: flex; gap: 4px; padding: 12px 24px 0;
+    border-bottom: 1px solid #e2e8f0; flex-shrink: 0; background: #fff;
+  }
+  .dp-tab {
+    padding: 8px 18px; border: none; background: transparent;
+    font-size: .85rem; font-weight: 600; color: #64748b;
+    cursor: pointer; border-bottom: 2px solid transparent;
+    transition: all .18s; border-radius: 6px 6px 0 0;
+  }
+  .dp-tab.active { color: #021a71; border-bottom-color: #021a71; }
+  .dp-modal-body { flex: 1; overflow-y: auto; padding: 20px 24px; }
+
+  /* Upload zone */
+  .drag-drop-zone {
+    border: 2px dashed #93c5fd; border-radius: 12px;
+    background: #eff6ff; cursor: pointer; padding: 36px; text-align: center; transition: all .2s;
+  }
+  .drag-drop-zone:hover, .drag-drop-zone.dragover { background: #dbeafe; border-color: #021a71; }
+  .drag-drop-zone i { font-size: 2.5rem; color: #021a71; }
+  .dp-progress-wrap { height: 8px; border-radius: 4px; background: #e2e8f0; overflow: hidden; margin-top: 10px; }
+  .dp-progress-bar {
+    height: 100%; background: linear-gradient(90deg, #021a71, #4e73df);
+    border-radius: 4px; transition: width .3s;
+  }
+  .preview-iframe { width: 100%; height: 380px; border: 1px solid #e2e8f0; border-radius: 8px; }
+
+  /* Chat */
+  .chat-area { display: flex; flex-direction: column; gap: 16px; padding-bottom: 4px; }
+  .chat-msg { display: flex; gap: 12px; }
+  .chat-avatar {
+    width: 36px; height: 36px; border-radius: 10px;
+    background: linear-gradient(135deg, #021a71, #4e73df);
+    color: #fff; flex-shrink: 0; display: flex; align-items: center;
+    justify-content: center; font-weight: 700; font-size: .95rem;
+  }
+  .chat-bubble { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 0 12px 12px 12px; padding: 10px 14px; flex: 1; }
+  .chat-meta { font-size: .75rem; color: #64748b; margin-bottom: 4px; }
+  .chat-text { font-size: .9rem; line-height: 1.5; }
+  .media-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+  .media-tile {
+    width: 68px; height: 68px; border-radius: 8px; border: 1px solid #e2e8f0;
+    overflow: hidden; display: flex; align-items: center; justify-content: center;
+    flex-direction: column; background: #fff; text-decoration: none; transition: transform .18s;
+  }
+  .media-tile:hover { transform: translateY(-2px); }
+  .media-tile img { width: 100%; height: 100%; object-fit: cover; }
+  .media-tile.doc i { font-size: 1.8rem; color: #021a71; }
+  .media-tile.doc span { font-size: .62rem; font-weight: 700; color: #64748b; }
+
+  /* Modal footer */
+  .dp-modal-footer {
+    padding: 14px 24px; border-top: 1px solid #e2e8f0;
+    display: flex; align-items: center; justify-content: space-between;
+    background: #fafbff; flex-shrink: 0;
+  }
+  .btn-decline {
+    padding: 8px 18px; border-radius: 8px; background: transparent;
+    border: 1px solid #dc3545; color: #dc3545;
+    font-size: .83rem; font-weight: 600; cursor: pointer; transition: all .18s;
+  }
+  .btn-decline:hover { background: #dc3545; color: #fff; }
+  .btn-submit {
+    padding: 8px 22px; border-radius: 8px; background: #021a71;
+    color: #fff; border: none; font-size: .85rem; font-weight: 600;
+    cursor: pointer; transition: opacity .18s;
+  }
+  .btn-submit:disabled { opacity: .5; cursor: not-allowed; }
+  .btn-submit:not(:disabled):hover { opacity: .88; }
+
+  /* Global spinner */
+  .dp-loading-overlay {
+    position: fixed; inset: 0; z-index: 2000;
+    background: rgba(255,255,255,.7); display: flex; align-items: center; justify-content: center;
+  }
+  .spinner-ring {
+    width: 44px; height: 44px; border-radius: 50%;
+    border: 4px solid #e2e8f0; border-top-color: #021a71;
+    animation: dp-spin .7s linear infinite;
+  }
+</style>
+{% endblock %}
+
+{% block user_page %}
+<div id="dp-app" v-cloak>
+
+  <!-- Global loading overlay -->
+  <div class="dp-loading-overlay" v-if="globalLoading">
+    <div class="spinner-ring"></div>
+  </div>
+
+  <!-- STATS STRIP -->
+  <div class="stats-strip">
+    <div class="stat-card pending">
+      <div class="stat-label">Pending Cases</div>
+      <div class="stat-value">[[ pendingCases.length ]]</div>
+    </div>
+    <div class="stat-card reported">
+      <div class="stat-label">Reported Cases</div>
+      <div class="stat-value">[[ reportedCases.length ]]</div>
+    </div>
+    <div class="stat-card total">
+      <div class="stat-label">Total Assigned</div>
+      <div class="stat-value">[[ pendingCases.length + reportedCases.length ]]</div>
+    </div>
+  </div>
+
+  <!-- CONTROLS BAR -->
+  <div class="controls-bar">
+    <div class="seg-control">
+      <button class="seg-btn" :class="{active: activeTab==='pending'}" @click="switchTab('pending')">
+        Pending <span class="count-badge pending">[[ pendingCases.length ]]</span>
+      </button>
+      <button class="seg-btn" :class="{active: activeTab==='reported'}" @click="switchTab('reported')">
+        Reported <span class="count-badge reported">[[ reportedCases.length ]]</span>
+      </button>
+    </div>
+    <input class="dp-search" type="text" placeholder="Search patient, MR No, test..." v-model="searchQuery" @input="resetPage" />
+    <input class="dp-date" type="date" v-model="fromDate" title="From date" @change="resetPage" />
+    <input class="dp-date" type="date" v-model="toDate" title="To date" @change="resetPage" />
+    <button class="btn-refresh" :class="{spinning: globalLoading}" @click="loadAll">
+      <i class="bi bi-arrow-clockwise"></i> Refresh
+    </button>
+  </div>
+
+  <!-- CASE GRID -->
+  <div class="case-grid">
+
+    <!-- PENDING TAB -->
+    <template v-if="activeTab === 'pending'">
+      <div v-if="filteredPending.length === 0" class="empty-state">
+        <i class="bi bi-inbox"></i><p>No pending cases match your filters.</p>
+      </div>
+      <div class="case-card" v-for="c in paginatedCases" :key="c.reporting_id">
+        <div class="case-card-header">
+          <div class="patient-info">
+            <div class="patient-name">[[ c.patient_name ]]</div>
+            <div class="patient-meta">
+              <span class="meta-chip"><i class="bi bi-hash"></i>MR: [[ c.mr_no || 'N/A' ]]</span>
+              <span class="meta-chip"><i class="bi bi-calendar-person"></i>[[ c.age ]] [[ c.age_unit || 'Years' ]] &middot; [[ c.gender ]]</span>
+              <span class="meta-chip"><i class="bi bi-person-circle"></i>Ref: [[ c.referred_by || 'Self' ]]</span>
+            </div>
+          </div>
+          <span class="status-pill pending"><i class="bi bi-hourglass-split"></i>Pending</span>
+        </div>
+        <div class="case-card-body">
+          <div>
+            <span class="test-tag"><i class="bi bi-activity"></i> [[ c.test_name ]]</span>
+            <div class="assign-meta mt-1">Assigned by [[ c.assigned_by ]] at [[ c.assigned_at ]]</div>
+          </div>
+          <div class="card-actions">
+            <button class="btn-action outline" @click="openModal(c, 'pending', 'comments')"
+              :title="c.technician_comments ? 'View technician notes' : 'No notes'">
+              <i class="bi" :class="c.technician_comments ? 'bi-chat-left-text-fill text-info' : 'bi-chat-left-text'"></i> Notes
+            </button>
+            <button class="btn-action primary" @click="openModal(c, 'pending', 'report')">
+              <i class="bi bi-cloud-arrow-up"></i> Upload Report
+            </button>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <!-- REPORTED TAB -->
+    <template v-if="activeTab === 'reported'">
+      <div v-if="filteredReported.length === 0" class="empty-state">
+        <i class="bi bi-check2-circle"></i><p>No reported cases match your filters.</p>
+      </div>
+      <div class="case-card" v-for="c in paginatedCases" :key="c.report_details_id">
+        <div class="case-card-header">
+          <div class="patient-info">
+            <div class="patient-name">[[ c.patient_name ]]</div>
+            <div class="patient-meta">
+              <span class="meta-chip"><i class="bi bi-calendar-person"></i>[[ c.age ]] [[ c.age_unit || 'Years' ]] &middot; [[ c.gender ]]</span>
+              <span class="meta-chip"><i class="bi bi-check2-square"></i>Reported: [[ c.reported_at ]]</span>
+            </div>
+          </div>
+          <span class="status-pill reported"><i class="bi bi-check-circle-fill"></i>Reported</span>
+        </div>
+        <div class="case-card-body">
+          <div>
+            <span class="test-tag"><i class="bi bi-activity"></i> [[ c.tests && c.tests.test_name || 'N/A' ]]</span>
+            <div class="assign-meta mt-1">Assigned by [[ c.assigned_by ]] at [[ c.assigned_at ]]</div>
+          </div>
+          <div class="card-actions">
+            <button class="btn-action outline" @click="openModal(c, 'reported', 'comments')">
+              <i class="bi bi-chat-left-text"></i> Notes
+            </button>
+            <button class="btn-action success" @click="openModal(c, 'reported', 'report')">
+              <i class="bi bi-file-earmark-check"></i> View Report
+            </button>
+          </div>
+        </div>
+      </div>
+    </template>
+
+  </div><!-- /case-grid -->
+
+  <!-- PAGINATION BAR -->
+  <div class="pagination-bar" v-if="totalPages > 1">
+    <button @click="prevPage" :disabled="currentPage <= 1">
+      <i class="bi bi-chevron-left"></i> Previous
+    </button>
+    <span class="page-info">Page [[ currentPage ]] of [[ totalPages ]]</span>
+    <button @click="nextPage" :disabled="currentPage >= totalPages">
+      Next <i class="bi bi-chevron-right"></i>
+    </button>
+  </div>
+
+  <!-- UNIFIED CASE MODAL -->
+  <div class="dp-overlay" v-if="activeCase" @click.self="closeModal">
+    <div class="dp-modal">
+
+      <!-- Modal header -->
+      <div class="dp-modal-header">
+        <h5><i class="bi bi-file-earmark-medical me-2"></i>Case Details</h5>
+        <button class="dp-modal-close" @click="closeModal"><i class="bi bi-x-lg"></i></button>
+      </div>
+
+      <!-- Patient banner -->
+      <div class="patient-banner">
+        <div class="pt-name">[[ activeCase.patient_name ]]</div>
+        <div class="pt-chips">
+          <span class="pt-chip" v-if="activeCase.mr_no"><i class="bi bi-hash"></i>MR: [[ activeCase.mr_no ]]</span>
+          <span class="pt-chip"><i class="bi bi-calendar-person"></i>[[ activeCase.age ]] [[ activeCase.age_unit || 'Years' ]] &middot; [[ activeCase.gender ]]</span>
+          <span class="pt-chip" v-if="activeCase.referred_by"><i class="bi bi-person-circle"></i>Ref: [[ activeCase.referred_by ]]</span>
+          <span class="pt-chip"><i class="bi bi-activity"></i>[[ activeCaseTestName ]]</span>
+          <span class="pt-chip"><i class="bi bi-person-badge"></i>Assigned by [[ activeCase.assigned_by ]]</span>
+        </div>
+      </div>
+
+      <!-- Inner tabs -->
+      <div class="dp-modal-tabs">
+        <button class="dp-tab" :class="{active: modalTab==='report'}" @click="modalTab='report'">
+          <i class="bi bi-file-earmark-arrow-up"></i>
+          [[ activeCaseType === 'pending' ? 'Upload Report' : 'View Report' ]]
+        </button>
+        <button class="dp-tab" :class="{active: modalTab==='comments'}" @click="switchToComments">
+          <i class="bi bi-chat-left-text"></i> Notes
+        </button>
+      </div>
+
+      <!-- Tab content -->
+      <div class="dp-modal-body">
+
+        <!-- PENDING REPORT TAB -->
+        <template v-if="modalTab === 'report' && activeCaseType === 'pending'">
+          <div v-if="uploadState === 'idle'">
+            <div class="drag-drop-zone"
+              @click="triggerFileInput"
+              @dragover.prevent="isDragging=true"
+              @dragleave="isDragging=false"
+              @drop.prevent="onFileDrop"
+              :class="{dragover: isDragging}">
+              <i class="bi bi-file-earmark-arrow-up mb-2 d-block"></i>
+              <h5 class="fw-bold mb-1">Drag &amp; Drop Report Document</h5>
+              <p class="text-muted small mb-0">PDF or Word file, max 15 MB</p>
+              <input type="file" ref="fileInputRef" class="d-none" accept=".pdf,.doc,.docx" @change="onFileChange" />
+            </div>
+          </div>
+          <div v-if="uploadState === 'uploading'" class="text-center py-4">
+            <div class="spinner-ring mx-auto mb-3"></div>
+            <div class="fw-bold">[[ uploadFileName ]]</div>
+            <div class="text-muted small mt-1">[[ uploadStatusText ]]</div>
+            <div class="dp-progress-wrap mt-2">
+              <div class="dp-progress-bar" :style="{width: uploadProgress + '%'}"></div>
+            </div>
+          </div>
+          <div v-if="uploadState === 'done'">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <span class="badge bg-success"><i class="bi bi-check-circle"></i> Document Ready</span>
+              <button class="btn btn-sm btn-outline-secondary" @click="resetUpload">
+                <i class="bi bi-arrow-repeat"></i> Replace
+              </button>
+            </div>
+            <iframe class="preview-iframe" :src="previewSrc" v-if="previewSrc"></iframe>
+          </div>
+        </template>
+
+        <!-- REPORTED REPORT TAB -->
+        <template v-if="modalTab === 'report' && activeCaseType === 'reported'">
+          <div v-if="reportLoading" class="text-center py-5">
+            <div class="spinner-ring mx-auto"></div>
+            <div class="text-muted mt-2 small">Loading report...</div>
+          </div>
+          <div v-else-if="existingReportUrl">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <span class="badge bg-success px-3 py-2"><i class="bi bi-check-circle"></i> Report On File</span>
+              <button class="btn btn-sm btn-outline-primary" @click="showReplaceZone=!showReplaceZone">
+                <i class="bi bi-cloud-arrow-up"></i> Update Report
+              </button>
+            </div>
+            <div v-if="showReplaceZone">
+              <div v-if="uploadState === 'idle'" class="drag-drop-zone mb-3"
+                @click="triggerFileInput"
+                @dragover.prevent="isDragging=true"
+                @dragleave="isDragging=false"
+                @drop.prevent="onFileDrop"
+                :class="{dragover: isDragging}">
+                <i class="bi bi-cloud-upload mb-2 d-block"></i>
+                <h6 class="fw-bold mb-1">Upload Replacement Document</h6>
+                <p class="text-muted small mb-0">PDF or Word, max 15 MB</p>
+                <input type="file" ref="fileInputRef" class="d-none" accept=".pdf,.doc,.docx" @change="onFileChange" />
+              </div>
+              <div v-if="uploadState === 'uploading'" class="text-center py-3">
+                <div class="spinner-ring mx-auto mb-2"></div>
+                <div class="text-muted small">[[ uploadStatusText ]]</div>
+                <div class="dp-progress-wrap mt-2">
+                  <div class="dp-progress-bar" :style="{width: uploadProgress+'%'}"></div>
+                </div>
+              </div>
+            </div>
+            <iframe class="preview-iframe" :src="previewSrc || existingReportUrl"></iframe>
+          </div>
+          <div v-else class="text-center py-5 text-muted">
+            <i class="bi bi-file-earmark-text" style="font-size:2.5rem;opacity:.4;"></i>
+            <p class="mt-2">No document on file yet.</p>
+            <div class="drag-drop-zone mt-3"
+              @click="triggerFileInput"
+              @dragover.prevent="isDragging=true"
+              @dragleave="isDragging=false"
+              @drop.prevent="onFileDrop"
+              :class="{dragover:isDragging}">
+              <i class="bi bi-cloud-arrow-up mb-1 d-block"></i>
+              <p class="small mb-0">Drag &amp; Drop or click to browse</p>
+              <input type="file" ref="fileInputRef" class="d-none" accept=".pdf,.doc,.docx" @change="onFileChange" />
+            </div>
+          </div>
+        </template>
+
+        <!-- COMMENTS TAB (read-only) -->
+        <template v-if="modalTab === 'comments'">
+          <div v-if="chatLoading" class="text-center py-5">
+            <div class="spinner-ring mx-auto"></div>
+            <div class="text-muted mt-2 small">Loading notes...</div>
+          </div>
+          <div v-else>
+            <div class="chat-area" v-if="chatMessages.length > 0">
+              <div class="chat-msg" v-for="(msg, idx) in chatMessages" :key="idx">
+                <div class="chat-avatar">[[ msg.user_name ? msg.user_name[0].toUpperCase() : '?' ]]</div>
+                <div class="chat-bubble">
+                  <div class="chat-meta">
+                    <strong>[[ msg.user_name || 'System' ]]</strong>
+                    <span class="ms-2">[[ formatMsgTime(msg.created_at) ]]</span>
+                  </div>
+                  <div class="chat-text" v-html="(msg.message || '').replace(/\n/g, '<br>')"></div>
+                  <div class="media-grid" v-if="msg.media && msg.media.length">
+                    <a v-for="att in msg.media" :href="att.url" target="_blank"
+                      class="media-tile" :class="att.type && att.type.includes('image') ? '' : 'doc'">
+                      <img v-if="att.type && att.type.includes('image')" :src="att.url" />
+                      <template v-else>
+                        <i class="bi bi-file-earmark-text"></i>
+                        <span>[[ att.name ? att.name.split('.').pop().substring(0,4).toUpperCase() : 'FILE' ]]</span>
+                      </template>
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div v-else class="empty-state" style="padding:30px 0;">
+              <i class="bi bi-chat-left" style="font-size:2rem;"></i>
+              <p>No technician notes for this booking.</p>
+            </div>
+          </div>
+        </template>
+
+      </div><!-- /dp-modal-body -->
+
+      <!-- Modal footer -->
+      <div class="dp-modal-footer">
+        <div>
+          <button class="btn-decline"
+            v-if="activeCaseType === 'pending' && modalTab === 'report'"
+            @click="declineCase">
+            <i class="bi bi-x-circle"></i> Decline Assignment
+          </button>
+        </div>
+        <div class="d-flex gap-2">
+          <button style="padding:8px 18px;border-radius:8px;background:#e2e8f0;border:none;cursor:pointer;font-weight:600;"
+            @click="closeModal">Close</button>
+          <button class="btn-submit"
+            v-if="activeCaseType === 'pending' && modalTab === 'report'"
+            :disabled="uploadState !== 'done'"
+            @click="submitReport">
+            <i class="bi bi-save"></i> Submit Report
+          </button>
+          <button class="btn-submit"
+            v-if="activeCaseType === 'reported' && modalTab === 'report' && uploadState === 'done'"
+            @click="updateReport">
+            <i class="bi bi-save"></i> Save Changes
+          </button>
+        </div>
+      </div>
+
+    </div><!-- /dp-modal -->
+  </div><!-- /dp-overlay -->
+
+</div><!-- #dp-app -->
+{% endblock %}
+
+{% block javascript %}
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<script>
+(function() {
+  const DOCTOR_ID   = {{ session.get('user_id', 'null') }};
+  const UPLOAD_BASE = '/uploads/api/upload';
+
+  const { createApp } = Vue;
+  createApp({
+    delimiters: ['[[', ']]'],
+    data() {
+      const now   = new Date();
+      const first = new Date(now.getFullYear(), now.getMonth(), 1);
+      return {
+        doctorId: DOCTOR_ID,
+        activeTab: 'pending',
+        pendingCases: [],
+        reportedCases: [],
+        searchQuery: '',
+        fromDate: first.toISOString().split('T')[0],
+        toDate:   now.toISOString().split('T')[0],
+        currentPage: 1,
+        pageSize: 12,
+        globalLoading: false,
+        activeCase: null,
+        activeCaseType: null,
+        modalTab: 'report',
+        uploadState: 'idle',
+        uploadProgress: 0,
+        uploadStatusText: '',
+        uploadFileName: '',
+        finalUploadedUrl: null,
+        selectedFile: null,
+        previewSrc: null,
+        isDragging: false,
+        isUploadingProcess: false,
+        existingReportUrl: null,
+        reportLoading: false,
+        showReplaceZone: false,
+        chatMessages: [],
+        chatLoading: false,
+      };
+    },
+
+    computed: {
+      activeCaseTestName() {
+        if (!this.activeCase) return '';
+        if (this.activeCaseType === 'pending') return this.activeCase.test_name || '';
+        return (this.activeCase.tests && this.activeCase.tests.test_name) || '';
+      },
+      filteredPending() {
+        return this.applyFilters(this.pendingCases, c =>
+          (c.patient_name||'') + ' ' + (c.mr_no||'') + ' ' + (c.test_name||''),
+          c => c.assigned_at
+        );
+      },
+      filteredReported() {
+        return this.applyFilters(this.reportedCases, c =>
+          (c.patient_name||'') + ' ' + ((c.tests && c.tests.test_name)||''),
+          c => c.reported_at
+        );
+      },
+      activeFiltered() {
+        return this.activeTab === 'pending' ? this.filteredPending : this.filteredReported;
+      },
+      totalPages() {
+        return Math.max(1, Math.ceil(this.activeFiltered.length / this.pageSize));
+      },
+      paginatedCases() {
+        const start = (this.currentPage - 1) * this.pageSize;
+        return this.activeFiltered.slice(start, start + this.pageSize);
+      },
+    },
+
+    mounted() { this.loadAll(); },
+
+    methods: {
+      // ── DATA ────────────────────────────────────────────────────
+      async loadAll() {
+        this.globalLoading = true;
+        try {
+          const [pRes, rRes] = await Promise.all([
+            axios.get('/reports/bookings/pendingcase'),
+            axios.get('/reports/bookings/reportedcase'),
+          ]);
+          this.pendingCases  = pRes.data || [];
+          this.reportedCases = rRes.data || [];
+          this.resetPage();
+        } catch(e) {
+          console.error(e);
+          Swal.fire('Error', 'Failed to load cases. Please refresh.', 'error');
+        } finally { this.globalLoading = false; }
+      },
+
+      applyFilters(list, textFn, dateFn) {
+        const q    = (this.searchQuery || '').toLowerCase().trim();
+        const from = this.fromDate ? new Date(this.fromDate + 'T00:00:00') : null;
+        const to   = this.toDate   ? new Date(this.toDate   + 'T23:59:59') : null;
+        return list.filter(c => {
+          if (q && !textFn(c).toLowerCase().includes(q)) return false;
+          const raw = dateFn(c);
+          if (raw && (from || to)) {
+            const d = new Date(raw);
+            if (from && d < from) return false;
+            if (to   && d > to)   return false;
+          }
+          return true;
+        });
+      },
+
+      // ── PAGINATION / TAB ─────────────────────────────────────────
+      switchTab(tab) { this.activeTab = tab; this.resetPage(); },
+      resetPage()    { this.currentPage = 1; },
+      prevPage()     { if (this.currentPage > 1) this.currentPage--; },
+      nextPage()     { if (this.currentPage < this.totalPages) this.currentPage++; },
+
+      // ── MODAL ────────────────────────────────────────────────────
+      openModal(caseItem, caseType, initialTab) {
+        this.activeCase      = caseItem;
+        this.activeCaseType  = caseType;
+        this.modalTab        = initialTab;
+        this.resetUpload();
+        this.existingReportUrl = null;
+        this.reportLoading     = false;
+        this.showReplaceZone   = false;
+        this.chatMessages      = [];
+        if (initialTab === 'report' && caseType === 'reported')
+          this.loadExistingReport(caseItem.report_details_id);
+        if (initialTab === 'comments')
+          this.loadChat(caseItem.booking_id);
+      },
+      closeModal() {
+        if (this.isUploadingProcess) {
+          Swal.fire('Warning', 'Upload in progress. Please wait.', 'warning');
+          return;
+        }
+        this.activeCase = null;
+      },
+      switchToComments() {
+        this.modalTab = 'comments';
+        if (this.activeCase && this.chatMessages.length === 0)
+          this.loadChat(this.activeCase.booking_id);
+      },
+
+      // ── EXISTING REPORT ──────────────────────────────────────────
+      async loadExistingReport(reportDetailsId) {
+        this.reportLoading = true;
+        try {
+          const res = await axios.get('/reports/get-report-data/' + reportDetailsId);
+          const d = res.data;
+          if (d.report_file_url) {
+            this.existingReportUrl = d.report_file_url;
+            this.previewSrc = this.buildPreviewSrc(d.report_file_url, d.report_file_name);
+          }
+        } catch(e) { console.error(e); }
+        finally { this.reportLoading = false; }
+      },
+      buildPreviewSrc(url, name) {
+        const lower = (url + (name||'')).toLowerCase();
+        if (lower.includes('.pdf')) return url;
+        return 'https://view.officeapps.live.com/op/embed.aspx?src=' + encodeURIComponent(url);
+      },
+
+      // ── FILE UPLOAD ──────────────────────────────────────────────
+      triggerFileInput() { this.$refs.fileInputRef && this.$refs.fileInputRef.click(); },
+      onFileDrop(e)  { this.isDragging = false; if (e.dataTransfer.files.length) this.handleFile(e.dataTransfer.files[0]); },
+      onFileChange(e){ if (e.target.files.length) this.handleFile(e.target.files[0]); },
+      handleFile(file) {
+        const ok = ['application/pdf','application/msword',
+                    'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+        if (!ok.includes(file.type)) {
+          Swal.fire('Invalid File', 'Please upload a PDF or Word document.', 'error'); return;
+        }
+        if (file.size > 15*1024*1024) {
+          Swal.fire('File Too Large', 'Maximum allowed size is 15 MB.', 'error'); return;
+        }
+        this.selectedFile = file;
+        this.executeCloudUpload();
+      },
+      resetUpload() {
+        this.selectedFile = null; this.finalUploadedUrl = null;
+        this.uploadState  = 'idle'; this.uploadProgress = 0;
+        this.uploadStatusText = ''; this.uploadFileName = '';
+        this.previewSrc = null; this.isUploadingProcess = false; this.isDragging = false;
+      },
+      setProgress(pct, text) { this.uploadProgress = pct; this.uploadStatusText = text; },
+      async executeCloudUpload() {
+        if (!this.selectedFile || !this.activeCase) return;
+        const file      = this.selectedFile;
+        const bookingId = this.activeCase.booking_id;
+        this.isUploadingProcess = true;
+        this.uploadState    = 'uploading';
+        this.uploadFileName = file.name;
+        this.setProgress(5, 'Initializing connection...');
+        try {
+          const initRes = await axios.post(UPLOAD_BASE + '/init', {
+            filename: file.name, content_type: file.type,
+            target_folder: 'doctor_reports/booking_' + bookingId
+          });
+          const { upload_id, file_key } = initRes.data;
+          this.setProgress(10, 'Preparing secure transfer...');
+          const CHUNK = 5*1024*1024;
+          const totalParts = Math.ceil(file.size/CHUNK);
+          const urlsRes = await axios.post(UPLOAD_BASE + '/chunk-urls',
+            { file_key, upload_id, total_parts: totalParts });
+          const parts = [];
+          for (let i = 0; i < urlsRes.data.urls.length; i++) {
+            this.setProgress(10 + Math.floor((i/urlsRes.data.urls.length)*80),
+              'Uploading part ' + (i+1) + '...');
+            const chunk = file.slice(i*CHUNK, (i+1)*CHUNK);
+            const up = await axios.put(urlsRes.data.urls[i].url, chunk,
+              { headers: { 'Content-Type': file.type } });
+            let etag = up.headers.etag;
+            if (!etag.startsWith('"')) etag = '"' + etag + '"';
+            parts.push({ PartNumber: urlsRes.data.urls[i].part_number, ETag: etag });
+          }
+          this.setProgress(95, 'Finalizing cloud assembly...');
+          const completeRes = await axios.post(UPLOAD_BASE + '/complete',
+            { file_key, upload_id, parts });
+          this.finalUploadedUrl = completeRes.data.file_url;
+          this.previewSrc       = this.buildPreviewSrc(this.finalUploadedUrl, file.name);
+          this.setProgress(100, 'Upload complete!');
+          setTimeout(() => {
+            this.uploadState        = 'done';
+            this.isUploadingProcess = false;
+          }, 500);
+        } catch(err) {
+          console.error(err); this.isUploadingProcess = false; this.resetUpload();
+          Swal.fire('Upload Failed', 'Cloud connection failed. Please try again.', 'error');
+        }
+      },
+
+      // ── SUBMIT (Pending) ─────────────────────────────────────────
+      async submitReport() {
+        if (!this.finalUploadedUrl || !this.activeCase || !this.selectedFile) return;
+        const c = this.activeCase;
+        const payload = {
+          booking_id: c.booking_id, doctor_id: this.doctorId,
+          patient_name: c.patient_name||'Unknown', gender: c.gender||'Unknown', age: c.age||0,
+          test_id: c.test_id, report_file_url: this.finalUploadedUrl,
+          report_file_name: this.selectedFile.name, file_mime_type: this.selectedFile.type,
+          file_size_bytes: this.selectedFile.size
+        };
+        try {
+          this.globalLoading = true;
+          await axios.post('/reports/api/save-report', payload);
+          this.closeModal(); await this.loadAll();
+          Swal.fire({ title:'Success!', text:'Report submitted.', icon:'success', timer:2000, showConfirmButton:false });
+        } catch(err) {
+          Swal.fire('Error', err.response?.data?.error||'Failed to save report.', 'error');
+        } finally { this.globalLoading = false; }
+      },
+
+      // ── UPDATE (Reported) ────────────────────────────────────────
+      async updateReport() {
+        if (!this.finalUploadedUrl || !this.activeCase || !this.selectedFile) return;
+        const reportId = this.activeCase.report_details_id;
+        const payload  = {
+          report_file_url: this.finalUploadedUrl, report_file_name: this.selectedFile.name,
+          file_mime_type: this.selectedFile.type, file_size_bytes: this.selectedFile.size
+        };
+        try {
+          this.globalLoading = true;
+          await axios.put('/reports/api/update-report/' + reportId, payload);
+          this.closeModal(); await this.loadAll();
+          Swal.fire({ title:'Updated!', text:'Report updated.', icon:'success', timer:2000, showConfirmButton:false });
+        } catch(err) {
+          Swal.fire('Error', err.response?.data?.error||'Failed to update.', 'error');
+        } finally { this.globalLoading = false; }
+      },
+
+      // ── DECLINE ──────────────────────────────────────────────────
+      async declineCase() {
+        const c = this.activeCase;
+        const r = await Swal.fire({
+          title: 'Decline Assignment?', text: 'This will remove this case from your pending list.',
+          icon: 'warning', showCancelButton: true,
+          confirmButtonColor: '#dc3545', confirmButtonText: 'Yes, decline'
+        });
+        if (!r.isConfirmed) return;
+        try {
+          this.globalLoading = true;
+          await axios.post('/reports/decline-assignment', { reporting_id: c.reporting_id });
+          this.closeModal(); await this.loadAll();
+          Swal.fire({ title:'Declined', icon:'success', timer:1800, showConfirmButton:false });
+        } catch(err) {
+          Swal.fire('Error', err.response?.data?.error||'Failed to decline.', 'error');
+        } finally { this.globalLoading = false; }
+      },
+
+      // ── CHAT (read-only) ─────────────────────────────────────────
+      async loadChat(bookingId) {
+        this.chatLoading = true; this.chatMessages = [];
+        try {
+          const res = await axios.get('/booking/api/v1/bookings/' + bookingId + '/chat');
+          this.chatMessages = res.data.messages || [];
+        } catch(e) { console.error(e); }
+        finally { this.chatLoading = false; }
+      },
+
+      formatMsgTime(ts) {
+        if (!ts) return '';
+        try {
+          return new Date(ts).toLocaleString([], {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'});
+        } catch { return ts; }
+      },
+    },
+
+  }).mount('#dp-app');
+})();
+</script>
+{% endblock %}

@@ -155,15 +155,9 @@ MENU = {
     
     "doctor": [
         {
-            "label": "Pending Cases", 
-            "icon": "bi-bag-plus-fill", 
-            "endpoint": "reports.view_pending_cases",
-            "css_class": "nav-group-booking" 
-        },
-        {
-            "label": "Report Cases", 
-            "icon": "bi bi-eye-fill", 
-            "endpoint": "reports.view_reported_cases",
+            "label": "Doctor Portal", 
+            "icon": "bi-columns-gap", 
+            "endpoint": "reports.view_doctor_portal",
             "css_class": "nav-group-booking" 
         },
     ],

@@ -223,6 +223,11 @@ $(document).ready(function () {
             $("#age").val(p.age).removeClass("input-error");
         }
 
+        // 6. Age Unit
+        if(p.age_unit) {
+            $("#age_unit").val(p.age_unit);
+        }
+
         // Close Modal & Show Success
         $("#patientSearchModal").modal("hide");
         showToastMessage("success", "Patient details auto-filled!");
@@ -356,7 +361,14 @@ function populateTestDropdown(data) {
         theme: "bootstrap-5",
         placeholder: "Search or select a test",
         allowClear: true,
-        width: '100%'
+        width: '100%',
+        matcher: function (params, data) {
+            if (!params.term || !data.text) return data;
+            const haystack = data.text.toLowerCase();
+            const tokens = params.term.toLowerCase().split(/\s+/).filter(Boolean);
+            const allMatch = tokens.every(tok => haystack.includes(tok));
+            return allMatch ? data : null;
+        }
     });
 }
 
@@ -565,6 +577,7 @@ $(document).on("click", "#submit_booking", async function () {
             patient_name: ($("#patient_title option:selected").text() + " " + $("#patient_name").val().trim()).trim(),
             gender: $("#gender").val(),
             age: $("#age").val() ? parseInt($("#age").val()) : null,
+            age_unit: $("#age_unit").val() || "Years",
             contact_no: $("#contact_no").val().trim(),
 
             referred_dr: $("#referred_dr").val() || null,
@@ -721,7 +734,7 @@ function resetBookingForm() {
     // 2. Standard Dropdowns (Gender, Age Type, Discount, Payment)
     $("#gender").val("male");
     $("#patient_title").val("mr"); // Reset Title
-    $("#age_type").val("years");   // Reset Age Type to default
+    $("#age_unit").val("Years");   // Reset Age Unit to default
     $("#discount_type").val("Amount");
     $("#payment_type").val("Cash");
 

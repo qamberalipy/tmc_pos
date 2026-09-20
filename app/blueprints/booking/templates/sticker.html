@@ -64,7 +64,7 @@ button{padding:6px 10px;font-size:14px;background:#7a1f2b;color:#fff;border:none
 
       <div class="patient-block">
         <div class="patient-name-lg"><span class="label">Pt. Name:</span>{{ booking.patient_name or '-' }}</div>
-        <div><b>Age:</b> {{ booking.age or '-' }} &nbsp; <b>Gender:</b> {{ booking.gender or '-' }}</div>
+        <div><b>Age:</b> {{ booking.age or '-' }} {{ booking.age_unit or 'Years' }} &nbsp; <b>Gender:</b> {{ booking.gender or '-' }}</div>
         <div><b>Contact No:</b> {{ booking.contact_no or '-' }}</div>
       </div>
 

@@ -12,6 +12,7 @@ class TestBooking(db.Model):
         nullable=False
     )
     age = db.Column(db.Integer)
+    age_unit = db.Column(db.String(10), default="Years")  # "Years" | "Months" | "Days"
     contact_no = db.Column(db.String(15), nullable=False)
     technician_comments = db.Column(db.Text)
     referred_dr = db.Column(db.Integer)
