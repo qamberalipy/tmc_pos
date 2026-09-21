@@ -19,6 +19,7 @@ from app.models.referred import Referred
 from werkzeug.exceptions import BadRequest, NotFound
 from app.models.expenses import PaymentTransaction
 from app.models.doctor_category_rate import DoctorCategoryRate
+from app.utils.timezone import to_local
 
 def _to_float(value):
     if value is None:
@@ -258,7 +259,7 @@ def get_due_clearance_report(branch_id, start_utc, end_utc, shift_ranges=None, u
                 "mr_no": r.mr_no,
                 "amount": _to_float(r.amount),
                 "type": r.payment_type,
-                "time": r.payment_date.strftime("%Y-%m-%d %I:%M %p"), # Sending full UTC timestamp string for frontend format
+                "time": to_local(r.payment_date, "%Y-%m-%d %I:%M %p"),
                 "collected_by": r.collected_by
             }
             for r in rows
@@ -394,7 +395,7 @@ def get_doctor_assigned_reports_service(branch_id=None, status=None, from_date=N
                 "status": row.status,
                 "assign_to": row.doctor_name,
                 "assign_by": row.assign_by if row.assign_by else "System",
-                "assigned_at": row.assigned_at.strftime('%Y-%m-%d %I:%M %p') if row.assigned_at else None,
+                "assigned_at": to_local(row.assigned_at, '%Y-%m-%d %I:%M %p') if row.assigned_at else None,
                 "report_details_id": row.report_details_id,
                 "id": row.reported_id,
                 
@@ -462,7 +463,7 @@ def get_doctor_pending_bookings(doctor_id):
             "booking_id": dr_detail.booking_id,
             "status": dr_detail.status,
             "assigned_by": user.name,
-            "assigned_at": dr_detail.report_at.strftime("%Y-%m-%d %H:%M:%S") if dr_detail.report_at else None,
+            "assigned_at": to_local(dr_detail.report_at, "%Y-%m-%d %H:%M:%S") if dr_detail.report_at else None,
             "patient_name": booking.patient_name,
             "mr_no": booking.mr_no,
             "age": booking.age,
@@ -503,8 +504,8 @@ def get_doctor_reported_bookings(doctor_id):
             "age_unit": "Years",  # DoctorReportData doesn't store age_unit; default safe
 
             "assigned_by": user.name if hasattr(user, "name") else None,
-            "assigned_at": details.report_at.strftime("%Y-%m-%d %H:%M:%S") if details.report_at else None,
-            "reported_at": report.created_at.strftime("%Y-%m-%d %H:%M:%S") if report.created_at else None,
+            "assigned_at": to_local(details.report_at, "%Y-%m-%d %H:%M:%S") if details.report_at else None,
+            "reported_at": to_local(report.created_at, "%Y-%m-%d %H:%M:%S") if report.created_at else None,
 
             "tests": {
                 "test_id": test.id,
@@ -649,13 +650,13 @@ def get_doctor_report_by_id(report_id):
         # ----------------------------------------------
 
         # Tracking fields
-        "assigned_at": assigned_at.strftime("%Y-%m-%d %H:%M:%S") if assigned_at else None,
-        "reported_at": report_obj.created_at.strftime("%Y-%m-%d %H:%M:%S") if report_obj.created_at else None,
+        "assigned_at": to_local(assigned_at, "%Y-%m-%d %H:%M:%S") if assigned_at else None,
+        "reported_at": to_local(report_obj.created_at, "%Y-%m-%d %H:%M:%S") if report_obj.created_at else None,
 
         "created_by": report_obj.created_by,
         "updated_by": report_obj.updated_by,
-        "created_at": report_obj.created_at.strftime("%Y-%m-%d %H:%M:%S") if report_obj.created_at else None,
-        "updated_at": report_obj.updated_at.strftime("%Y-%m-%d %H:%M:%S") if report_obj.updated_at else None,
+        "created_at": to_local(report_obj.created_at, "%Y-%m-%d %H:%M:%S") if report_obj.created_at else None,
+        "updated_at": to_local(report_obj.updated_at, "%Y-%m-%d %H:%M:%S") if report_obj.updated_at else None,
         "doctor_signature": doctor_user.signature_data if hasattr(doctor_user, 'signature_data') else None
     }
 
@@ -1001,9 +1002,8 @@ def get_monthly_commission_sheet(branch_id, month_str):
 
             data.append({
                 "s_no":          idx,
-                "date":          f"{booking.create_at.day}-{booking.create_at.strftime('%b-%Y')}"
-                                 if hasattr(booking.create_at, "strftime")
-                                 else "",
+                "date":          to_local(booking.create_at, "%d-%b-%Y")
+                                 if booking.create_at else "",
                 "patient_name":  booking.patient_name or "",
                 "ref_by_dr":     ref_by_dr,
                 "investigations": investigations,
@@ -1145,7 +1145,7 @@ def get_monthly_case_logs(branch_id, from_date_str, to_date_str, referred_dr_id=
     return [{
         "s_no": i,
         "booking_id": r.booking_id,
-        "date": r.create_at.strftime("%Y-%m-%d") if r.create_at else "",
+        "date": to_local(r.create_at, "%Y-%m-%d") if r.create_at else "",
         "patient_name": r.patient_name or "",
         "mr_no": r.mr_no or "",
         "referred_dr": r.referred_dr_name or "-",

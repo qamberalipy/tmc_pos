@@ -4,6 +4,7 @@ from sqlalchemy import cast, String
 from app.extensions import db
 from app.models import Expense_head, Branch, User 
 from app.models.expenses import Expenses, PaymentTransaction
+from app.utils.timezone import to_local
 
 ALLOWED_PAYMENT_METHODS = {"Cash", "Card", "Online", "Other"}
 
@@ -289,7 +290,7 @@ def get_monthly_expense_log(branch_id, month_str):
     grand_total = 0
 
     for e, head_name, created_by_name in rows:
-        d = e.created_at.strftime("%Y-%m-%d")
+        d = to_local(e.created_at, "%Y-%m-%d")
         days.setdefault(d, {"rows": [], "total": 0})
         days[d]["rows"].append({
             "date": d,
@@ -297,7 +298,7 @@ def get_monthly_expense_log(branch_id, month_str):
             "detail": e.description or "-",
             "amount": float(e.amount),
             "paid_to": e.paid_to or "-",
-            "authorized_by": f"{created_by_name} @ {e.created_at.strftime('%I:%M%p')}"
+            "authorized_by": f"{created_by_name} @ {to_local(e.created_at, '%I:%M %p')}"
         })
         days[d]["total"] += float(e.amount)
 

@@ -39,9 +39,9 @@ class TestBooking(db.Model):
     due_amount = db.Column(db.Numeric(10, 2), default=0)
     is_transferred_in = db.Column(db.Boolean, default=False)
     create_by = db.Column(db.Integer, nullable=False)
-    create_at = db.Column(db.DateTime, default=datetime.utcnow)
+    create_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     update_by = db.Column(db.Integer)
-    update_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    update_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
 class TestFilmUsage(db.Model):
     __tablename__ = "test_film_usage"
@@ -54,7 +54,7 @@ class TestFilmUsage(db.Model):
     usage_type = db.Column(db.Enum('Normal', 'Extra', 'Repeat', 'Error', name='usage_type_enum'), nullable=False)
     reason = db.Column(db.String(255))  
     used_by = db.Column(db.Integer, nullable=False)
-    used_at = db.Column(db.DateTime, default=datetime.utcnow)
+    used_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     branch_id = db.Column(db.Integer, nullable=False)
     last_edited_by = db.Column(db.Integer, nullable=True)
     last_edited_at = db.Column(db.DateTime, nullable=True)
@@ -64,7 +64,7 @@ class FilmInventoryTransaction(db.Model):
     __tablename__ = "film_inventory_transactions"
 
     id = db.Column(db.Integer, primary_key=True)
-    transaction_date = db.Column(db.DateTime, default=datetime.utcnow)
+    transaction_date = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     transaction_type = db.Column(db.Enum('IN', 'OUT', 'ADJUST', name='trans_type_enum'),nullable=False)
     quantity = db.Column(db.Integer, nullable=False)
     booking_id = db.Column(db.Integer, nullable=True)

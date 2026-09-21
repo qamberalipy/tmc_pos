@@ -6,6 +6,7 @@ from app.models.referred import ReferralShare
 from app.models.expenses import Expenses
 from sqlalchemy import cast, Integer, func
 from sqlalchemy.exc import SQLAlchemyError
+from app.utils.timezone import to_local
 
 def create_branch(data):
     branch = Branch(
@@ -249,7 +250,7 @@ def get_dashboard_summary(branch_id):
             {
                 "patient": b.patient_name,
                 "amount": float(b.net_receivable or 0),
-                "date": b.create_at.strftime("%d-%b-%Y"),
+                "date": to_local(b.create_at, "%d-%b-%Y"),
                 "status": "Paid" if (b.due_amount or 0) == 0 else "Due"
             }
             for b in recent
@@ -284,7 +285,7 @@ def get_staff_dashboard_summary(branch_id):
             "mr_no": b.mr_no,
             "patient_name": b.patient_name,
             "due_amount": float(b.due_amount or 0),
-            "date": b.create_at.strftime("%d-%b-%Y") if b.create_at else None,
+            "date": to_local(b.create_at, "%d-%b-%Y") if b.create_at else None,
         }
         for b in outstanding_dues
     ]
@@ -340,7 +341,7 @@ def get_staff_dashboard_summary(branch_id):
             "net_amount": float(b.net_receivable or 0),
             "due_amount": float(b.due_amount or 0),
             "status": "Paid" if (b.due_amount or 0) == 0 else "Due",
-            "date": b.create_at.strftime("%d-%b %I:%M %p") if b.create_at else None,
+            "date": to_local(b.create_at, "%d-%b %I:%M %p") if b.create_at else None,
         }
         for b in recent_rows
     ]
@@ -366,7 +367,7 @@ def get_staff_dashboard_summary(branch_id):
             "booking_id": b.id,
             "mr_no": b.mr_no,
             "patient_name": b.patient_name,
-            "updated_at": b.update_at.strftime("%d-%b %I:%M %p") if b.update_at else None,
+            "updated_at": to_local(b.update_at, "%d-%b %I:%M %p") if b.update_at else None,
         }
         for b in result_rows
     ]

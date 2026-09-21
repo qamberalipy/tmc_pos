@@ -8,10 +8,11 @@ from app.models import TestBookingDetails,User,Branch,Referred
 from werkzeug.security import generate_password_hash
 from sqlalchemy.exc import SQLAlchemyError,IntegrityError
 from decimal import Decimal, InvalidOperation
-from datetime import datetime, date, time,timezone
+from datetime import datetime, date, time, timezone
 from werkzeug.exceptions import BadRequest
 from app.helper import convert_to_utc
-from app.helper import get_lab_date_bounds # <-- Add this import at the top
+from app.helper import get_lab_date_bounds
+from app.utils.timezone import to_local
 from sqlalchemy.ext.mutable import MutableDict, MutableList
 from app.models.test_booking import TestFilmUsage, TestBooking,FilmInventoryTransaction,BookingTransferLog,TechnicianBookingMedia
 from app.models.test_registration import Test_registration
@@ -362,7 +363,7 @@ def get_due_receipt_details(transaction_id):
 
         data = {
             "receipt_no": txn.id,
-            "date": txn.payment_date.strftime("%d-%b-%Y %I:%M %p"),
+            "date": to_local(txn.payment_date, "%d-%b-%Y %I:%M %p"),
             "amount_paid": float(txn.amount),
             "payment_mode": txn.payment_type,
             
@@ -439,7 +440,7 @@ def get_dues_list(branch_id, from_date=None, to_date=None, status=None):
                 "mr_no": b.mr_no,
                 "patient_name": b.patient_name,
                 "contact_no": b.contact_no,
-                "date": b.create_at.strftime("%Y-%m-%d %I:%M %p") if b.create_at else None,
+                "date": to_local(b.create_at, "%Y-%m-%d %I:%M %p") if b.create_at else None,
                 "total_amount": float(b.net_receivable or 0),
                 "paid_amount": float(b.paid_amount or 0),
                 "due_amount": float(b.due_amount or 0),
@@ -683,7 +684,7 @@ def get_films_audit(branch_id=None, from_date=None, to_date=None):
                 "usage_type": r.usage_type,
                 "reason": r.reason,
                 "used_by": r.used_by_name or "Unknown",
-                "used_at": r.used_at.strftime("%Y-%m-%d %H:%M:%S") if r.used_at else None
+                "used_at": to_local(r.used_at, "%Y-%m-%d %H:%M:%S") if r.used_at else None
             })
 
         return {"data": result}, 200
@@ -841,7 +842,7 @@ def get_booking_details(booking_id: int):
                 "no_of_films": t.no_of_films,
                 "amount": float(t.amount or 0),
                 "reporting_date": (
-                    t.reporting_date.strftime("%d-%b-%Y %I:%M %p")
+                    to_local(t.reporting_date, "%d-%b-%Y")
                     if t.reporting_date else None
                 ),
                 "test_name": db.session.query(Test_registration.test_name)
@@ -888,7 +889,7 @@ def get_booking_details(booking_id: int):
                 "balance": float(booking.due_amount or 0),
             },
             "tests": test_list,
-            "printed_at": datetime.now(timezone.utc).strftime("%d-%b-%Y %I:%M %p"),
+            "printed_at": to_local(datetime.now(timezone.utc), "%d-%b-%Y %I:%M %p"),
             "current_user": session.get("user_name"),
         }, 200
 
@@ -905,7 +906,7 @@ def _format_test_booking(row):
         "booking_id": row.id,
         "patient_name": row.patient_name,
         "mr_no": row.mr_no,
-        "date": row.create_at.strftime("%Y-%m-%d") if row.create_at else None,
+        "date": to_local(row.create_at, "%Y-%m-%d") if row.create_at else None,
         "age": row.age,
         "age_unit": row.age_unit or "Years",
         "referred_dr": row.referred_dr,
@@ -1024,7 +1025,7 @@ def add_booking_comment(booking_id: int, data):
             "user_name": session.get("user_name"),
             "role": session.get("user_role"),
             "comment": comment_text,
-            "datetime": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
+            "datetime": to_local(datetime.now(timezone.utc), "%Y-%m-%d %H:%M:%S"),
         }
 
         comments["comments"].append(new_comment)
@@ -1169,14 +1170,14 @@ def get_referral_shares_service(filters):
                 "patient_name": booking.patient_name,
                 "doctor_name": doc_name,
                 "test_list": test_names,
-                "booking_date": booking.create_at.strftime('%Y-%m-%d'),
+                "booking_date": to_local(booking.create_at, "%Y-%m-%d"),
                 "created_by": booking.create_by,
                 "booking_amount": float(booking.net_receivable) if booking.net_receivable else 0.0,
                 # --- NEW: Send Due Amount ---
                 "booking_due": float(booking.due_amount) if booking.due_amount else 0.0,
                 "share_amount": float(share.share_amount),
                 "is_paid": share.is_paid,
-                "paid_at": share.paid_at.strftime('%Y-%m-%d') if share.paid_at else None
+                "paid_at": to_local(share.paid_at, "%Y-%m-%d") if share.paid_at else None
             })
         
         return data, 200
@@ -1320,7 +1321,7 @@ def search_patient_service(term, branch_id):
                     "gender": row.gender,
                     "age": row.age,
                     "contact_no": row.contact_no,
-                    "last_visit": row.create_at.strftime("%Y-%m-%d") if row.create_at else ""
+                    "last_visit": to_local(row.create_at, "%Y-%m-%d") if row.create_at else ""
                 })
 
         # Return top 10 unique results
@@ -1488,7 +1489,7 @@ def transfer_and_rebook_service(old_booking_id, target_branch_id, new_tests, due
             "user_id": user_id,
             "user_name": "System", 
             "role": "Auto", 
-            "datetime": datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S'), 
+            "datetime": to_local(datetime.now(timezone.utc), "%Y-%m-%d %H:%M:%S"),
             "comment": f"Transferred from Branch {current_branch_id}. Reason: {reason}"
         }
         old_comments_dict["comments"].insert(0, system_comment)
@@ -1633,7 +1634,7 @@ def get_technician_dashboard_list(branch_id, from_date=None, to_date=None, searc
                 "gender": b.gender,
                 "contact_no": b.contact_no,
                 "total_no_of_films_used": b.total_no_of_films_used or 0,
-                "date": b.create_at.strftime("%Y-%m-%d %I:%M %p") if b.create_at else None,
+                "date": to_local(b.create_at, "%Y-%m-%d %I:%M %p") if b.create_at else None,
                 "has_comments": has_comments,
                 "tests": tests_map.get(b.id, []),
                 "test_count": len(tests_map.get(b.id, []))
@@ -1664,7 +1665,7 @@ def get_booking_media_list(booking_id, branch_id):
             "file_name": m.file_name,
             "file_mime_type": m.file_mime_type,
             "file_size_bytes": m.file_size_bytes,
-            "uploaded_at": m.uploaded_at.strftime("%Y-%m-%d %I:%M %p") if m.uploaded_at else None,
+            "uploaded_at": to_local(m.uploaded_at, "%Y-%m-%d %I:%M %p") if m.uploaded_at else None,
             "uploaded_by": m.uploaded_by
         } for m in media_records]
         
@@ -1817,7 +1818,7 @@ def add_chat_message(booking_id, user_id, message_text, media_payloads=None):
         # Safely extract name regardless of database schema (Fixes the 500 error)
         sender_name = getattr(user_record, 'name', getattr(user_record, 'first_name', getattr(user_record, 'username', 'Technician')))
         
-        timestamp_str = datetime.now().strftime("%d-%b-%Y %H:%M")
+        timestamp_str = to_local(datetime.now(timezone.utc), "%d-%b-%Y %H:%M")
         legacy_append_str = f"\n\n[{timestamp_str}] {sender_name}: {message_text}"
         
         if saved_file_names:
