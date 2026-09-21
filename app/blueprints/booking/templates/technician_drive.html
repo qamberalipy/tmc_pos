@@ -46,16 +46,38 @@
                      class="worklist-item" 
                      :class="{'active-row': selectedBooking && (selectedBooking.booking_id || selectedBooking.id) === (booking.booking_id || booking.id)}"
                      @click="selectBooking(booking)">
-                    <div>
-                        <div class="fw-bold mb-1" style="color: var(--text-main); font-size: 0.95rem;">
-                            [[ booking.patient_name || 'Unregistered' ]]
+                    
+                    <div class="wli-avatar" :style="{ backgroundColor: getAvatarColor(booking.patient_name) }">
+                        [[ getCleanInitials(booking.patient_name) ]]
+                    </div>
+                    
+                    <div class="wli-content">
+                        <div class="wli-name-row">
+                            <span class="wli-name">[[ booking.patient_name || 'Unregistered' ]]</span>
+                            <i v-if="booking.gender === 'Male'" class="bi bi-gender-male wli-gender"></i>
+                            <i v-else-if="booking.gender === 'Female'" class="bi bi-gender-female wli-gender"></i>
                         </div>
-                        <div class="small fw-medium" style="color: var(--text-muted);">
-                            <span style="color: var(--bs-primary);">B#[[ booking.booking_id || booking.id ]]</span> &bull; MR: [[ booking.mr_no || 'N/A' ]]
+                        
+                        <div class="wli-details-row">
+                            <span class="wli-booking-id">#[[ booking.booking_id || booking.id ]]</span> &bull; 
+                            <i class="bi bi-person-vcard wli-icon"></i> [[ booking.mr_no || 'N/A' ]]
+                        </div>
+                        
+                        <div class="wli-chips-row" v-if="booking.tests && booking.tests.length">
+                            <div class="wli-chip">
+                                <i class="bi bi-file-medical wli-chip-icon"></i> <span class="wli-chip-text">[[ booking.tests[0].test_name ]]</span>
+                            </div>
+                            <div class="wli-chip wli-chip-more" v-if="booking.tests.length > 1">
+                                +[[ booking.tests.length - 1 ]]
+                            </div>
                         </div>
                     </div>
-                    <div>
-                        <i class="bi bi-chevron-right action-chevron"></i>
+                    
+                    <div class="wli-meta">
+                        <div class="wli-time" v-if="booking.created_at">
+                            <i class="bi bi-clock"></i> [[ formatShortTime(booking.created_at) ]]
+                        </div>
+                        <i v-else class="bi bi-chevron-right action-chevron"></i>
                     </div>
                 </div>
             </div>

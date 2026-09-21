@@ -212,6 +212,36 @@ const app = createApp({
         },
         
         // --- Date Formatters ---
+        formatShortTime(dateStr) {
+            if (!dateStr) return '';
+            const d = new Date(dateStr);
+            return d.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute:'2-digit' });
+        },
+        
+        // --- Visual Helpers ---
+        getCleanInitials(name) {
+            if (!name) return 'U';
+            // Strip out common titles
+            const cleanName = name.replace(/\b(Mr\.|Mrs\.|Ms\.|Dr\.)\s+/gi, '').trim();
+            const words = cleanName.split(/\s+/);
+            let initials = '';
+            if (words.length > 0) initials += words[0].charAt(0);
+            if (words.length > 1) initials += words[1].charAt(0);
+            return initials.toUpperCase() || 'U';
+        },
+        getAvatarColor(name) {
+            if (!name) return 'var(--bs-secondary)';
+            let hash = 0;
+            for (let i = 0; i < name.length; i++) {
+                hash = name.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            const colors = [
+                'var(--bs-primary)', 'var(--bs-success)', 'var(--bs-danger)',
+                'var(--bs-warning)', 'var(--bs-info)', 'var(--bs-dark)'
+            ];
+            return colors[Math.abs(hash) % colors.length];
+        },
+        
         formatDateSeparator(dateObj) {
             const today = new Date();
             const yest = new Date(); yest.setDate(yest.getDate() - 1);
