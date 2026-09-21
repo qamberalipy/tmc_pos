@@ -1,423 +1,389 @@
-let localDataTableInstance = null;
-let activeSessionBookingId = null;
-let currentUppyInstance = null;
-let pendingMediaUploads = []; // Queue for files ready to be sent
+const { createApp } = Vue;
 
-$(document).ready(function () {
-    // 1. Initialize Dates
-    const today = new Date();
-    const onemonthAgo = new Date();
-    onemonthAgo.setDate(today.getDate() - 30);
-    $('#filterToDate').val(today.toISOString().split('T')[0]);
-    $('#filterFromDate').val(onemonthAgo.toISOString().split('T')[0]);
-
-    initSystemComponents();
-
-    // 2. Event Bindings
-    $('#btnFilterList').on('click', function() { if (localDataTableInstance) localDataTableInstance.ajax.reload(); });
-    $('#btnSendChat').off('click').on('click', dispatchUnifiedPayload);
-    
-    $('#chatMessageInput').on('keypress', function (e) {
-        if (e.which === 13) { e.preventDefault(); dispatchUnifiedPayload(); }
-    });
-
-    // 3. Attachment Drawer Toggle Logic
-    $('#btnToggleDrawer').on('click', function() {
-        const $drawer = $('#attachmentDrawer');
-        const $btn = $(this);
+const app = createApp({
+    delimiters: ['[[', ']]'],
+    data() {
+        const today = new Date();
+        const oneMonthAgo = new Date();
+        oneMonthAgo.setDate(today.getDate() - 30);
         
-        if ($drawer.hasClass('open')) {
-            $drawer.removeClass('open');
-            $btn.removeClass('active');
-        } else {
-            $drawer.addClass('open');
-            $btn.addClass('active');
-            if (!currentUppyInstance) setupUppyMultipartEngine();
-        }
-    });
-});
-
-function initSystemComponents() {
-    const targetEndpoint = `${APP_BASE_URL}/booking/technician-drive/list`;
-
-    localDataTableInstance = $('#patientsTable').DataTable({
-        responsive: true, destroy: true,
-        pageLength: 20, paging: false, info: false,
-        scrollY: "calc(100vh - 180px)", 
-        ordering: false,
-        ajax: {
-            url: targetEndpoint,
-            data: function(d) {
-                d.from_date = $('#filterFromDate').val();
-                d.to_date = $('#filterToDate').val();
-                d.booking_id = new URLSearchParams(window.location.search).get('booking_id') || undefined;
-                if (d.search && d.search.value) d.search = d.search.value; else delete d.search;
+        return {
+            bookings: [],
+            loadingWorklist: false,
+            filters: {
+                from: oneMonthAgo.toISOString().split('T')[0],
+                to: today.toISOString().split('T')[0],
+                search: ''
             },
-            dataSrc: function (json) {
-                const rows = json.data || json || [];
-                // Index rows by booking id for workspace test-chip lookup
-                window.driveRowsById = window.driveRowsById || {};
-                rows.forEach(function(data) {
-                    window.driveRowsById[data.booking_id || data.id] = data;
-                });
-                const params = new URLSearchParams(window.location.search);
-                const deepLinkId = params.get('booking_id');
-                if (deepLinkId && !window.__deepLinkHandled) {
-                    window.__deepLinkHandled = true; // fire once only
-                    const match = rows.find(r => String(r.booking_id || r.id) === String(deepLinkId));
-                    if (match) {
-                        setTimeout(() => {
-                            mountWorkspaceScope(null, match.booking_id || match.id,
-                                match.patient_name || 'Unregistered', match.mr_no || '',
-                                match.age || '', match.gender || '', match.age_unit || 'Years', match.total_no_of_films_used || 0);
-                            params.delete('booking_id');
-                            history.replaceState({}, '', `${location.pathname}${params.toString() ? '?' + params : ''}`);
-                        }, 0);
-                    } else {
-                        console.warn('Deep-linked booking_id not found in results:', deepLinkId);
-                    }
-                }
-                return rows;
+            selectedBooking: null,
+            messages: [],
+            loadingChat: false,
+            
+            // Composer & Upload
+            newMessage: '',
+            drawerOpen: false,
+            dragActive: false,
+            pendingMediaUploads: [],
+            uppyInstance: null,
+            sending: false,
+
+            // Films Modal
+            filmsModalObj: null,
+            savingFilms: false,
+            filmsForm: {
+                tests: [],
+                testId: '',
+                changedFilms: '',
+                cause: 'Extra',
+                reason: '',
+                grandTotalFilms: 0
             }
-        },
-        columns: [
-            { 
-                data: null,
-                render: function(data) {
-                    const safeName = (data.patient_name || 'Unregistered').replace(/'/g, "\\'");
-                    const targetId = data.booking_id || data.id; 
-                    return `
-                        <div class="py-2 px-3" style="cursor:pointer;" 
-                             onclick="mountWorkspaceScope(this, ${targetId}, '${safeName}', '${data.mr_no || ''}', '${data.age || ''}', '${data.gender || ''}', '${data.age_unit || 'Years'}', ${data.total_no_of_films_used || 0})">
-                            <div class="fw-bold mb-1" style="color: var(--text-main); font-size: 0.95rem;">${data.patient_name || 'Unregistered'}</div>
-                            <div class="small fw-medium" style="color: var(--text-muted);">
-                                <span style="color: var(--bs-primary);">B#${targetId}</span> &bull; MR: ${data.mr_no || 'N/A'}
-                            </div>
-                        </div>
-                    `;
-                }
-            },
-            {
-                data: null, className: "text-end align-middle pe-4",
-                render: function(data) {
-                    const safeName = (data.patient_name || 'Unregistered').replace(/'/g, "\\'");
-                    const targetId = data.booking_id || data.id; 
-                    // Render the animated Chevron instead of the ugly blue button
-                    return `
-                        <div onclick="mountWorkspaceScope(this.closest('tr'), ${targetId}, '${safeName}', '${data.mr_no || ''}', '${data.age || ''}', '${data.gender || ''}', '${data.age_unit || 'Years'}', ${data.total_no_of_films_used || 0})" style="cursor:pointer;">
-                            <i class="bi bi-chevron-right action-chevron"></i>
-                        </div>
-                    `;
-                }
-            }
-        ],
-        language: { search: "", searchPlaceholder: "Search records..." }
-    });
-}
+        };
+    },
+    computed: {
+        groupedMessages() {
+            if (!this.messages || this.messages.length === 0) return [];
+            
+            const groups = [];
+            let currentGroup = null;
+            let lastDateLabel = null;
 
-// -------------------------------------------------------------
-// MOBILE & WORKSPACE ORCHESTRATION
-// -------------------------------------------------------------
-window.mountWorkspaceScope = function(rowElement, bookingId, patientName, mrNo, age, gender, ageUnit, filmsCount) {
-    if (!bookingId) return;
-    activeSessionBookingId = bookingId;
-    
-    // Desktop Highlight
-    $('#patientsTable tbody tr').removeClass('active-row');
-    $(rowElement).closest('tr').addClass('active-row');
-
-    // Mobile View Toggle
-    $('body').addClass('mobile-workspace-active');
-
-    // Reset UI
-    $('#emptyWorkspacePanel').hide();
-    $('#workspacePanel').css('display', 'flex');
-    $('#wsPatientName').text(patientName);
-    $('#wsBookingId').text(`B#${bookingId}`);
-    $('#wsMrNo').text(`MR: ${mrNo}`);
-    $('#wsAgeGender').text(`${age} ${ageUnit || 'Years'} | ${gender}`);
-    renderWorkspaceTests(bookingId);
-    $('#filmUsageInput').val(filmsCount || 0);
-    $('#chatMessageInput').val('');
-    
-    resetUploadState();
-
-    syncChatTimelineData(bookingId);
-};
-
-window.renderWorkspaceTests = function(bookingId) {
-    const rec = (window.driveRowsById || {})[bookingId];
-    const tests = (rec && rec.tests) || [];
-    const $box = $('#wsTests');
-    if (!tests.length) {
-        $box.html('<span class="text-muted" style="font-size:0.72rem;">No tests recorded</span>');
-        return;
-    }
-    $box.html(tests.map(t => `
-        <span class="test-chip" title="${t.category}${t.films ? ' \u2022 ' + t.films + ' film(s)' : ''}">
-            <span class="test-chip-name">${t.test_name}</span>
-            <span class="test-chip-meta">${t.category}${t.films ? ' \u00b7 ' + t.films + 'f' : ''}</span>
-        </span>`).join(''));
-};
-
-window.closeMobileWorkspace = function() {
-    $('body').removeClass('mobile-workspace-active');
-};
-
-function resetUploadState() {
-    pendingMediaUploads = [];
-    $('#uploadPreviewArea').hide().empty();
-    $('#attachmentDrawer').removeClass('open');
-    $('#btnToggleDrawer').removeClass('active');
-    if (currentUppyInstance) currentUppyInstance.cancelAll();
-}
-
-let grandTotalFilms = 0;
-
-$(document).on('click', '#btnEditFilms', function () {
-    if (!activeSessionBookingId) return;
-    const $testSelect = $("#testIdSelect");
-    $("#bookingIdInput").val(activeSessionBookingId);
-    $("#changedFilmsInput, #reasonInput, #currentFilmsInput").val("");
-    $testSelect.html('<option value="">Loading tests...</option>');
-
-    if (typeof myshowLoader === 'function') myshowLoader();
-    axios.get(`${APP_BASE_URL}/booking/get-films-by-booking/${activeSessionBookingId}`)
-        .then(res => {
-            grandTotalFilms = Number(res.data.grand_total_films) || 0;
-            $("#totalFilmsUsedInput").val(grandTotalFilms);
-            $testSelect.empty().append('<option value="">-- Select Test --</option>');
-            (res.data.details || []).forEach(item => {
-                let opt = $('<option>', { value: item.test_id, text: item.test_name }).data('films', item.films_used);
-                $testSelect.append(opt);
-            });
-            $("#filmsModal").modal("show");
-        })
-        .finally(() => { if (typeof myhideLoader === 'function') myhideLoader(); });
-});
-
-$(document).on("change", "#testIdSelect", function () {
-    $("#currentFilmsInput").val($(this).find(':selected').data('films') || 0);
-});
-
-$(document).on("input", "#changedFilmsInput", function () {
-    $("#totalFilmsUsedInput").val(grandTotalFilms + (Number($(this).val()) || 0));
-});
-
-$(document).on("click", "#SaveEditfilms", function () {
-    const bookingId = parseInt($("#bookingIdInput").val());
-    const testId = $("#testIdSelect").val();
-    const currentTestFilms = Number($("#currentFilmsInput").val()) || 0;
-    const addedFilms = Number($("#changedFilmsInput").val()) || 0;
-    const filmsUnderTest = currentTestFilms + addedFilms;
-    const totalNewFilmsUsed = Number($("#totalFilmsUsedInput").val());
-
-    const payload = {
-        booking_id: bookingId, test_id: parseInt(testId),
-        films_under_test: filmsUnderTest, total_new_films_used: totalNewFilmsUsed,
-        usage_type: $("#causeSelect").val(), reason: $("#reasonInput").val().trim()
-    };
-    if (!payload.test_id) return showToastMessage("error", "Please select a test.");
-    if (addedFilms <= 0) return showToastMessage("error", "Please enter a valid number of films.");
-    if (!payload.reason) return showToastMessage("error", "Reason is required.");
-
-    if (typeof myshowLoader === 'function') myshowLoader();
-    axios.post(`${APP_BASE_URL}/booking/films/`, payload)
-        .then(() => { showToastMessage("success", "Film usage updated!"); $("#filmsModal").modal("hide"); })
-        .catch(err => handleAxiosError ? handleAxiosError(err) : console.error(err))
-        .finally(() => { if (typeof myhideLoader === 'function') myhideLoader(); });
-});
-
-// -------------------------------------------------------------
-// CHAT RENDERING (Instagram Style)
-// -------------------------------------------------------------
-function syncChatTimelineData(bookingId) {
-    const $chatWrapper = $('#chatHistoryBox');
-    $chatWrapper.empty().append('<div class="text-center py-4"><div class="spinner-border text-primary spinner-border-sm"></div></div>');
-
-    axios.get(`${APP_BASE_URL}/booking/api/v1/bookings/${bookingId}/chat`)
-    .then(response => { compileAndRenderChatTimeline(response.data.messages || []); })
-    .catch(error => { $chatWrapper.html('<div class="text-center text-danger py-4 small">Failed to load comments.</div>'); });
-}
-
-function compileAndRenderChatTimeline(messages) {
-    const $chatWrapper = $('#chatHistoryBox');
-    $chatWrapper.empty();
-    
-    if (!messages || messages.length === 0) {
-        $chatWrapper.append('<div class="text-center text-muted py-5 mt-5"><i class="bi bi-chat-left-text fs-1 opacity-50"></i><p class="mt-3">No comments yet.</p></div>');
-        return;
-    }
-
-    messages.forEach(msg => {
-        const senderName = msg.user_name || 'System';
-        const initial = senderName.charAt(0).toUpperCase();
-        const timeLabel = new Date(msg.created_at).toLocaleString([], {month: 'short', day: 'numeric', hour: '2-digit', minute:'2-digit'});
-
-        let mediaHtml = '';
-        if (msg.media && msg.media.length > 0) {
-            mediaHtml = '<div class="media-grid">';
-            msg.media.forEach(attachment => {
-                const typeStr = attachment.type || '';
-                const ext = attachment.name.split('.').pop().substring(0,3).toUpperCase();
+            this.messages.forEach(msg => {
+                const dateObj = new Date(msg.created_at);
+                const dateLabel = this.formatDateSeparator(dateObj);
                 
-                if (typeStr.includes('image')) {
-                    mediaHtml += `<a href="${attachment.url}" target="_blank" class="media-tile"><img src="${attachment.url}"></a>`;
-                } else {
-                    mediaHtml += `
-                        <a href="${attachment.url}" target="_blank" class="media-tile doc-tile">
-                            <i class="bi bi-file-earmark-text"></i><span>${ext}</span>
-                        </a>`;
+                if (dateLabel !== lastDateLabel) {
+                    currentGroup = { dateLabel: dateLabel, messages: [] };
+                    groups.push(currentGroup);
+                    lastDateLabel = dateLabel;
+                }
+                
+                // Add computed properties to the message for UI
+                msg.is_own = (msg.user_id && msg.user_id === INTERNAL_USER_ID) || msg.is_optimistic;
+                msg.senderName = msg.user_name || 'System';
+                msg.initial = msg.senderName.charAt(0).toUpperCase();
+                msg.timeLabel = dateObj.toLocaleString([], { hour: '2-digit', minute:'2-digit' });
+                msg.safeText = (msg.message || '').replace(/\n/g, '<br>');
+                
+                currentGroup.messages.push(msg);
+            });
+            return groups;
+        },
+        currentTestFilms() {
+            if (!this.filmsForm.testId) return 0;
+            const t = this.filmsForm.tests.find(x => x.test_id == this.filmsForm.testId);
+            return t ? (t.films_used || 0) : 0;
+        },
+        newTotalFilms() {
+            return this.filmsForm.grandTotalFilms + (Number(this.filmsForm.changedFilms) || 0);
+        }
+    },
+    methods: {
+        fetchWorklist() {
+            this.loadingWorklist = true;
+            const params = new URLSearchParams({
+                from_date: this.filters.from,
+                to_date: this.filters.to
+            });
+            if (this.filters.search) params.append('search', this.filters.search);
+            
+            // Handle deep linking on first load
+            const urlParams = new URLSearchParams(window.location.search);
+            const deepLinkId = urlParams.get('booking_id');
+            if (deepLinkId && !this.__deepLinkHandled) {
+                params.append('booking_id', deepLinkId);
+            }
+
+            axios.get(`${APP_BASE_URL}/booking/technician-drive/list?${params.toString()}`)
+                .then(res => {
+                    this.bookings = res.data.data || res.data || [];
+                    
+                    if (deepLinkId && !this.__deepLinkHandled) {
+                        this.__deepLinkHandled = true;
+                        const match = this.bookings.find(r => String(r.booking_id || r.id) === String(deepLinkId));
+                        if (match) {
+                            this.selectBooking(match);
+                            urlParams.delete('booking_id');
+                            history.replaceState({}, '', `${location.pathname}${urlParams.toString() ? '?' + urlParams : ''}`);
+                        }
+                    }
+                })
+                .catch(err => {
+                    console.error('Error fetching worklist:', err);
+                    this.showToast('error', 'Failed to load worklist.');
+                })
+                .finally(() => {
+                    this.loadingWorklist = false;
+                });
+        },
+        selectBooking(booking) {
+            this.selectedBooking = booking;
+            document.body.classList.add('mobile-workspace-active');
+            
+            this.resetUploadState();
+            this.newMessage = '';
+            
+            this.fetchChat();
+        },
+        closeMobileWorkspace() {
+            document.body.classList.remove('mobile-workspace-active');
+        },
+        fetchChat() {
+            if (!this.selectedBooking) return;
+            const targetId = this.selectedBooking.booking_id || this.selectedBooking.id;
+            
+            this.loadingChat = true;
+            this.messages = [];
+            
+            axios.get(`${APP_BASE_URL}/booking/api/v1/bookings/${targetId}/chat`)
+                .then(res => {
+                    this.messages = res.data.messages || [];
+                    this.scrollToBottom();
+                })
+                .catch(err => {
+                    console.error('Failed to load chat:', err);
+                    this.showToast('error', 'Failed to load comments.');
+                })
+                .finally(() => {
+                    this.loadingChat = false;
+                });
+        },
+        scrollToBottom() {
+            this.$nextTick(() => {
+                const box = this.$refs.chatHistoryBox;
+                if (box) {
+                    box.scrollTop = box.scrollHeight;
                 }
             });
-            mediaHtml += '</div>';
+        },
+        handleKeydown(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                this.sendMessage();
+            }
+        },
+        async sendMessage() {
+            if (!this.selectedBooking || this.sending) return;
+            const txt = this.newMessage.trim();
+            if (!txt && this.pendingMediaUploads.length === 0) return;
+            
+            const targetId = this.selectedBooking.booking_id || this.selectedBooking.id;
+            this.sending = true;
+            
+            // Optimistic UI append
+            const tempId = 'temp_' + Date.now();
+            const optimisticMsg = {
+                client_id: tempId,
+                message: txt,
+                media: [...this.pendingMediaUploads],
+                created_at: new Date().toISOString(),
+                user_name: 'You',
+                user_id: INTERNAL_USER_ID,
+                is_optimistic: true,
+                pending: true
+            };
+            this.messages.push(optimisticMsg);
+            this.scrollToBottom();
+            
+            // Save payload
+            const payloadMedia = [...this.pendingMediaUploads];
+            this.newMessage = '';
+            this.resetUploadState();
+
+            try {
+                await axios.post(`${APP_BASE_URL}/booking/api/v1/bookings/${targetId}/chat`, {
+                    message: txt,
+                    media: payloadMedia
+                });
+                
+                // Refresh to get actual IDs and correct timestamps
+                this.fetchChat();
+            } catch (error) {
+                console.error("Failed to send message:", error);
+                this.showToast('error', 'Failed to send message.');
+                // Remove optimistic message on failure
+                this.messages = this.messages.filter(m => m.client_id !== tempId);
+                // Restore state (simplified, assumes user might retry)
+                this.newMessage = txt;
+                this.pendingMediaUploads = payloadMedia;
+            } finally {
+                this.sending = false;
+            }
+        },
+        
+        // --- Date Formatters ---
+        formatDateSeparator(dateObj) {
+            const today = new Date();
+            const yest = new Date(); yest.setDate(yest.getDate() - 1);
+            if (dateObj.toDateString() === today.toDateString()) return 'Today';
+            if (dateObj.toDateString() === yest.toDateString()) return 'Yesterday';
+            return dateObj.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+        },
+        
+        // --- Media Helpers ---
+        isImage(attachment) {
+            const typeStr = (attachment.type || attachment.file_mime_type || '').toLowerCase();
+            if (typeStr.includes('image')) return true;
+            const ext = this.getExt(attachment).toLowerCase();
+            return ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext);
+        },
+        getExt(attachment) {
+            const name = attachment.name || attachment.file_name || '';
+            const parts = name.split('.');
+            return parts.length > 1 ? parts.pop().substring(0,3).toUpperCase() : 'DOC';
+        },
+        truncate(str, len) {
+            if (!str) return '';
+            return str.length > len ? str.substring(0, len-3) + '...' : str;
+        },
+        
+        // --- Uppy Integration ---
+        toggleAttachmentDrawer() {
+            this.drawerOpen = !this.drawerOpen;
+            if (this.drawerOpen && !this.uppyInstance) {
+                this.initUppy();
+            }
+        },
+        resetUploadState() {
+            this.pendingMediaUploads = [];
+            this.drawerOpen = false;
+            if (this.uppyInstance) {
+                this.uppyInstance.cancelAll();
+            }
+        },
+        initUppy() {
+            const mountingNode = document.getElementById('uppyDashboardContainer');
+            if (!mountingNode) return;
+
+            this.uppyInstance = new Uppy.Uppy({
+                restrictions: { maxFileSize: 3221225472 },
+                autoProceed: true 
+            })
+            .use(Uppy.Dashboard, {
+                target: mountingNode, inline: true, height: 260, 
+                showProgressDetails: true, hideUploadButton: true,
+                theme: 'light', proudlyDisplayPoweredByUppy: false
+            })
+            .use(Uppy.Webcam, {
+                target: Uppy.Dashboard, modes: ['video-audio', 'video-only', 'audio-only', 'picture'],
+                mirror: true, facingMode: 'environment'
+            })
+            .use(Uppy.AwsS3Multipart, {
+                limit: 4,
+                createMultipartUpload(file) {
+                    return axios.post(UPLOAD_API_INIT, {
+                        filename: file.name, content_type: file.type, target_folder: 'technician_workspace'
+                    }).then(res => ({ uploadId: res.data.upload_id, key: res.data.file_key }));
+                },
+                signPart(file, partData) {
+                    return axios.post(UPLOAD_API_CHUNK, {
+                        file_key: partData.key, upload_id: partData.uploadId,
+                        total_parts: 1, partNumber: partData.partNumber
+                    }).then(res => ({ url: res.data.urls[0].url }));
+                },
+                completeMultipartUpload(file, uploadData) {
+                    return axios.post(UPLOAD_API_COMPLETE, {
+                        file_key: uploadData.key, upload_id: uploadData.uploadId, parts: uploadData.parts
+                    }).then(res => ({ location: res.data.file_url }));
+                },
+                abortMultipartUpload(file, opts) { return Promise.resolve(); }
+            });
+
+            this.uppyInstance.on('upload-success', (file, response) => {
+                this.pendingMediaUploads.push({
+                    id: file.id,
+                    file_url: response.body.location, 
+                    file_name: file.name,
+                    file_mime_type: file.type, 
+                    file_size_bytes: file.size
+                });
+                // Auto-close drawer slightly to show the input
+                this.drawerOpen = false;
+            });
+        },
+        removePendingMedia(fileId) {
+            this.pendingMediaUploads = this.pendingMediaUploads.filter(m => m.id !== fileId);
+            if (this.uppyInstance) this.uppyInstance.removeFile(fileId);
+        },
+
+        // --- Edit Films Modal ---
+        openFilmsModal() {
+            if (!this.selectedBooking) return;
+            const targetId = this.selectedBooking.booking_id || this.selectedBooking.id;
+            
+            this.filmsForm.testId = '';
+            this.filmsForm.changedFilms = '';
+            this.filmsForm.reason = '';
+            this.filmsForm.tests = [];
+            
+            if (typeof myshowLoader === 'function') myshowLoader();
+            axios.get(`${APP_BASE_URL}/booking/get-films-by-booking/${targetId}`)
+                .then(res => {
+                    this.filmsForm.grandTotalFilms = Number(res.data.grand_total_films) || 0;
+                    this.filmsForm.tests = res.data.details || [];
+                    
+                    if (!this.filmsModalObj) {
+                        this.filmsModalObj = new bootstrap.Modal(this.$refs.filmsModalRef);
+                    }
+                    this.filmsModalObj.show();
+                })
+                .catch(err => {
+                    console.error(err);
+                    this.showToast('error', 'Failed to load film data.');
+                })
+                .finally(() => {
+                    if (typeof myhideLoader === 'function') myhideLoader();
+                });
+        },
+        saveEditFilms() {
+            if (!this.filmsForm.testId) return this.showToast("error", "Please select a test.");
+            const addedFilms = Number(this.filmsForm.changedFilms) || 0;
+            if (addedFilms <= 0) return this.showToast("error", "Please enter a valid number of films.");
+            if (!this.filmsForm.reason.trim()) return this.showToast("error", "Reason is required.");
+
+            const targetId = this.selectedBooking.booking_id || this.selectedBooking.id;
+            const payload = {
+                booking_id: targetId, 
+                test_id: parseInt(this.filmsForm.testId),
+                films_under_test: this.currentTestFilms + addedFilms, 
+                total_new_films_used: this.newTotalFilms,
+                usage_type: this.filmsForm.cause, 
+                reason: this.filmsForm.reason.trim()
+            };
+
+            this.savingFilms = true;
+            axios.post(`${APP_BASE_URL}/booking/films/`, payload)
+                .then(() => { 
+                    this.showToast("success", "Film usage updated!"); 
+                    if (this.filmsModalObj) this.filmsModalObj.hide();
+                    
+                    // Optionally update the local UI model for total films if shown
+                    if (this.selectedBooking.total_no_of_films_used !== undefined) {
+                        this.selectedBooking.total_no_of_films_used = this.newTotalFilms;
+                    }
+                })
+                .catch(err => {
+                    if (typeof handleAxiosError === 'function') handleAxiosError(err);
+                    else console.error(err);
+                })
+                .finally(() => {
+                    this.savingFilms = false;
+                });
+        },
+
+        // --- Toasts ---
+        showToast(type, message) {
+            if (typeof showToastMessage === 'function') {
+                showToastMessage(type, message);
+            } else {
+                alert(`${type.toUpperCase()}: ${message}`);
+            }
         }
-
-        const safeText = (msg.message || '').replace(/\n/g, '<br>');
-        
-        $chatWrapper.append(`
-            <div class="comment-block">
-                <div class="comment-avatar">${initial}</div>
-                <div class="comment-content">
-                    <div class="comment-header">
-                        <span class="comment-name">${senderName}</span>
-                        <span class="comment-time">${timeLabel}</span>
-                    </div>
-                    ${safeText ? `<div class="comment-text">${safeText}</div>` : ''}
-                    ${mediaHtml}
-                </div>
-            </div>
-        `);
-    });
-
-    $chatWrapper.animate({ scrollTop: $chatWrapper[0].scrollHeight }, 300);
-}
-
-// -------------------------------------------------------------
-// UPPY ENGINE (Camera Enabled) & PREVIEW PILLS
-// -------------------------------------------------------------
-function setupUppyMultipartEngine() {
-    const mountingNode = document.getElementById('uppyDashboardContainer');
-    if (!mountingNode) return;
-
-    currentUppyInstance = new Uppy.Uppy({
-        restrictions: { maxFileSize: 3221225472 },
-        autoProceed: true 
-    })
-    .use(Uppy.Dashboard, {
-        target: mountingNode, inline: true, height: 260, 
-        showProgressDetails: true, hideUploadButton: true,
-        theme: 'light', proudlyDisplayPoweredByUppy: false
-    })
-    .use(Uppy.DropTarget, {
-        target: document.getElementById('workspacePanel'),
-        onDragOver: () => document.getElementById('workspacePanel').classList.add('drag-active'),
-        onDragLeave: () => document.getElementById('workspacePanel').classList.remove('drag-active'),
-        onDrop: () => document.getElementById('workspacePanel').classList.remove('drag-active')
-    })
-    .use(Uppy.Webcam, { // NEW: Camera Integration Enabled
-        target: Uppy.Dashboard, modes: ['video-audio', 'video-only', 'audio-only', 'picture'],
-        mirror: true, facingMode: 'environment'
-    })
-    .use(Uppy.AwsS3Multipart, {
-        limit: 4,
-        createMultipartUpload(file) {
-            return axios.post(UPLOAD_API_INIT, {
-                filename: file.name, content_type: file.type, target_folder: 'technician_workspace'
-            }).then(res => ({ uploadId: res.data.upload_id, key: res.data.file_key }));
-        },
-        signPart(file, partData) {
-            return axios.post(UPLOAD_API_CHUNK, {
-                file_key: partData.key, upload_id: partData.uploadId,
-                total_parts: 1, partNumber: partData.partNumber
-            }).then(res => ({ url: res.data.urls[0].url }));
-        },
-        completeMultipartUpload(file, uploadData) {
-            return axios.post(UPLOAD_API_COMPLETE, {
-                file_key: uploadData.key, upload_id: uploadData.uploadId, parts: uploadData.parts
-            }).then(res => ({ location: res.data.file_url }));
-        },
-        abortMultipartUpload(file, opts) { return Promise.resolve(); }
-    });
-
-    // Populate WhatsApp-Style Pills when upload completes
-    currentUppyInstance.on('upload-success', (file, response) => {
-        const fileId = file.id;
-        pendingMediaUploads.push({
-            id: fileId, // Tracking ID for removal
-            file_url: response.body.location, 
-            file_name: file.name,
-            file_mime_type: file.type, 
-            file_size_bytes: file.size
-        });
-        
-        renderPreviewPills();
-        
-        // Auto-close drawer slightly to show the input
-        $('#attachmentDrawer').removeClass('open');
-        $('#btnToggleDrawer').removeClass('active');
-    });
-}
-
-function renderPreviewPills() {
-    const $area = $('#uploadPreviewArea');
-    if (pendingMediaUploads.length === 0) {
-        $area.hide().empty();
-        return;
+    },
+    mounted() {
+        this.__deepLinkHandled = false;
+        this.fetchWorklist();
     }
+});
 
-    $area.empty().css('display', 'flex');
-    pendingMediaUploads.forEach(media => {
-        const icon = media.file_mime_type.includes('image') ? 'bi-image' : 'bi-file-earmark';
-        const safeName = media.file_name.length > 15 ? media.file_name.substring(0,12) + '...' : media.file_name;
-        
-        $area.append(`
-            <div class="preview-pill" id="pill-${media.id}">
-                <i class="bi ${icon}"></i>
-                <span>${safeName}</span>
-                <i class="bi bi-x remove-btn" onclick="removePendingMedia('${media.id}')"></i>
-            </div>
-        `);
-    });
-}
-
-window.removePendingMedia = function(fileId) {
-    pendingMediaUploads = pendingMediaUploads.filter(m => m.id !== fileId);
-    if (currentUppyInstance) currentUppyInstance.removeFile(fileId);
-    renderPreviewPills();
-};
-
-// -------------------------------------------------------------
-// UNIFIED SUBMISSION
-// -------------------------------------------------------------
-async function dispatchUnifiedPayload() {
-    if (!activeSessionBookingId) return;
-
-    const targetedMessageBody = $('#chatMessageInput').val().trim();
-
-    // Prevent double submission / empty submission
-    if (!targetedMessageBody && pendingMediaUploads.length === 0) return; 
-
-    const $actionBtn = $('#btnSendChat');
-    const originalIcon = $actionBtn.html();
-    $actionBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm text-white"></span>');
-
-    try {
-        await axios.post(`${APP_BASE_URL}/booking/api/v1/bookings/${activeSessionBookingId}/chat`, {
-            message: targetedMessageBody, 
-            media: pendingMediaUploads
-        });
-
-        // Interface Clean Reset
-        resetUploadState();
-        $('#chatMessageInput').val('');
-        
-        syncChatTimelineData(activeSessionBookingId);
-
-    } catch (error) {
-        console.error("Pipeline fault:", error);
-        if (typeof showToastMessage === 'function') showToastMessage('error', 'Failed to save.');
-    } finally {
-        $actionBtn.prop('disabled', false).html(originalIcon);
-    }
-}
+app.mount('#techDriveApp');
