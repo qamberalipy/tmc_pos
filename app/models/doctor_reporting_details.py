@@ -11,7 +11,7 @@ class DoctorReportingdetails(db.Model):
     branch_id = db.Column(db.Integer)
     status = db.Column(db.Enum("Pending", "Reported", "Declined", name="status_enum"), default="Pending")
     report_details_id = db.Column(db.Integer, nullable=True)
-    report_at = db.Column(db.DateTime, default=datetime.utcnow)
+    report_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     assign_by = db.Column(db.Integer)
     is_active = db.Column(db.Boolean, default=True)
 
