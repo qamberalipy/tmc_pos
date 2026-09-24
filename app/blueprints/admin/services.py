@@ -69,22 +69,56 @@ def get_all_branches():
 
 # 4. Get Branch by ID
 def get_branch_by_id(branch_id):
-    branch = (
-        db.session.query(
-            Branch.id,
-            Branch.branch_name,
-            Branch.contact_number,
-            Branch.additional_contact_number,
-            Branch.address,
-            Branch.description,
-            User.name.label("created_by_name"),
-            Branch.is_active,
-            Branch.created_at
+    try:
+        branch = (
+            db.session.query(
+                Branch.id,
+                Branch.branch_name,
+                Branch.contact_number,
+                Branch.additional_contact_number,
+                Branch.address,
+                Branch.description,
+                User.name.label("created_by_name"),
+                Branch.is_active,
+                Branch.created_at
+            )
+            .outerjoin(User, User.id == cast(Branch.created_by, Integer))
+            .filter(Branch.id == branch_id)
+            .first()
         )
-        .join(User, User.id == Branch.created_by)
-        .filter(Branch.id == branch_id)
-        .first()
-    )
+    except SQLAlchemyError as e:
+        logger.error(f"SQL error in get_branch_by_id for branch {branch_id}. Bad data in Branch.created_by? Error: {e}")
+        db.session.rollback()
+        # Fallback without the User join
+        branch = (
+            db.session.query(
+                Branch.id,
+                Branch.branch_name,
+                Branch.contact_number,
+                Branch.additional_contact_number,
+                Branch.address,
+                Branch.description,
+                Branch.is_active,
+                Branch.created_at,
+                Branch.created_by
+            )
+            .filter(Branch.id == branch_id)
+            .first()
+        )
+        if not branch:
+            return {"error": "Branch not found"}
+            
+        return {
+            "id": branch.id,
+            "branch_name": branch.branch_name,
+            "contact_number": branch.contact_number,
+            "additional_contact_number": branch.additional_contact_number,
+            "address": branch.address,
+            "description": branch.description,
+            "created_by": f"Invalid ID: {branch.created_by}",
+            "is_active": branch.is_active,
+            "created_at": branch.created_at
+        }
 
     if not branch:
         return {"error": "Branch not found"}

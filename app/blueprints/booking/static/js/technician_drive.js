@@ -27,8 +27,8 @@ const app = createApp({
             uppyInstance: null,
             sending: false,
 
-            // Films Modal
-            filmsModalObj: null,
+            // Films Panel
+            filmsOpen: false,
             savingFilms: false,
             filmsForm: {
                 tests: [],
@@ -352,10 +352,7 @@ const app = createApp({
                     this.filmsForm.grandTotalFilms = Number(res.data.grand_total_films) || 0;
                     this.filmsForm.tests = res.data.details || [];
                     
-                    if (!this.filmsModalObj) {
-                        this.filmsModalObj = new bootstrap.Modal(this.$refs.filmsModalRef);
-                    }
-                    this.filmsModalObj.show();
+                    this.filmsOpen = true;
                 })
                 .catch(err => {
                     console.error(err);
@@ -385,7 +382,7 @@ const app = createApp({
             axios.post(`${APP_BASE_URL}/booking/films/`, payload)
                 .then(() => { 
                     this.showToast("success", "Film usage updated!"); 
-                    if (this.filmsModalObj) this.filmsModalObj.hide();
+                    this.filmsOpen = false;
                     
                     // Optionally update the local UI model for total films if shown
                     if (this.selectedBooking.total_no_of_films_used !== undefined) {
