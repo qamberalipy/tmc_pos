@@ -94,7 +94,7 @@
             <p class="text-center px-4" style="color: var(--text-muted); font-size: 0.95rem;">Select a patient from the worklist to view history, <br>add comments, or upload media.</p>
         </div>
 
-        <div v-else id="workspacePanel" style="display: flex; height: 100%; flex-direction: column;" :class="{'drag-active': dragActive}">
+        <div v-else id="workspacePanel" style="display: flex; height: 100%; flex-direction: column; position: relative;" :class="{'drag-active': dragActive}">
             
             <div class="p-3 p-md-4 d-flex justify-content-between align-items-center z-1 workspace-header">
                 <div class="d-flex align-items-center overflow-hidden">
@@ -186,59 +186,63 @@
                 </div>
             </div>
 
-        </div>
-    </div>
-    
-    <!-- Edit Films Modal -->
-    <div class="modal fade" id="filmsModal" tabindex="-1" aria-hidden="true" ref="filmsModalRef">
-        <div class="modal-dialog modal-lg modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Edit Films</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <label class="mb-1 small fw-bold">Select Test *</label>
-                            <select v-model="filmsForm.testId" class="form-control mb-2">
-                                <option value="">-- Select Test --</option>
-                                <option v-for="t in filmsForm.tests" :key="t.test_id" :value="t.test_id">[[ t.test_name ]]</option>
-                            </select>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="mb-1 small fw-bold">Current Films (This Test):</label>
-                            <input type="number" class="form-control mb-2" :value="currentTestFilms" disabled>
-                        </div>
+            <!-- ── Docked Films Panel ── -->
+            <div class="films-panel" :class="{'open': filmsOpen}" v-show="filmsOpen">
+                <div class="films-panel__header d-flex align-items-center justify-content-between p-3 border-bottom bg-white" style="flex-shrink: 0;">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="bi bi-film text-primary"></i>
+                        <span class="fw-bold" style="font-size: 1rem;">Edit Films</span>
                     </div>
-                    <hr>
-                    <div class="row">
-                        <div class="col-md-6">
-                            <label class="mb-1 text-primary small fw-bold">Add/Change Films By: *</label>
-                            <input type="number" class="form-control mb-2" v-model.number="filmsForm.changedFilms" placeholder="e.g. 2" min="0">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="mb-1 small fw-bold">New Booking Grand Total:</label>
-                            <input type="number" class="form-control mb-2 fw-bold" :value="newTotalFilms" disabled style="background-color: #f8f9fa;">
-                        </div>
-                    </div>
-                    <label class="mb-1 small fw-bold">Cause *</label>
-                    <select v-model="filmsForm.cause" class="form-control mb-2">
-                        <option value="Extra">Extra</option>
-                        <option value="Repeat">Repeat</option>
-                        <option value="Error">Error</option>
-                    </select>
-                    <label class="mb-1 small fw-bold">Reason *</label>
-                    <textarea v-model="filmsForm.reason" rows="3" class="form-control" placeholder="Enter reason for change..."></textarea>
+                    <button class="btn btn-sm btn-light rounded-circle" @click="filmsOpen = false" title="Close" style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    <button type="button" class="btn btn-primary" @click="saveEditFilms" :disabled="savingFilms">
+                
+                <div class="films-panel__body p-3 flex-grow-1" style="overflow-y: auto;">
+                    <div class="mb-3">
+                        <label class="mb-1 small fw-bold text-muted text-uppercase">Select Test *</label>
+                        <select v-model="filmsForm.testId" class="form-control form-control-sm">
+                            <option value="">-- Select Test --</option>
+                            <option v-for="t in filmsForm.tests" :key="t.test_id" :value="t.test_id">[[ t.test_name ]]</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="mb-1 small fw-bold text-muted text-uppercase">Current Films (This Test)</label>
+                        <input type="number" class="form-control form-control-sm" :value="currentTestFilms" disabled>
+                    </div>
+                    <hr class="my-3 text-muted">
+                    <div class="mb-3">
+                        <label class="mb-1 small fw-bold text-primary text-uppercase">Add/Change Films By *</label>
+                        <input type="number" class="form-control form-control-sm" v-model.number="filmsForm.changedFilms" placeholder="e.g. 2" min="0">
+                    </div>
+                    <div class="mb-3">
+                        <label class="mb-1 small fw-bold text-muted text-uppercase">New Booking Grand Total</label>
+                        <input type="number" class="form-control form-control-sm fw-bold bg-light" :value="newTotalFilms" disabled>
+                    </div>
+                    <div class="mb-3">
+                        <label class="mb-1 small fw-bold text-muted text-uppercase">Cause *</label>
+                        <select v-model="filmsForm.cause" class="form-control form-control-sm">
+                            <option value="Extra">Extra</option>
+                            <option value="Repeat">Repeat</option>
+                            <option value="Error">Error</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="mb-1 small fw-bold text-muted text-uppercase">Reason *</label>
+                        <textarea v-model="filmsForm.reason" rows="3" class="form-control form-control-sm" placeholder="Enter reason for change..."></textarea>
+                    </div>
+                </div>
+                
+                <div class="films-panel__footer d-flex justify-content-end gap-2 p-3 border-top bg-light" style="flex-shrink: 0;">
+                    <button type="button" class="btn btn-secondary btn-sm" @click="filmsOpen = false">Cancel</button>
+                    <button type="button" class="btn btn-primary btn-sm" @click="saveEditFilms" :disabled="savingFilms">
                         <span v-if="savingFilms" class="spinner-border spinner-border-sm text-white"></span>
                         <span v-else>Save Changes</span>
                     </button>
                 </div>
             </div>
+            <!-- ── /Docked Films Panel ── -->
+
         </div>
     </div>
 </div>
