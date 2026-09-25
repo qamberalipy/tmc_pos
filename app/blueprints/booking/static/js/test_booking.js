@@ -597,6 +597,7 @@ $(document).on("click", "#submit_booking", async function () {
             paid_amount: parseFloat($("#net_receivable").val()) || 0,
             
             due_amount: parseFloat($("#dues").val()) || 0,
+            is_appointment: $("#is_appointment").is(":checked"),
             total_no_of_films: bookingState.totals.films,
             tests: bookingState.tests.map(t => ({
                 test_id: t.id,
@@ -730,6 +731,7 @@ function resetBookingForm() {
     // 1. Text Fields
     $("#mr_ref_no").val(""); 
     $("#patient_name, #age, #contact_no, #discount_value, #net_receivable, #dues, #txt_patient_search").val("");
+    $("#is_appointment").prop("checked", false);
     
     // 2. Standard Dropdowns (Gender, Age Type, Discount, Payment)
     $("#gender").val("male");

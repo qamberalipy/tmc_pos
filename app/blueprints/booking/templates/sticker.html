@@ -44,7 +44,12 @@ button{padding:6px 10px;font-size:14px;background:#7a1f2b;color:#fff;border:none
 <div class="sticker">
   <div class="sticker-inner">
 
-    <div class="banner"><div class="name">TMC Diagnostic Center</div></div>
+    <div class="banner">
+      <div class="name">TMC Diagnostic Center</div>
+      {% if booking.is_appointment %}
+      <div style="background:#fff;color:#7a1f2b;font-size:12px;font-weight:700;padding:2px 6px;border-radius:3px;letter-spacing:0.5px;">APPOINTMENT</div>
+      {% endif %}
+    </div>
 
     <div class="body-content">
 

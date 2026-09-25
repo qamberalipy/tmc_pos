@@ -197,6 +197,12 @@ def clear_booking_due_api(booking_id):
 
     return jsonify(result), status
 
+@booking_bp.route("/convert-appointment/<int:booking_id>", methods=["POST"])
+@login_required
+def convert_appointment(booking_id):
+    result, status = booking_services.convert_appointment_to_booking(booking_id, session.get("user_id"))
+    return jsonify(result), status
+
 # Add this route to your file
 @booking_bp.route("/receipt/due/<int:transaction_id>")
 @login_required

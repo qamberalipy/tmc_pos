@@ -317,6 +317,10 @@ function getAllTestBookings() {
                 ? `<br><span class="badge bg-info text-dark ms-1" style="font-size:0.65rem;"><i class="bi bi-send-check"></i> Sent to Dr</span><br>`
                 : ``;
 
+            let apptBadge = t.is_appointment
+                ? `<span class="badge bg-info ms-1">Appointment</span>`
+                : ``;
+
             // --- 3. UPDATE: Add Transfer Button & Apply Security Locks ---
             // We disable/hide certain buttons if the booking was transferred in from another branch
             let transferBtnHtml = !t.is_transferred_in 
@@ -331,6 +335,10 @@ function getAllTestBookings() {
                 ? `<button class="btn btn-action text-warning shadow-sm edit-share" data-id="${t.booking_id}" data-share="${currentShareId}" title="Update Share"><i class="bi bi-person-gear"></i></button>`
                 : ``;
 
+            let convertBtnHtml = t.is_appointment
+                ? `<button class="btn btn-action text-success shadow-sm convert-appointment" data-id="${t.booking_id}" title="Convert to Booking (deducts films)"><i class="bi bi-calendar2-check"></i></button>`
+                : ``;
+
             // 4. ASSEMBLE ACTIONS
             let actions = `
             <div class="d-flex gap-1 justify-content-center">
@@ -342,6 +350,7 @@ function getAllTestBookings() {
                 <button class="btn btn-action text-dark shadow-sm edit-films" data-id="${t.booking_id}" data-test-ids="${allTestIdsStr}" title="Edit Films"><i class="bi bi-plus-square"></i></button>
                 
                 ${shareBtnHtml}
+                ${convertBtnHtml}
                 ${transferBtnHtml}
                 ${refundBtnHtml}
             </div>`;
@@ -350,7 +359,7 @@ function getAllTestBookings() {
             rowsToAdd.push([
                 `<input type="checkbox" class="chk-booking custom-chk" value="${t.booking_id}">`,
                 `<div><div class="fw-bold">#${t.booking_id}</div><div class="text-muted text-xs">${t.date}</div></div>`,
-                `<div><div class="fw-bold text-primary">${t.patient_name} ${transferBadge}${sentBadge}</div><div class="text-muted text-xs">MR: ${t.mr_no || 'N/A'}</div></div>`,
+                `<div><div class="fw-bold text-primary">${t.patient_name} ${transferBadge}${sentBadge}${apptBadge}</div><div class="text-muted text-xs">MR: ${t.mr_no || 'N/A'}</div></div>`,
                 testHtml,
                 `<div class="text-xs fw-medium">${t.referred_dr || 'Self'}</div>`,
                 `<div class=" text-xs">${t.total_amount}</div>`,
@@ -369,6 +378,38 @@ function getAllTestBookings() {
 // 6. TABLE EVENT BINDINGS
 // ---------------------------------------------------------
 function rebindTableEvents() {
+    $("#testReg_table").off("click", ".convert-appointment").on("click", ".convert-appointment", function () {
+        const bookingId = $(this).data("id");
+        Swal.fire({
+            title: "Convert to Booking?",
+            text: "Convert this appointment to a normal booking? Films will be deducted now.",
+            icon: "warning",
+            showCancelButton: true,
+            confirmButtonColor: "#198754",
+            confirmButtonText: "Yes, Convert",
+            showLoaderOnConfirm: true,
+            preConfirm: () => {
+                return axios.post(`${baseUrl}/booking/convert-appointment/${bookingId}`)
+                    .then(res => res.data)
+                    .catch(err => {
+                        Swal.showValidationMessage(`Conversion failed: ${err.response?.data?.error || err.message}`);
+                    });
+            },
+            allowOutsideClick: () => !Swal.isLoading()
+        }).then((result) => {
+            if (result.isConfirmed) {
+                Swal.fire({
+                    title: "Success",
+                    text: "Converted successfully.",
+                    icon: "success",
+                    timer: 2000,
+                    showConfirmButton: false
+                });
+                getAllTestBookings();
+            }
+        });
+    });
+
     $("#testReg_table").off("click", ".comment-booking").on("click", ".comment-booking", function () {
         let bookingId = $(this).data("id");
         window.open(`${baseUrl}/booking/view/technician-drive?booking_id=${bookingId}`, "_blank");
