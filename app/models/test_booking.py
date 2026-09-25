@@ -38,6 +38,7 @@ class TestBooking(db.Model):
     due_date = db.Column(db.Date)
     due_amount = db.Column(db.Numeric(10, 2), default=0)
     is_transferred_in = db.Column(db.Boolean, default=False)
+    is_appointment = db.Column(db.Boolean, default=False)
     create_by = db.Column(db.Integer, nullable=False)
     create_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     update_by = db.Column(db.Integer)

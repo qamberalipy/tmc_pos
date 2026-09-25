@@ -72,7 +72,8 @@ def create_test_booking(data):
                 payment_type=data.get("payment_type", "Cash"),
                 paid_amount=paid_amount,
                 due_amount=due_amount,
-                create_by=data["create_by"]
+                create_by=data["create_by"],
+                is_appointment=bool(data.get("is_appointment", False))
             )
             db.session.add(booking)
             db.session.flush()  # FLUSH to get the ID, but don't commit yet
@@ -141,8 +142,8 @@ def create_test_booking(data):
             if details:
                 db.session.add_all(details)
             
-            # --- 7. Film Usage & Inventory Transaction (NEW LOGIC) ---
-            if total_initial_films > 0:
+            # --- 7. Film Usage & Inventory Transaction (skip for appointments — deducted on conversion) ---
+            if total_initial_films > 0 and not booking.is_appointment:
                 # Calls the existing helper function to create Usage Record + Inventory Transaction
                 add_film_usage(
                     booking_id=booking.id,
@@ -181,6 +182,32 @@ def create_test_booking(data):
             db.session.rollback()
             print("General error:", str(e))
             return {"error": str(e)}, 400
+
+def convert_appointment_to_booking(booking_id, converted_by):
+    booking = TestBooking.query.get(booking_id)
+    if not booking:
+        return {"error": "Booking not found"}, 404
+    if not booking.is_appointment:
+        return {"error": "Booking is not an appointment or already converted"}, 400
+
+    total_films = db.session.query(func.coalesce(func.sum(TestBookingDetails.no_of_films), 0)).filter(
+        TestBookingDetails.booking_id == booking_id).scalar()
+
+    booking.is_appointment = False
+    db.session.flush()
+
+    if total_films and total_films > 0:
+        add_film_usage(
+            booking_id=booking_id,
+            films_used=int(total_films),
+            usage_type="Normal",
+            used_by=converted_by,
+            branch_id=booking.branch_id,
+            reason="Converted from Appointment"
+        )
+
+    db.session.commit()
+    return {"message": "Appointment converted to booking successfully", "booking_id": booking_id}, 200
 
 def _generate_mr_no():
     now = datetime.now(timezone.utc)
@@ -923,6 +950,7 @@ def _format_test_booking(row):
         "balance": float(row.due_amount or 0),
         "branch": row.branch_name,
         "is_transferred_in": row.is_transferred_in,
+        "is_appointment": row.is_appointment,
         "created_by": row.created_by_name,
         "created_at": row.create_at.isoformat() if row.create_at else None,
         "updated_at": row.update_at.isoformat() if row.update_at else None
@@ -951,6 +979,7 @@ def get_all_test_bookings(branch_id=None, from_date=None, to_date=None):
                 TestBooking.total_amount,
                 TestBooking.discount_value,
                 TestBooking.is_transferred_in,
+                TestBooking.is_appointment,
                 TestBooking.paid_amount,
                 TestBooking.due_amount,
                 TestBooking.create_at,
