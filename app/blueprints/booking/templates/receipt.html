@@ -95,7 +95,11 @@ h2,p{margin:0;padding:0}
       <div class="letterhead-space"></div>
 
       <div class="booking-strip">
-        <span><span class="lbl">Booking ID</span><span class="val">{{ booking.booking_id }}</span></span>
+        <span><span class="lbl">Booking ID</span><span class="val">{{ booking.booking_id }}</span>
+          {% if booking.is_appointment %}
+          <span style="background:#7a1f2b;color:#fff;font-size:7.5px;padding:1px 4px;border-radius:2px;margin-left:6px;vertical-align:middle;">APPOINTMENT</span>
+          {% endif %}
+        </span>
         <span style="text-align:right"><span class="lbl">Bill Date</span><span class="val" id="billDate"></span></span>
       </div>
 

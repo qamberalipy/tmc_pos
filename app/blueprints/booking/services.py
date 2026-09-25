@@ -918,6 +918,7 @@ def get_booking_details(booking_id: int):
             "tests": test_list,
             "printed_at": to_local(datetime.now(timezone.utc), "%d-%b-%Y %I:%M %p"),
             "current_user": session.get("user_name"),
+            "is_appointment": booking.is_appointment,
         }, 200
 
     except SQLAlchemyError as e:

@@ -380,10 +380,34 @@ function getAllTestBookings() {
 function rebindTableEvents() {
     $("#testReg_table").off("click", ".convert-appointment").on("click", ".convert-appointment", function () {
         const bookingId = $(this).data("id");
-        if (!confirm("Convert this appointment to a normal booking? Films will be deducted now.")) return;
-        axios.post(`${baseUrl}/booking/convert-appointment/${bookingId}`)
-            .then(() => { showToastMessage("success", "Converted successfully."); getAllTestBookings(); })
-            .catch(err => showToastMessage("error", err.response?.data?.error || "Conversion failed."));
+        Swal.fire({
+            title: "Convert to Booking?",
+            text: "Convert this appointment to a normal booking? Films will be deducted now.",
+            icon: "warning",
+            showCancelButton: true,
+            confirmButtonColor: "#198754",
+            confirmButtonText: "Yes, Convert",
+            showLoaderOnConfirm: true,
+            preConfirm: () => {
+                return axios.post(`${baseUrl}/booking/convert-appointment/${bookingId}`)
+                    .then(res => res.data)
+                    .catch(err => {
+                        Swal.showValidationMessage(`Conversion failed: ${err.response?.data?.error || err.message}`);
+                    });
+            },
+            allowOutsideClick: () => !Swal.isLoading()
+        }).then((result) => {
+            if (result.isConfirmed) {
+                Swal.fire({
+                    title: "Success",
+                    text: "Converted successfully.",
+                    icon: "success",
+                    timer: 2000,
+                    showConfirmButton: false
+                });
+                getAllTestBookings();
+            }
+        });
     });
 
     $("#testReg_table").off("click", ".comment-booking").on("click", ".comment-booking", function () {
