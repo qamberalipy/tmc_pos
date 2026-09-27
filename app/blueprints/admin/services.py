@@ -335,22 +335,20 @@ def get_staff_dashboard_summary(branch_id):
     else:
         today_expense_total = 0.0
 
-    # --- Films balance (today's closing from inventory report; reuse booking service) ---
+    # --- Films balance (all-time balance from inventory ledger) ---
     films_balance = 0
     last_packet_date = None
     try:
-        film_report, _fstatus = booking_services.get_film_inventory_report(
-            branch_id=branch_id,
-            from_date=today_str,
-            to_date=today_str
-        )
-        report_rows = film_report.get("data", []) if isinstance(film_report, dict) else []
-        normal_rows = [r for r in report_rows if r.get("type") == "normal"]
-        if normal_rows:
-            films_balance = normal_rows[-1].get("closing", 0)
-        packet_rows = [r for r in report_rows if r.get("type") == "packet"]
-        if packet_rows:
-            last_packet_date = packet_rows[-1].get("date")
+        films_balance = booking_services.get_current_film_balance(branch_id)
+        from app.models.test_booking import FilmInventoryTransaction
+        last_in = db.session.query(
+            func.max(FilmInventoryTransaction.transaction_date)
+        ).filter(
+            FilmInventoryTransaction.branch_id == branch_id,
+            FilmInventoryTransaction.transaction_type == "IN"
+        ).scalar()
+        if last_in:
+            last_packet_date = to_local(last_in, "%Y-%m-%d")
     except Exception:
         films_balance = 0
 

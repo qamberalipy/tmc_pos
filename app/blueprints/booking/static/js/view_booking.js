@@ -485,32 +485,55 @@ $(document).on("change", ".film-issue-toggle", function () {
     const testId = $toggle.data("test-id");
     const isIssued = $toggle.is(":checked");
 
-    if (isIssued) {
-        $card.removeClass('status-pending').addClass('status-issued');
-        $statusLabel.text('ISSUED');
-    } else {
-        $card.removeClass('status-issued').addClass('status-pending');
-        $statusLabel.text('PENDING');
-    }
+    // Revert checkbox to previous state immediately — only apply after confirm
+    $toggle.prop('checked', !isIssued);
 
-    $card.css('opacity', '0.6');
-    axios.post(baseUrl + "/booking/update-film-status", {
-        booking_id: bookingId, test_id: testId, film_issued: isIssued
-    })
-        .then(() => {
-            showToastMessage("success", "Film status updated");
-            // Also update the local map so if user clicks Bulk Assign immediately, data is fresh
-            if(window.bookingsMap[bookingId]) {
-                 let tests = window.bookingsMap[bookingId].test_booking_details;
-                 let tObj = tests.find(x => x.id === testId);
-                 if(tObj) tObj.film_issued = isIssued;
+    Swal.fire({
+        title: isIssued ? 'Mark film as issued?' : 'Mark film as pending?',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Yes',
+        cancelButtonText: 'No'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            // Apply the checkbox and UI changes
+            $toggle.prop('checked', isIssued);
+            if (isIssued) {
+                $card.removeClass('status-pending').addClass('status-issued');
+                $statusLabel.text('ISSUED');
+            } else {
+                $card.removeClass('status-issued').addClass('status-pending');
+                $statusLabel.text('PENDING');
             }
-        })
-        .catch(err => {
-            $toggle.prop('checked', !isIssued);
-            handleAxiosError(err);
-        })
-        .finally(() => $card.css('opacity', '1'));
+
+            $card.css('opacity', '0.6');
+            axios.post(baseUrl + "/booking/update-film-status", {
+                booking_id: bookingId, test_id: testId, film_issued: isIssued
+            })
+                .then(() => {
+                    showToastMessage("success", "Film status updated");
+                    // Also update the local map so if user clicks Bulk Assign immediately, data is fresh
+                    if(window.bookingsMap[bookingId]) {
+                         let tests = window.bookingsMap[bookingId].test_booking_details;
+                         let tObj = tests.find(x => x.id === testId);
+                         if(tObj) tObj.film_issued = isIssued;
+                    }
+                })
+                .catch(err => {
+                    $toggle.prop('checked', !isIssued);
+                    if (isIssued) {
+                        $card.removeClass('status-issued').addClass('status-pending');
+                        $statusLabel.text('PENDING');
+                    } else {
+                        $card.removeClass('status-pending').addClass('status-issued');
+                        $statusLabel.text('ISSUED');
+                    }
+                    handleAxiosError(err);
+                })
+                .finally(() => $card.css('opacity', '1'));
+        }
+        // On cancel/dismiss: checkbox already reverted, do nothing
+    });
 });
 
 $(document).on("input", "#changedFilmsInput", function () {

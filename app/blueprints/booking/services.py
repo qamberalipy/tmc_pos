@@ -548,6 +548,30 @@ def inventory_transaction(quantity, transaction_type, handled_by, branch_id, boo
     return txn
 
 
+def get_current_film_balance(branch_id):
+    """Return the all-time current film balance for a branch.
+
+    Balance = SUM(IN + ADJUST quantities) - SUM(OUT quantities).
+    This is the single source of truth for both the staff dashboard
+    and the film inventory report page.
+    """
+    q = FilmInventoryTransaction
+    result = db.session.query(
+        func.sum(case(
+            (q.transaction_type.in_(["IN", "ADJUST"]), q.quantity),
+            else_=0
+        )).label("total_in"),
+        func.sum(case(
+            (q.transaction_type == "OUT", q.quantity),
+            else_=0
+        )).label("total_out")
+    ).filter(q.branch_id == branch_id).one()
+
+    total_in = int(result.total_in or 0)
+    total_out = int(result.total_out or 0)
+    return total_in - total_out
+
+
 def get_inventory_summary(from_date, to_date, branch_id=None):
     try:
         # ---------------------------
@@ -610,7 +634,29 @@ def get_film_inventory_report(branch_id=None, from_date=None, to_date=None):
     from_date = datetime.strptime(from_date, "%Y-%m-%d").date()
     to_date = datetime.strptime(to_date, "%Y-%m-%d").date()
 
-    # Fetch all transactions
+    # --- Compute opening balance from all transactions BEFORE from_date ---
+    prior_query = (
+        db.session.query(
+            func.sum(case(
+                (FilmInventoryTransaction.transaction_type.in_(["IN", "ADJUST"]),
+                 FilmInventoryTransaction.quantity),
+                else_=0
+            )).label("in_qty"),
+            func.sum(case(
+                (FilmInventoryTransaction.transaction_type == "OUT",
+                 FilmInventoryTransaction.quantity),
+                else_=0
+            )).label("out_qty")
+        )
+        .filter(cast(FilmInventoryTransaction.transaction_date, Date) < from_date)
+    )
+    if branch_id:
+        prior_query = prior_query.filter(FilmInventoryTransaction.branch_id == branch_id)
+
+    prior_res = prior_query.one()
+    opening_balance = int((prior_res.in_qty or 0)) - int((prior_res.out_qty or 0))
+
+    # Fetch all transactions in the date range
     query = (
         db.session.query(
             cast(FilmInventoryTransaction.transaction_date, Date).label("tdate"),
@@ -632,18 +678,19 @@ def get_film_inventory_report(branch_id=None, from_date=None, to_date=None):
     for r in records:
         dt = r.tdate
         if dt not in day_map:
-            day_map[dt] = {"IN": 0, "OUT": 0}
+            day_map[dt] = {"IN": 0, "OUT": 0, "ADJUST": 0}
         day_map[dt][r.transaction_type] = r.qty
 
     # Generate final rows
     report = []
-    previous_closing = 0
+    previous_closing = opening_balance
 
     for dt in sorted(day_map.keys()):
         opening = previous_closing
         used = day_map[dt]["OUT"]
         new_packets = day_map[dt]["IN"]
-        closing = (opening + new_packets) - used
+        adjustments = day_map[dt]["ADJUST"]
+        closing = (opening + new_packets + adjustments) - used
 
         # If IN, add yellow row (New Packet Insert)
         if new_packets > 0:
