@@ -1611,6 +1611,10 @@ def get_technician_dashboard_list(branch_id, from_date=None, to_date=None, searc
             TestBooking.total_no_of_films_used, TestBooking.create_at, TestBooking.technician_comments
         ).filter(TestBooking.branch_id == branch_id)
 
+        # Exclude unconverted appointment bookings from technician worklist (only real/confirmed bookings)
+        appointment_filter = or_(TestBooking.is_appointment == False, TestBooking.is_appointment.is_(None))
+        query = query.filter(or_(appointment_filter, TestBooking.id == deep_link_id) if deep_link_id else appointment_filter)
+
         if start_utc and end_utc:
             date_filter = and_(TestBooking.create_at >= start_utc, TestBooking.create_at <= end_utc)
             query = query.filter(or_(date_filter, TestBooking.id == deep_link_id) if deep_link_id else date_filter)
