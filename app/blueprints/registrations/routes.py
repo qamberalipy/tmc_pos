@@ -145,16 +145,15 @@ def get_all_referred_list():
 def create_test_registration():
     data = request.get_json() or {}
     data["created_by"] = session.get("user_id")  # from session
-    data["branch_id"] = session.get("branch_id")  # from session
+    data["branch_id"] = session.get("branch_id") or 1  # legacy column support
     result, status = registrations_services.create_test_registration(data)
     return jsonify(result), status
 
 # Get All
 @registrations_bp.route("/test-registration", methods=["GET"])
 def get_all_test_registrations():
-    role = session.get("role", "").lower()
-    branch_id = None if role == "admin" else session.get("branch_id")
-    result, status = registrations_services.get_all_test_registrations(branch_id)
+    # Unified test catalog: return all registered tests across all branches
+    result, status = registrations_services.get_all_test_registrations()
     return jsonify(result), status
 
 # Get One
@@ -183,7 +182,8 @@ def toggle_test_registration_status(test_id):
 @registrations_bp.route('/test/list', methods=['GET'])
 def get_all_tests_list():
     try:
-        data = registrations_services.get_all_test_list(session.get("branch_id"))
+        # Unified test catalog: return active tests across all branches
+        data = registrations_services.get_all_test_list()
         return jsonify(data), 200
     except Exception as e:
         print(f"Error in get_all_tests_list: {str(e)}")
@@ -192,6 +192,7 @@ def get_all_tests_list():
 @registrations_bp.route('/test/list/<int:branch_id>', methods=['GET'])
 def get_all_tests_list_via_branch(branch_id):
     try:
+        # Backward-compatible route: accepts branch_id but returns unified active test list
         data = registrations_services.get_all_test_list(branch_id)
         return jsonify(data), 200
     except Exception as e:

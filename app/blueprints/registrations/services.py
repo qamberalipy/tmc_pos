@@ -3,6 +3,7 @@ from app.extensions import db
 from app.models import Expense_head, Branch, User ,Referred,Test_registration
 from app.models.test_registration import CATEGORY_CHOICES
 from werkzeug.security import generate_password_hash
+from sqlalchemy import func
 from sqlalchemy.exc import SQLAlchemyError
 
 # Helper: format expense head
@@ -318,13 +319,28 @@ def _format_test_registration(t, branch_name=None, created_by_name=None):
 # 🔹 Create
 def create_test_registration(data):
     try:
+        # Note: branch_id is legacy; ensure a default integer exists so DB non-null column is satisfied
+        if not data.get("branch_id"):
+            data["branch_id"] = 1
+
         required = ["test_name", "charges", "required_days", "branch_id", "created_by"]
         for field in required:
             if not data.get(field):
                 return {"error": f"{field} is required"}, 400
 
+        test_name = str(data.get("test_name", "")).strip()
+        if not test_name:
+            return {"error": "test_name is required"}, 400
+
+        # Step 5: Global case-insensitive uniqueness check across ALL branches
+        existing = Test_registration.query.filter(
+            func.lower(Test_registration.test_name) == func.lower(test_name)
+        ).first()
+        if existing:
+            return {"error": f"A test with the name '{test_name}' already exists."}, 400
+
         test = Test_registration(
-            test_name=data["test_name"],
+            test_name=test_name,
             sample_collection=data.get("sample_collection"),
             department_id=data.get("department_id"),
             category=data.get("category") if data.get("category") in CATEGORY_CHOICES else "Other",
@@ -333,7 +349,7 @@ def create_test_registration(data):
             sequence_no=data["sequence_no"],
             no_of_films=data.get("no_of_films"),
             description=data.get("description"),
-            branch_id=data["branch_id"],
+            branch_id=data["branch_id"],  # Preserved as harmless legacy column
             created_by=data["created_by"],
             updated_by=data["created_by"]
         )
@@ -348,6 +364,11 @@ def create_test_registration(data):
     
 # 🔹 Get All
 def get_all_test_registrations(branch_id=None):
+    """
+    Returns all registered tests across all branches (unified catalog).
+    branch_id is accepted for backward-compatibility with existing callers,
+    but filtering by branch_id is bypassed so all branches share one catalog.
+    """
     try:
         query = (
             db.session.query(
@@ -357,9 +378,9 @@ def get_all_test_registrations(branch_id=None):
             )
             .outerjoin(Branch, Test_registration.branch_id == Branch.id)
             .outerjoin(User, Test_registration.created_by == User.id)
+            .order_by(Test_registration.test_name.asc())
         )
-        if branch_id:
-            query = query.filter(Test_registration.branch_id == branch_id)
+        # Bypassed: branch_id filter removed so all branches share one unified catalog
 
         results = query.all()
         return [_format_test_registration(t, branch_name, created_by_name) for t, branch_name, created_by_name in results], 200
@@ -390,12 +411,19 @@ def get_test_registration_by_id(test_id):
 
     except SQLAlchemyError as e:
         return {"error": str(e.__dict__.get("orig", e))}, 500
-def get_all_test_list(branch_id):
+
+def get_all_test_list(branch_id=None):
+    """
+    Returns active tests for dropdown population.
+    branch_id is accepted for backward-compatibility, but filtering by branch_id
+    is removed so all active tests are available across all branches.
+    Note: 'Import Tests from Another Branch' is now redundant as all branches
+    share one unified catalog.
+    """
     try:
         tests = Test_registration.query.filter(
-            Test_registration.is_active == True, 
-            Test_registration.branch_id == branch_id
-        ).all()
+            Test_registration.is_active == True
+        ).order_by(Test_registration.test_name.asc()).all()
         
         return [
             {
@@ -412,6 +440,7 @@ def get_all_test_list(branch_id):
     except Exception as e:
         print(f"Unexpected error in get_all_test_list: {str(e)}")
         raise
+
 # 🔹 Update
 def update_test_registration(test_id, data):
     try:
@@ -420,7 +449,17 @@ def update_test_registration(test_id, data):
             return {"error": "Test Registration not found"}, 404
         print(f"Updating Test Registration ID {test_id} with data: {data}")
         if data.get("test_name"):
-            t.test_name = data["test_name"]
+            new_name = str(data["test_name"]).strip()
+            if not new_name:
+                return {"error": "test_name cannot be empty"}, 400
+            # Global uniqueness check across ALL branches (case-insensitive)
+            existing = Test_registration.query.filter(
+                func.lower(Test_registration.test_name) == func.lower(new_name),
+                Test_registration.id != test_id
+            ).first()
+            if existing:
+                return {"error": f"A test with the name '{new_name}' already exists."}, 400
+            t.test_name = new_name
         if "sample_collection" in data:
             t.sample_collection = data["sample_collection"]
         if "department_id" in data:
@@ -443,7 +482,7 @@ def update_test_registration(test_id, data):
             t.no_of_films = data["no_of_films"]
         if "description" in data:
             t.description = data["description"]
-        if "branch_id" in data:
+        if "branch_id" in data and data["branch_id"]:
             t.branch_id = data["branch_id"]
         if "updated_by" in data:
             t.updated_by = data["updated_by"]

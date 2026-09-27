@@ -72,7 +72,7 @@ The spelling `techician` (missing an 'n') is **intentional** and used everywhere
 | `user.py` | `User` | `user` | `_signature_data` maps to column `doctor_signature` (Text, stores JSON string). Has `@property signature_data` getter/setter |
 | `role.py` | `Role` | `role` | Column is `role` (same as table name) — `Role.role` returns the role string |
 | `department.py` | `Department` | `department` | `created_by`/`updated_by` are String, not Integer |
-| `test_registration.py` | `Test_registration` | `test_registration` | `CATEGORY_CHOICES = ["Contrast", "Full Study", "Screening", "Other"]`, `charges` is Float (not Numeric), `no_of_films` determines film allocation per test |
+| `test_registration.py` | `Test_registration` | `test_registration` | `CATEGORY_CHOICES = ["Contrast", "Full Study", "Screening", "Other"]`, `charges` is Float (not Numeric), `no_of_films` determines film allocation per test. Catalog is unified across branches; `branch_id` is legacy schema column unused for query filtering |
 | `test_booking.py` | `TestBooking` | `test_booking` | **`create_at`/`update_at`** (not created_at), **`create_by`/`update_by`** (not created_by). `mr_no` is auto-generated unique. `technician_comments` is Text storing JSON |
 | | `TestFilmUsage` | `test_film_usage` | `usage_type` enum: Normal/Extra/Repeat/Error |
 | | `FilmInventoryTransaction` | `film_inventory_transactions` | `transaction_type` enum: IN/OUT/ADJUST |

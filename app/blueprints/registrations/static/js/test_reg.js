@@ -112,7 +112,8 @@ $(document).on("click", "#update_testReg", function () {
         .catch(err => {
             myhideLoader();
             console.error("Error updating test registration:", err);
-            showToastMessage("error", "Failed to update Test Registration!");
+            let msg = err.response?.data?.error || "Failed to update Test Registration!";
+            showToastMessage("error", msg);
         });
 });
 
