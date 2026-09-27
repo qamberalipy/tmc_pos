@@ -18,20 +18,21 @@ See the root `AGENTS.md` for repo-wide conventions.
 
 ## Conventions
 
-- **Branch scoping**: API GET endpoints check `session.get("role")` — `admin` sees all branches, everyone else is filtered to `session.get("branch_id")`. POST/PUT inject `branch_id` and `created_by`/`updated_by` from session.
+- **Branch scoping**: For `Referred` and `Expense_head`, API GET endpoints check `session.get("role")` — `admin` sees all branches, everyone else is filtered to `session.get("branch_id")`. POST/PUT inject `branch_id` and `created_by`/`updated_by` from session. **Exception**: `Test_registration` is **unified across all branches** into a single shared catalog; `branch_id` is legacy/unused for filtering.
 - **Service return pattern**: All service functions return `(result, status_code)` tuples. Routes unpack as `result, status = service_fn(...)`.
 - **Toggle endpoints** use PATCH with `{"is_active": true/false}` — e.g., `PATCH /registrations/test-registration/<id>/status`.
-- **List endpoints** (suffix `/list`) return `[{id, name}]` arrays filtered to `is_active == True` and `branch_id == session branch`. Used for populating dropdowns in booking forms.
+- **List endpoints** (suffix `/list`): `expense_head` and `referred` return items filtered to `is_active == True` and `branch_id == session branch`. `test/list` returns all active tests across **all branches** (branch-agnostic unified catalog). Used for populating dropdowns in booking forms.
 
 ## Domain notes — Test Registration
 
 - Model: `Test_registration` (underscore in class name is canonical)
+- **Unified Catalog**: Test catalog is global across all branches. `branch_id` is kept in DB for schema compatibility without migration, but is ignored during read/list queries. Test name uniqueness is enforced globally (case-insensitive) on create and update.
 - `CATEGORY_CHOICES = ["Contrast", "Full Study", "Screening", "Other"]` — defined in `models/test_registration.py`, enforced on create/update; unrecognised values default to `"Other"`
 - `charges` is **Float**, `report_charges` is Float (default 0.0) — report_charges is the doctor's per-report fee used in commission calculations
 - `no_of_films` (Integer, nullable) — determines how many X-ray/MRI films are pre-allocated when this test is booked
 - `sequence_no` is String, not Integer
 - `required_days` is **String** (not Integer) — stores human-readable text like "2-3 days"
-- Test list endpoint (`GET /registrations/test/list` and `/test/list/<branch_id>`) returns `{id, test_name, price, no_of_films}`
+- Test list endpoint (`GET /registrations/test/list` and `/test/list/<branch_id>`) returns `{id, test_name, price, no_of_films}` for all active tests across all branches.
 
 ## Domain notes — Referred
 
