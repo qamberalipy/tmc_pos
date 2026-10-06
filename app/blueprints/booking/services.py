@@ -902,6 +902,7 @@ def get_booking_details(booking_id: int):
                 TestBookingDetails.quantity,
                 TestBookingDetails.no_of_films,
                 TestBookingDetails.amount,
+                TestBookingDetails.film_issued,
                 TestBookingDetails.reporting_date,
                 TestBookingDetails.sample_to_follow,
             )
@@ -915,6 +916,7 @@ def get_booking_details(booking_id: int):
                 "quantity": t.quantity,
                 "no_of_films": t.no_of_films,
                 "amount": float(t.amount or 0),
+                "film_issued": t.film_issued,
                 "reporting_date": (
                     to_local(t.reporting_date, "%d-%b-%Y")
                     if t.reporting_date else None
@@ -977,6 +979,17 @@ def get_booking_details(booking_id: int):
 
 
 def _format_test_booking(row):
+    # Check if this booking was transferred in — expose the log entry so UI can show a link
+    transfer_in_log = None
+    if row.is_transferred_in:
+        log = BookingTransferLog.query.filter_by(new_booking_id=row.id).first()
+        if log:
+            transfer_in_log = {
+                "log_id": log.id,
+                "from_branch_id": log.from_branch_id,
+                "transferred_at": to_local(log.transferred_at, "%Y-%m-%d %H:%M") if log.transferred_at else None,
+                "reason": log.reason
+            }
     return {
         "booking_id": row.id,
         "patient_name": row.patient_name,
@@ -988,7 +1001,7 @@ def _format_test_booking(row):
         "give_share_to": row.give_share_to,
         "sent_to_doctor": row.sent_to_doctor,
         # This contains: [{"id": 12, "test_name": "xyz", "film_issued": False}, ...]
-        "test_booking_details": row.test_booking_details,  
+        "test_booking_details": row.test_booking_details,
         "technician_comments": row.technician_comments,
         "total_amount": float(row.total_amount) if getattr(row, 'total_amount', None) is not None else float((row.net_receivable or 0) + (row.discount_value or 0)),
         "total_films": row.total_no_of_films_used,
@@ -998,6 +1011,7 @@ def _format_test_booking(row):
         "balance": float(row.due_amount or 0),
         "branch": row.branch_name,
         "is_transferred_in": row.is_transferred_in,
+        "transfer_in_log": transfer_in_log,
         "is_appointment": row.is_appointment,
         "created_by": row.created_by_name,
         "created_at": row.create_at.isoformat() if row.create_at else None,
@@ -1491,7 +1505,12 @@ def process_refund_service(booking_id, user_id, branch_id, refund_reason=""):
         print(f"Error processing refund: {str(e)}")
         return {"error": str(e)}, 500
     
-def transfer_and_rebook_service(old_booking_id, target_branch_id, new_tests, due_amount, reason, user_id, current_branch_id):
+def transfer_and_rebook_service(old_booking_id, target_branch_id, due_amount, reason, user_id, current_branch_id, assigned_to=None):
+    """
+    Transfers a booking to a target branch.
+    Tests are automatically copied from the original booking's TestBookingDetails —
+    no caller-supplied new_tests list needed (catalog is unified across branches).
+    """
     try:
         old_booking = TestBooking.query.get(old_booking_id)
         if not old_booking:
@@ -1500,14 +1519,34 @@ def transfer_and_rebook_service(old_booking_id, target_branch_id, new_tests, due
         if str(old_booking.branch_id) == str(target_branch_id):
             return {"error": "Booking is already at the selected branch"}, 400
 
-        # Save metadata and cash state before executing delete
+        # --- Save metadata and cash state before executing delete ---
         held_cash = old_booking.paid_amount
         mr_no = old_booking.mr_no
         patient_name = old_booking.patient_name
         gender = old_booking.gender
         age = old_booking.age
+        age_unit = old_booking.age_unit
         contact_no = old_booking.contact_no
         payment_type = old_booking.payment_type
+        net_receivable = old_booking.net_receivable
+        total_amount = old_booking.total_amount
+        discount_type = old_booking.discount_type
+        discount_value = old_booking.discount_value
+
+        # --- Snapshot TestBookingDetails BEFORE deleting them ---
+        old_details = TestBookingDetails.query.filter_by(booking_id=old_booking_id).all()
+        if not old_details:
+            return {"error": "Cannot transfer: booking has no test details to copy"}, 400
+        new_tests_snapshot = [
+            {
+                "test_id": d.test_id,
+                "amount": d.amount,
+                "quantity": d.quantity if d.quantity else 1,
+                "no_of_films": d.no_of_films if d.no_of_films else 0
+            }
+            for d in old_details
+        ]
+        new_total = sum(d.amount for d in old_details)
 
         # Extract old comments to migrate them safely
         old_comments_dict = {"comments": []}
@@ -1534,21 +1573,21 @@ def transfer_and_rebook_service(old_booking_id, target_branch_id, new_tests, due
             db.session.add(refund)
             db.session.delete(usage)
 
-        # FIX 1: Detach old inventory logs to prevent ghost references
+        # Detach old inventory logs to prevent ghost references
         old_inventory_logs = FilmInventoryTransaction.query.filter_by(booking_id=old_booking_id).all()
         for inv in old_inventory_logs:
             inv.booking_id = None
             db.session.add(inv)
 
-        # 2. Detach Payments (Transforms it to TransferOut_Held)
+        # 2. Detach Payments (Transforms to TransferOut_Held — cash stays at origin)
         payments = PaymentTransaction.query.filter_by(booking_id=old_booking_id).all()
         for p in payments:
             p.booking_id = None
-            p.transaction_type = "TransferOut_Held" 
+            p.transaction_type = "TransferOut_Held"
             p.description = f"Transferred-Out Cash Held (MR: {mr_no}) - Reason: {reason}"
             db.session.add(p)
 
-        # FIX 2: Prevent Foreign Key Crash from Referral Shares
+        # Prevent Foreign Key Crash from Referral Shares
         ReferralShare.query.filter_by(booking_id=old_booking_id).delete()
 
         # 3. Clean up old linked entities
@@ -1557,15 +1596,13 @@ def transfer_and_rebook_service(old_booking_id, target_branch_id, new_tests, due
 
         # 4. Delete the Old Booking
         db.session.delete(old_booking)
-        db.session.flush() # Immediately frees up the MR NO unique constraint
+        db.session.flush()  # Immediately frees up the MR_NO unique constraint
 
-        # 5. Create Native Booking at Target Branch
-        new_total = sum(Decimal(str(t.get('price', 0))) for t in new_tests)
-        
+        # 5. Create new Booking at Target Branch — preserving all original financials
         system_comment = {
             "user_id": user_id,
-            "user_name": "System", 
-            "role": "Auto", 
+            "user_name": "System",
+            "role": "Auto",
             "datetime": to_local(datetime.now(timezone.utc), "%Y-%m-%d %H:%M:%S"),
             "comment": f"Transferred from Branch {current_branch_id}. Reason: {reason}"
         }
@@ -1576,35 +1613,38 @@ def transfer_and_rebook_service(old_booking_id, target_branch_id, new_tests, due
             patient_name=patient_name,
             gender=gender,
             age=age,
+            age_unit=age_unit,
             contact_no=contact_no,
             branch_id=target_branch_id,
-            create_by=user_id, 
-            net_receivable=new_total,
-            paid_amount=held_cash, 
+            create_by=user_id,
+            discount_type=discount_type,
+            discount_value=discount_value,
+            total_amount=total_amount,
+            net_receivable=net_receivable,
+            paid_amount=held_cash,
             due_amount=Decimal(str(due_amount)),
             payment_type=payment_type,
-            is_transferred_in=True, 
-            technician_comments=json.dumps(old_comments_dict) 
+            is_transferred_in=True,
+            technician_comments=json.dumps(old_comments_dict)
         )
         db.session.add(new_booking)
         db.session.flush()
 
-        # 6. Add Target Branch's Native Tests & Track Films
+        # 6. Copy original tests & track films — server-side, no UI input needed
         total_new_films = 0
-        for t in new_tests:
-            films_count = int(t.get("no_of_films") or 0)
+        for t in new_tests_snapshot:
+            films_count = int(t["no_of_films"] or 0)
             total_new_films += films_count
-            
             detail = TestBookingDetails(
                 booking_id=new_booking.id,
-                test_id=t['test_id'],
-                amount=Decimal(str(t['price'])),
-                quantity=t.get('quantity', 1),
+                test_id=t["test_id"],
+                amount=Decimal(str(t["amount"])),
+                quantity=t["quantity"],
                 no_of_films=films_count
             )
             db.session.add(detail)
 
-        # 7. Execute Film Usage at Branch B
+        # 7. Execute Film Usage at Target Branch
         if total_new_films > 0:
             add_film_usage(
                 booking_id=new_booking.id,
@@ -1616,21 +1656,18 @@ def transfer_and_rebook_service(old_booking_id, target_branch_id, new_tests, due
             )
 
         # 8. Write to Audit Log
-        try:
-            transfer_log = BookingTransferLog(
-                new_booking_id=new_booking.id,
-                old_booking_id=old_booking_id,
-                from_branch_id=current_branch_id,
-                to_branch_id=target_branch_id,
-                transferred_by_user_id=user_id,
-                patient_name=patient_name,
-                mr_no=mr_no,
-                transferred_cash_held=held_cash,
-                reason=reason
-            )
-            db.session.add(transfer_log)
-        except ImportError:
-            pass 
+        transfer_log = BookingTransferLog(
+            new_booking_id=new_booking.id,
+            old_booking_id=old_booking_id,
+            from_branch_id=current_branch_id,
+            to_branch_id=target_branch_id,
+            transferred_by_user_id=user_id,
+            patient_name=patient_name,
+            mr_no=mr_no,
+            transferred_cash_held=held_cash,
+            reason=reason
+        )
+        db.session.add(transfer_log)
 
         db.session.commit()
         return {"message": "Booking transferred successfully", "new_booking_id": new_booking.id}, 200
@@ -1642,6 +1679,74 @@ def transfer_and_rebook_service(old_booking_id, target_branch_id, new_tests, due
     except Exception as e:
         db.session.rollback()
         print(f"Error in transfer_and_rebook_service: {str(e)}")
+        return {"error": str(e)}, 500
+
+
+def get_transfer_history_service(branch_id, user_role, from_date=None, to_date=None):
+    """
+    Returns transfer log entries where the branch was either origin or destination.
+    Admin sees all entries; other roles see only entries involving their branch.
+    """
+    try:
+        q = (
+            db.session.query(
+                BookingTransferLog.id,
+                BookingTransferLog.old_booking_id,
+                BookingTransferLog.new_booking_id,
+                BookingTransferLog.patient_name,
+                BookingTransferLog.mr_no,
+                BookingTransferLog.transferred_cash_held,
+                BookingTransferLog.reason,
+                BookingTransferLog.transferred_at,
+                BookingTransferLog.from_branch_id,
+                BookingTransferLog.to_branch_id,
+                Branch.branch_name.label("from_branch_name"),
+                User.name.label("transferred_by_name")
+            )
+            .outerjoin(Branch, Branch.id == BookingTransferLog.from_branch_id)
+            .outerjoin(User, User.id == BookingTransferLog.transferred_by_user_id)
+            .order_by(BookingTransferLog.transferred_at.desc())
+        )
+
+        if user_role != "admin" and branch_id:
+            q = q.filter(
+                or_(
+                    BookingTransferLog.from_branch_id == branch_id,
+                    BookingTransferLog.to_branch_id == branch_id
+                )
+            )
+
+        if from_date and to_date:
+            start_utc, end_utc = get_lab_date_bounds(from_date, to_date, branch_id)
+            q = q.filter(BookingTransferLog.transferred_at >= start_utc, BookingTransferLog.transferred_at <= end_utc)
+
+        # Resolve to-branch names with a subquery to avoid cartesian join on two Branch aliases
+        to_branch_map = {
+            b.id: b.branch_name
+            for b in Branch.query.all()
+        }
+
+        rows = q.all()
+        result = []
+        for r in rows:
+            result.append({
+                "log_id": r.id,
+                "old_booking_id": r.old_booking_id,
+                "new_booking_id": r.new_booking_id,
+                "patient_name": r.patient_name,
+                "mr_no": r.mr_no,
+                "cash_held": float(r.transferred_cash_held or 0),
+                "reason": r.reason,
+                "transferred_at": to_local(r.transferred_at, "%Y-%m-%d %H:%M") if r.transferred_at else None,
+                "from_branch_id": r.from_branch_id,
+                "to_branch_id": r.to_branch_id,
+                "from_branch_name": r.from_branch_name or f"Branch {r.from_branch_id}",
+                "to_branch_name": to_branch_map.get(r.to_branch_id, f"Branch {r.to_branch_id}"),
+                "transferred_by": r.transferred_by_name or "System"
+            })
+        return result, 200
+    except Exception as e:
+        print(f"Error in get_transfer_history_service: {str(e)}")
         return {"error": str(e)}, 500
 
 # TECHNICIAN DASHBOARD & MEDIA DRIVE SERVICE

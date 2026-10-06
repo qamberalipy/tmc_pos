@@ -68,10 +68,16 @@
         
         <div class="d-flex justify-content-between mb-3 align-items-center">
             <h5 class="text-pos mb-0">Test Booking Management</h5>
-            <button id="btnBulkAssign" class="btn btn-primary shadow-sm" style="display: none;">
-                Assign to Doctor <span class="badge bg-white text-primary ms-1" id="selectedCountBadge">0</span>
-            </button>
+            <div class="d-flex gap-2 align-items-center">
+                <a href="/booking/transfers" class="btn btn-outline-info btn-sm shadow-sm">
+                    <i class="bi bi-clock-history me-1"></i>Transfer History
+                </a>
+                <button id="btnBulkAssign" class="btn btn-primary shadow-sm" style="display: none;">
+                    Assign to Doctor <span class="badge bg-white text-primary ms-1" id="selectedCountBadge">0</span>
+                </button>
+            </div>
         </div>
+
 
         <div class="row g-3 mb-4">
             <div class="col-md-5">
