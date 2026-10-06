@@ -441,21 +441,24 @@ def refund_booking_route(booking_id):
 @login_required
 def transfer_booking_rebook_route():
     data = request.get_json()
-    
+
     old_booking_id = data.get("booking_id")
     target_branch_id = data.get("target_branch_id")
-    new_tests = data.get("new_tests", []) # Expected: [{"test_id": 5, "price": 1000}, ...]
     due_amount = data.get("due_amount", 0)
     reason = data.get("reason", "")
-    
+    assigned_to = data.get("assigned_to")  # optional doctor assignment
+
     user_id = session.get("user_id")
     current_branch_id = session.get("branch_id")
 
-    if not all([old_booking_id, target_branch_id, new_tests]):
-        return jsonify({"error": "Missing required transfer fields"}), 400
+    if not all([old_booking_id, target_branch_id]):
+        return jsonify({"error": "booking_id and target_branch_id are required"}), 400
+    if not reason:
+        return jsonify({"error": "Transfer reason is required"}), 400
 
     result, status = booking_services.transfer_and_rebook_service(
-        old_booking_id, target_branch_id, new_tests, due_amount, reason, user_id, current_branch_id
+        old_booking_id, target_branch_id, due_amount, reason, user_id, current_branch_id,
+        assigned_to=assigned_to
     )
     return jsonify(result), status
 
@@ -463,6 +466,28 @@ def transfer_booking_rebook_route():
 @login_required
 def get_booking_details_api(booking_id):
     result, status = booking_services.get_single_booking_details(booking_id)
+    return jsonify(result), status
+
+
+@booking_bp.route("/transfers")
+@login_required
+def view_transfer_history():
+    try:
+        return render_template('transfer_history.html')
+    except Exception as e:
+        print(f"Error in view_transfer_history: {str(e)}")
+        return redirect(url_for('main.error_page'))
+
+
+@booking_bp.route("/transfers/data", methods=["GET"])
+@login_required
+def api_get_transfer_history():
+    branch_id = session.get("branch_id")
+    user_role = session.get("user_role", "")
+    from_date = request.args.get("from_date")
+    to_date = request.args.get("to_date")
+    
+    result, status = booking_services.get_transfer_history_service(branch_id, user_role, from_date, to_date)
     return jsonify(result), status
 
 # TECHNICIAN DASHBOARD & MEDIA DRIVE ROUTES

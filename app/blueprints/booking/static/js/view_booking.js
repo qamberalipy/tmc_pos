@@ -308,10 +308,15 @@ function getAllTestBookings() {
 
             let currentShareId = t.give_share_to || "";
 
-            // --- 2. NEW: Visual Badge for Transferred-In Bookings & Sent to Doctor ---
-            let transferBadge = t.is_transferred_in 
-                ? `<span class="badge bg-warning text-dark ms-1" style="font-size:0.65rem;"><i class="bi bi-box-arrow-in-right"></i> Transferred In</span>` 
-                : ``;
+            // --- 2. Badges ---
+            let transferBadge = "";
+            if (t.is_transferred_in) {
+                let logInfo = t.transfer_in_log
+                    ? ` <small class="opacity-75">(${t.transfer_in_log.transferred_at || ''})</small>`
+                    : "";
+                transferBadge = `<a href="${baseUrl}/booking/transfers" class="badge bg-warning text-dark ms-1 text-decoration-none" style="font-size:0.65rem;" title="View Transfer History">
+                    <i class="bi bi-box-arrow-in-right"></i> Transferred In${logInfo}</a>`;
+            }
 
             let sentBadge = t.sent_to_doctor
                 ? `<br><span class="badge bg-info text-dark ms-1" style="font-size:0.65rem;"><i class="bi bi-send-check"></i> Sent to Dr</span><br>`

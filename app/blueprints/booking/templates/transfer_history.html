@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+
+{% block stylesheets %}
+<link rel="stylesheet" href="https://cdn.datatables.net/1.10.22/css/jquery.dataTables.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/responsive/2.2.6/css/responsive.dataTables.min.css">
+<style>
+    .badge-origin  { background-color: #fff3cd; color: #856404; border: 1px solid #ffc107; }
+    .badge-target  { background-color: #d1e7dd; color: #0a3622; border: 1px solid #198754; }
+    .direction-arrow { font-size: 1.1rem; color: #0d6efd; }
+</style>
+{% endblock %}
+
+{% block user_page %}
+<div class="container-fluid py-3">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h4 class="fw-bold mb-0 text-dark">
+            <i class="bi bi-clock-history text-info me-2"></i> Branch Transfer History
+        </h4>
+        <a href="{{ url_for('booking.view_view_booking') }}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left"></i> Back to Bookings
+        </a>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body p-3">
+            <div class="row g-3">
+                <div class="col-md-5">
+                    <label class="form-label small fw-bold">From Date</label>
+                    <input type="date" class="form-control" id="from_date">
+                </div>
+                <div class="col-md-5">
+                    <label class="form-label small fw-bold">To Date</label>
+                    <input type="date" class="form-control" id="to_date">
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <button class="btn btn-dark w-100" id="searchBtn">
+                        <i class="bi bi-search me-2"></i>Filter
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white border-bottom py-3">
+            <h6 class="fw-bold mb-0 text-secondary">
+                <i class="bi bi-arrow-left-right"></i> All Transfers (Originated or Received at Your Branch)
+            </h6>
+        </div>
+        <div class="card-body p-3">
+            <div class="table-responsive">
+                <table id="transferTable" class="table table-hover align-middle" style="width:100%">
+                    <thead class="table-light">
+                        <tr>
+                            <th>#</th>
+                            <th>Date / Time</th>
+                            <th>Patient</th>
+                            <th>MR No</th>
+                            <th>Route</th>
+                            <th class="text-end">Cash Held</th>
+                            <th>Reason</th>
+                            <th>Transferred By</th>
+                            <th class="text-center">New Booking</th>
+                        </tr>
+                    </thead>
+                    <tbody id="transferTableBody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block javascript %}
+<script src="https://cdn.datatables.net/1.10.22/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<script>
+$(document).ready(function () {
+    // Set default dates (last 30 days)
+    const today = new Date();
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(today.getDate() - 30);
+    
+    $("#from_date").val(thirtyDaysAgo.toISOString().split('T')[0]);
+    $("#to_date").val(today.toISOString().split('T')[0]);
+
+    let dtable = $("#transferTable").DataTable({
+        destroy: true,
+        responsive: true,
+        pageLength: 20,
+        ordering: true,
+        order: [[1, 'desc']],
+        lengthChange: false,
+        language: {
+            emptyTable: "No transfers found for the selected period."
+        }
+    });
+
+    function loadTransfers() {
+        let fromDate = $("#from_date").val();
+        let toDate = $("#to_date").val();
+
+        myshowLoader();
+        axios.get(`${baseUrl}/booking/transfers/data`, {
+            params: {
+                from_date: fromDate,
+                to_date: toDate
+            }
+        })
+            .then(res => {
+                dtable.clear();
+                let rows = [];
+
+                res.data.forEach(function (r) {
+                    let newBookingLink = r.new_booking_id
+                        ? `<a href="${baseUrl}/booking/view/view-booking" class="btn btn-sm btn-outline-primary py-0 px-2" title="View Booking #${r.new_booking_id}">
+                               <i class="bi bi-box-arrow-up-right"></i> #${r.new_booking_id}
+                           </a>`
+                        : `<span class="text-muted small">—</span>`;
+
+                    rows.push([
+                        r.log_id,
+                        `<span class="text-muted small">${r.transferred_at || '—'}</span>`,
+                        `<div class="fw-bold">${r.patient_name || '—'}</div>`,
+                        `<span class="badge bg-light text-dark border">${r.mr_no || '—'}</span>`,
+                        `<div class="d-flex align-items-center gap-2 flex-wrap">
+                             <span class="badge badge-origin px-2 py-1">${r.from_branch_name}</span>
+                             <i class="bi bi-arrow-right direction-arrow"></i>
+                             <span class="badge badge-target px-2 py-1">${r.to_branch_name}</span>
+                         </div>`,
+                        `<div class="text-end fw-bold text-success">Rs. ${parseFloat(r.cash_held || 0).toFixed(2)}</div>`,
+                        `<span class="small text-muted" title="${r.reason || ''}">${(r.reason || '').substring(0, 50)}${(r.reason || '').length > 50 ? '…' : ''}</span>`,
+                        `<span class="small">${r.transferred_by || '—'}</span>`,
+                        newBookingLink
+                    ]);
+                });
+
+                dtable.rows.add(rows).draw(false);
+            })
+            .catch(err => {
+                console.error("Error loading transfers:", err);
+                showToastMessage("error", "Failed to load transfer history.");
+            })
+            .finally(() => myhideLoader());
+    }
+
+    $("#searchBtn").on("click", function() {
+        loadTransfers();
+    });
+
+    loadTransfers();
+});
+</script>
+{% endblock %}
