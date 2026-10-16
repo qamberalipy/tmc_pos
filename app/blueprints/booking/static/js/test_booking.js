@@ -1,4 +1,4 @@
-// -------------------------------
+﻿// -------------------------------
 // Global State
 // -------------------------------
 const bookingState = {
@@ -253,18 +253,31 @@ $(document).ready(function () {
             $(this).removeClass("input-error");
         }
     });
+    $("#new_ref_contact").on("input", function () {
+        if ($(this).val().trim() !== "") {
+            $(this).removeClass("input-error");
+        }
+    });
 
     // 4. Save New Referred
     $("#save_referred_btn").on("click", async function () {
         let name = $("#new_ref_name").val().trim();
+        let contact = $("#new_ref_contact").val().trim();
         let isDoctor = $("#new_ref_is_doctor").val() === "true";
 
         // UX: Validation
+        let refValid = true;
         if (!name) {
             $("#new_ref_name").addClass("input-error");
             $("#new_ref_name").focus();
-            return;
+            refValid = false;
         }
+        if (!contact) {
+            $("#new_ref_contact").addClass("input-error");
+            if (refValid) $("#new_ref_contact").focus();
+            refValid = false;
+        }
+        if (!refValid) return;
 
         try {
             myshowLoader();
@@ -274,20 +287,20 @@ $(document).ready(function () {
                 is_doctor: isDoctor,
                 location: "Main Branch",
                 specialization: "General",
-                contact_no: ""
+                contact_no: contact
             };
 
             let res = await axios.post(baseUrl + "/registrations/referred", payload);
 
             if (res.status === 201 || res.status === 200) {
                 let newId = res.data.id;
-                let newName = name;
+                let label = name + (contact ? " - " + contact : "");
 
                 showToastMessage("success", "Added successfully!");
                 $("#addReferredModal").modal("hide");
 
                 let targetSelect = isDoctor ? "#referred_dr" : "#referred_non_dr";
-                let newOption = new Option(newName, newId, true, true);
+                let newOption = new Option(label, newId, true, true);
                 $(targetSelect).append(newOption).trigger('change');
             }
         } catch (err) {
@@ -303,6 +316,7 @@ $(document).ready(function () {
 // Helper to open modal and set state
 function openReferredModal(isDoctor) {
     $("#new_ref_name").val("").removeClass("input-error");
+    $("#new_ref_contact").val("").removeClass("input-error");
     $("#new_ref_is_doctor").val(isDoctor);
 
     let title = isDoctor ? "Add New Doctor" : "Add New Referrer";
@@ -328,7 +342,7 @@ async function loadDropdowns() {
         populateTestDropdown(testRes.data || []);
 
     } catch (err) {
-        console.error("❌ Error loading dropdowns:", err);
+        console.error("âŒ Error loading dropdowns:", err);
         showToastMessage("error", "Failed to load dropdown data!");
     } finally {
         myhideLoader();
@@ -342,11 +356,35 @@ function populateReferredDropdowns(data) {
     let $doctorSelect = $("#referred_dr");
     let $nonDoctorSelect = $("#referred_non_dr");
 
+    // Destroy existing select2 instances before rebuilding options
+    if ($doctorSelect.hasClass("select2-hidden-accessible")) { $doctorSelect.select2("destroy"); }
+    if ($nonDoctorSelect.hasClass("select2-hidden-accessible")) { $nonDoctorSelect.select2("destroy"); }
+
     $doctorSelect.empty().append(`<option value="">-- Select Doctor --</option>`);
     $nonDoctorSelect.empty().append(`<option value="">-- Select Non-Doctor --</option>`);
 
-    doctors.forEach(d => $doctorSelect.append(`<option value="${d.id}">${d.name}</option>`));
-    nonDoctors.forEach(nd => $nonDoctorSelect.append(`<option value="${nd.id}">${nd.name}</option>`));
+    doctors.forEach(d => {
+        let label = d.name + (d.contact_no ? " - " + d.contact_no : "");
+        $doctorSelect.append(`<option value="${d.id}">${label}</option>`);
+    });
+    nonDoctors.forEach(nd => {
+        let label = nd.name + (nd.contact_no ? " - " + nd.contact_no : "");
+        $nonDoctorSelect.append(`<option value="${nd.id}">${label}</option>`);
+    });
+
+    // Re-init select2 on both dropdowns
+    $doctorSelect.select2({
+        theme: "bootstrap-5",
+        placeholder: "-- Select Doctor --",
+        allowClear: true,
+        width: "100%"
+    });
+    $nonDoctorSelect.select2({
+        theme: "bootstrap-5",
+        placeholder: "-- Select Non-Doctor --",
+        allowClear: true,
+        width: "100%"
+    });
 }
 
 function populateTestDropdown(data) {
@@ -405,7 +443,7 @@ async function addTestToState(testId) {
         renderBooking();
         showToastMessage("success", "Test added successfully!");
     } catch (err) {
-        console.error("❌ Error fetching test:", err);
+        console.error("âŒ Error fetching test:", err);
         showToastMessage("error", "Failed to fetch test details!");
     } finally {
         myhideLoader();
@@ -589,7 +627,7 @@ $(document).on("click", "#submit_booking", async function () {
             total_amount: bookingState.totals.amount,
             
             net_receivable: bookingState.totals.net, 
-            // --- 🔥 FIX END ---
+            // --- ðŸ”¥ FIX END ---
 
             payment_type: $("#payment_type").val() || "Cash",
             
@@ -677,7 +715,7 @@ $(document).on("click", "#submit_booking", async function () {
         }
 
     } catch (err) {
-        console.error("❌ Booking submission failed:", err);
+        console.error("âŒ Booking submission failed:", err);
         let msg = err.response?.data?.error || "Failed to create booking!";
         showToastMessage("error", msg);
     } finally {
