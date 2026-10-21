@@ -16,6 +16,24 @@ $(document).ready(function () {
 
     let dtable = null;
 
+    // Track tab counts locally from fetched datasets (no extra API calls)
+    let tabCounts = { all: 0, appt: 0, trans: 0 };
+
+    function updateTabBadges() {
+        $("#count_all").text(tabCounts.all);
+        $("#count_appt").text(tabCounts.appt);
+        $("#count_trans").text(tabCounts.trans);
+    }
+
+    function initTooltips() {
+        if (typeof bootstrap !== 'undefined' && bootstrap.Tooltip) {
+            var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+            tooltipTriggerList.map(function (el) {
+                return new bootstrap.Tooltip(el);
+            });
+        }
+    }
+
     function getFilterParams() {
         let params = {
             type: $("#filter_type").val() || 'All',
@@ -48,8 +66,38 @@ $(document).ready(function () {
             const tbody = $("#appointments_transfers_body");
             tbody.empty();
 
+            // Update live tab counts from fetched dataset
+            let activeFilterType = ($("#filter_type").val() || 'All').trim().toLowerCase();
+            if (activeFilterType === 'all') {
+                tabCounts.all = data.length;
+                tabCounts.appt = data.filter(r => r.is_appointment).length;
+                tabCounts.trans = data.filter(r => r.is_transferred_in).length;
+            } else if (activeFilterType === 'appointment') {
+                tabCounts.appt = data.length;
+            } else if (activeFilterType === 'transferred') {
+                tabCounts.trans = data.length;
+            }
+            updateTabBadges();
+
             if (data.length === 0) {
-                tbody.html(`<tr><td colspan="8" class="text-center text-muted py-4">No appointments or transferred bookings found for the selected period.</td></tr>`);
+                tbody.html(`
+                    <tr>
+                        <td colspan="8" class="text-center py-5 border-0">
+                            <div class="d-flex flex-column align-items-center justify-content-center py-3">
+                                <div class="empty-state-icon-circle mb-3">
+                                    <i class="bi bi-calendar-x text-secondary" style="font-size: 2rem; opacity: 0.6;"></i>
+                                </div>
+                                <h6 class="fw-bold text-dark mb-1">No appointments or transfers found</h6>
+                                <p class="text-muted small mb-3 text-center" style="max-width: 380px;">
+                                    No records match your active filter criteria. Try adjusting the date range, branch selection, or search query.
+                                </p>
+                                <button type="button" class="btn btn-sm btn-outline-secondary px-3" id="emptyResetBtn">
+                                    <i class="bi bi-arrow-counterclockwise me-1"></i> Reset Filters
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `);
                 $("#tableRecordCount").text("0 records found");
                 return;
             }
@@ -57,43 +105,55 @@ $(document).ready(function () {
             $("#tableRecordCount").text(`${data.length} record(s) found`);
 
             data.forEach(function (r) {
-                // Type badge (Appointment / Transferred In — pure span, NO links to prevent navigation)
+                // Type badge: softer pill shape, subordinate origin branch text
                 let typeBadge = '';
                 if (r.type === 'both') {
-                    typeBadge = `<span class="badge bg-info text-white me-1">Appointment</span>` +
-                                `<span class="badge bg-warning text-dark"><i class="bi bi-box-arrow-in-right"></i> Transferred In</span>`;
+                    typeBadge = `<div class="d-flex flex-column align-items-center gap-1">` +
+                                `<span class="badge badge-pill-soft badge-appt-soft"><i class="bi bi-calendar-event"></i> Appointment</span>` +
+                                `<span class="badge badge-pill-soft badge-trans-soft"><i class="bi bi-box-arrow-in-right"></i> Transferred In</span>` +
+                                `</div>`;
                 } else if (r.type === 'Appointment') {
-                    typeBadge = `<span class="badge bg-info text-white">Appointment</span>`;
+                    typeBadge = `<span class="badge badge-pill-soft badge-appt-soft"><i class="bi bi-calendar-event"></i> Appointment</span>`;
                 } else if (r.type === 'Transferred In') {
                     let fromNote = (r.transfer_log && r.transfer_log.from_branch_name)
-                        ? `<div class="text-muted" style="font-size: 0.7rem;">From: ${r.transfer_log.from_branch_name}</div>`
+                        ? `<div class="origin-branch-text"><i class="bi bi-geo-alt opacity-75"></i> From: ${r.transfer_log.from_branch_name}</div>`
                         : '';
-                    typeBadge = `<span class="badge bg-warning text-dark"><i class="bi bi-box-arrow-in-right"></i> Transferred In</span>${fromNote}`;
+                    typeBadge = `<span class="badge badge-pill-soft badge-trans-soft"><i class="bi bi-box-arrow-in-right"></i> Transferred In</span>${fromNote}`;
                 } else {
-                    typeBadge = `<span class="badge bg-secondary">${r.type || 'Normal'}</span>`;
+                    typeBadge = `<span class="badge badge-pill-soft bg-light text-secondary border">${r.type || 'Normal'}</span>`;
                 }
 
-                // Amount breakdown
+                // Amount breakdown: compact 3-line stack with muted labels vs bold colored values
                 let totalAmount = parseFloat(r.total_amount || 0).toFixed(2);
                 let paidAmount = parseFloat(r.paid_amount || 0).toFixed(2);
-                let dueAmount = parseFloat(r.due_amount || 0).toFixed(2);
-                let dueClass = parseFloat(r.due_amount || 0) > 0 ? 'text-danger fw-bold' : 'text-muted';
+                let dueVal = parseFloat(r.due_amount || 0);
+                let dueAmount = dueVal.toFixed(2);
+                let dueValClass = dueVal > 0 ? 'text-danger' : 'text-muted';
 
                 let amountHtml = `
-                    <div class="amount-cell">
-                        <div>Total: <b>Rs. ${totalAmount}</b></div>
-                        <div class="text-success">Paid: <b>Rs. ${paidAmount}</b></div>
-                        <div class="${dueClass}">Due: <b>Rs. ${dueAmount}</b></div>
+                    <div class="amount-stack">
+                        <div class="d-flex justify-content-between align-items-center gap-2">
+                            <span class="amount-stack-label">Total:</span>
+                            <span class="amount-stack-val text-dark">Rs. ${totalAmount}</span>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center gap-2">
+                            <span class="amount-stack-label">Paid:</span>
+                            <span class="amount-stack-val text-success">Rs. ${paidAmount}</span>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center gap-2">
+                            <span class="amount-stack-label">Due:</span>
+                            <span class="amount-stack-val ${dueValClass}">Rs. ${dueAmount}</span>
+                        </div>
                     </div>`;
 
-                // Status badge
+                // Status badge: consistent sizing and padding with Type badge
                 let statusBadge = '';
                 if (r.status === 'Paid') {
-                    statusBadge = `<span class="badge bg-success">Paid</span>`;
+                    statusBadge = `<span class="badge badge-pill-soft status-pill-paid"><i class="bi bi-check-circle-fill" style="font-size: 0.65rem;"></i> Paid</span>`;
                 } else if (r.status === 'Partial') {
-                    statusBadge = `<span class="badge bg-warning text-dark">Partial</span>`;
+                    statusBadge = `<span class="badge badge-pill-soft status-pill-partial"><i class="bi bi-pie-chart-fill" style="font-size: 0.65rem;"></i> Partial</span>`;
                 } else {
-                    statusBadge = `<span class="badge bg-danger">Unpaid</span>`;
+                    statusBadge = `<span class="badge badge-pill-soft status-pill-unpaid"><i class="bi bi-exclamation-circle-fill" style="font-size: 0.65rem;"></i> Unpaid</span>`;
                 }
 
                 // Action buttons: View link to view_booking + Convert button
@@ -101,34 +161,34 @@ $(document).ready(function () {
                 let convertBtnHtml = '';
                 if (r.is_appointment && !r.is_transferred_in) {
                     convertBtnHtml = `
-                        <button type="button" class="btn btn-sm btn-outline-success py-0 px-2 convert-appointment-btn" 
+                        <button type="button" class="btn btn-sm btn-outline-success convert-appointment-btn" 
                                 data-id="${r.booking_id}" 
                                 title="Confirm Appointment → Normal Booking (deducts films)">
-                            <i class="bi bi-calendar2-check"></i> Convert
+                            <i class="bi bi-calendar2-check me-1"></i>Convert
                         </button>`;
                 }
 
                 let viewBtnHtml = `
                     <a href="${baseUrl}/booking/view/view-booking" 
-                       class="btn btn-sm btn-outline-primary py-0 px-2" 
-                       title="View Booking">
-                        <i class="bi bi-eye"></i> View
+                       class="btn btn-sm btn-outline-primary" 
+                       title="View Booking Details">
+                        <i class="bi bi-eye me-1"></i>View
                     </a>`;
 
                 let rowHtml = `
                     <tr>
-                        <td><span class="badge bg-light text-dark border font-monospace">${r.mr_no || 'N/A'}</span></td>
+                        <td><span class="badge bg-light text-dark border font-monospace px-2 py-1">${r.mr_no || 'N/A'}</span></td>
                         <td>
                             <div class="fw-bold text-dark">${r.patient_name || '—'}</div>
                             <div class="text-muted small">${r.contact_no || ''} ${r.age ? '(' + r.age + ' ' + (r.age_unit || 'Y') + ')' : ''}</div>
                         </td>
                         <td><span class="badge bg-secondary-subtle text-secondary-emphasis border px-2 py-1">${r.branch_name || 'N/A'}</span></td>
                         <td class="text-center">${typeBadge}</td>
-                        <td><span class="small">${r.date || '—'}</span></td>
+                        <td><span class="small text-secondary">${r.date || '—'}</span></td>
                         <td>${amountHtml}</td>
                         <td class="text-center">${statusBadge}</td>
                         <td class="text-center">
-                            <div class="d-flex justify-content-center align-items-center gap-1">
+                            <div class="d-flex justify-content-center align-items-center gap-1 action-btn-group" style="min-width: 140px;">
                                 ${viewBtnHtml}
                                 ${convertBtnHtml}
                             </div>
@@ -147,7 +207,13 @@ $(document).ready(function () {
                 order: [[4, 'desc']], // Sort by Date descending
                 lengthChange: false,
                 language: {
-                    emptyTable: "No appointments or transfers found."
+                    emptyTable: `
+                        <div class="py-4 text-center">
+                            <i class="bi bi-calendar-x text-muted d-block mb-2" style="font-size: 2rem; opacity: 0.5;"></i>
+                            <h6 class="fw-bold text-secondary mb-1">No records found</h6>
+                            <div class="text-muted small">No appointments or transfers match the selected filters.</div>
+                        </div>
+                    `
                 }
             });
         })
@@ -191,6 +257,26 @@ $(document).ready(function () {
     // Search Button
     $("#searchBtn").on("click", function (e) {
         e.preventDefault();
+        loadData();
+    });
+
+    // Reset Filters Button
+    $(document).on("click", "#resetBtn, #emptyResetBtn", function (e) {
+        e.preventDefault();
+        $("#from_date").val(formatDate(thirtyDaysAgo));
+        $("#to_date").val(formatDate(today));
+        $("#search_input").val("");
+
+        let $branch = $("#filter_branch");
+        if ($branch.length) {
+            let defaultBranchVal = $branch.find("option:first").val();
+            $branch.val(defaultBranchVal);
+        }
+
+        $(".type-tab").removeClass("active");
+        $(".type-tab[data-type='All']").addClass("active");
+        $("#filter_type").val("All");
+
         loadData();
     });
 
@@ -275,6 +361,8 @@ $(document).ready(function () {
         doc.save("Appointments_and_Transfers.pdf");
     });
 
-    // 7. Initial Load on DOM ready
+    // 7. Initial Setup & Load on DOM ready
+    initTooltips();
     loadData();
 });
+
