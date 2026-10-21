@@ -211,12 +211,15 @@ def convert_appointment(booking_id):
 
 
 @booking_bp.route("/convert/<int:booking_id>", methods=["POST"])
+@booking_bp.route("/convert_booking/<int:booking_id>", methods=["POST"])
+@booking_bp.route("/convert_booking", methods=["POST"])
 @login_required
-def convert_booking_api(booking_id):
+def convert_booking_api(booking_id=None):
     """
     Unified conversion endpoint.
 
     Body (JSON):
+      booking_id       : int  (required if not in URL path)
       target_type      : "normal" | "appointment" | "transfer"
       reason           : str  (required for transfers)
       target_branch_id : int  (required for transfers)
@@ -231,6 +234,12 @@ def convert_booking_api(booking_id):
         return jsonify({"error": "Unauthorized"}), 401
 
     data = request.get_json() or {}
+    if not booking_id:
+        booking_id = data.get("booking_id")
+
+    if not booking_id:
+        return jsonify({"error": "booking_id is required"}), 400
+
     target_type      = data.get("target_type")
     target_branch_id = data.get("target_branch_id")
     reason           = data.get("reason")
@@ -537,6 +546,55 @@ def api_get_transfer_history():
     
     result, status = booking_services.get_transfer_history_service(branch_id, user_role, from_date, to_date)
     return jsonify(result), status
+
+
+@booking_bp.route("/appointments-transfers", methods=["GET"])
+@login_required
+def view_appointments_transfers():
+    """Renders the Appointments & Transfers list page."""
+    try:
+        from app.models.branch import Branch
+        branches = Branch.query.all()
+        session_branch = None
+        if session.get("branch_id"):
+            session_branch = Branch.query.get(session.get("branch_id"))
+        session_branch_name = session_branch.branch_name if session_branch else "Current Branch"
+
+        return render_template(
+            "appointments_transfers.html",
+            branches=branches,
+            session_branch_name=session_branch_name
+        )
+    except Exception as e:
+        print(f"Error in view_appointments_transfers: {str(e)}")
+        return redirect(url_for("main.error_page"))
+
+
+@booking_bp.route("/appointments-transfers/data", methods=["GET"])
+@login_required
+def api_get_appointments_transfers():
+    """Returns JSON list for appointments and transfers."""
+    user_role = session.get("user_role", "")
+    if user_role == "admin":
+        branch_id = request.args.get("branch_id")
+    else:
+        branch_id = session.get("branch_id")
+
+    filter_type = request.args.get("type", "All")
+    from_date = request.args.get("from_date")
+    to_date = request.args.get("to_date")
+    search_term = request.args.get("search")
+
+    result, status = booking_services.get_appointments_and_transfers_service(
+        branch_id=branch_id,
+        user_role=user_role,
+        filter_type=filter_type,
+        from_date=from_date,
+        to_date=to_date,
+        search_term=search_term
+    )
+    return jsonify(result), status
+
 
 # TECHNICIAN DASHBOARD & MEDIA DRIVE ROUTES
 

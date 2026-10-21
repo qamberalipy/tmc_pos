@@ -37,6 +37,7 @@ MENU = {
             "children": [
                 {"label": "Test Booking", "icon": "bi-clipboard-plus", "endpoint": "booking.view_test_booking"},
                 {"label": "View Booking", "icon": "bi-list-check", "endpoint": "booking.view_view_booking"},
+                {"label": "Appointments & Transfers", "icon": "bi-calendar2-range", "endpoint": "booking.view_appointments_transfers"},
                 {"label": "Book Results", "icon": "bi-file-earmark-medical", "endpoint": "booking.view_booking_result"},
                 {"label": "View Dues", "icon": "bi-cash-stack", "endpoint": "booking.view_dues"},
                 {"label": "Transfer History", "icon": "bi-clock-history", "endpoint": "booking.view_transfer_history"}
@@ -112,6 +113,7 @@ MENU = {
             "children": [
                 {"label": "Test Booking", "icon": "bi-clipboard-plus", "endpoint": "booking.view_test_booking"},
                 {"label": "View Booking", "icon": "bi-list-check", "endpoint": "booking.view_view_booking"},
+                {"label": "Appointments & Transfers", "icon": "bi-calendar2-range", "endpoint": "booking.view_appointments_transfers"},
                 {"label": "Book Results", "icon": "bi-file-earmark-medical", "endpoint": "booking.view_booking_result"},
                 {"label": "View Dues", "icon": "bi-cash-stack", "endpoint": "booking.view_dues"},
                 {"label": "Technician Drive", "icon": "bi bi-folder2-open", "endpoint": "booking.view_technician_drive"},
