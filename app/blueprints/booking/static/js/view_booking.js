@@ -326,22 +326,29 @@ function getAllTestBookings() {
                 ? `<span class="badge bg-info ms-1">Appointment</span>`
                 : ``;
 
-            // --- 3. UPDATE: Add Transfer Button & Apply Security Locks ---
-            // We disable/hide certain buttons if the booking was transferred in from another branch
-            let transferBtnHtml = !t.is_transferred_in 
+            // --- 3. UPDATE: Action Buttons with full terminal-state enforcement ---
+            // If is_transferred_in == True the booking is terminal: NO convert/transfer/refund/share.
+
+            let transferBtnHtml = (!t.is_transferred_in)
                 ? `<a href="${baseUrl}/booking/transfer/${t.booking_id}" class="btn btn-action text-info shadow-sm" title="Transfer to Another Branch"><i class="bi bi-arrow-left-right"></i></a>` 
                 : ``;
 
-            let refundBtnHtml = !t.is_transferred_in
-                ? `<button class="btn btn-action text-danger shadow-sm refund-booking" data-id="${t.booking_id}" title="Refund & Delete"><i class="bi bi-arrow-counterclockwise"></i></button>`
+            let refundBtnHtml = (!t.is_transferred_in)
+                ? `<button class="btn btn-action text-danger shadow-sm refund-booking" data-id="${t.booking_id}" title="Refund &amp; Delete"><i class="bi bi-arrow-counterclockwise"></i></button>`
                 : ``;
 
-            let shareBtnHtml = !t.is_transferred_in
+            let shareBtnHtml = (!t.is_transferred_in)
                 ? `<button class="btn btn-action text-warning shadow-sm edit-share" data-id="${t.booking_id}" data-share="${currentShareId}" title="Update Share"><i class="bi bi-person-gear"></i></button>`
                 : ``;
 
-            let convertBtnHtml = t.is_appointment
-                ? `<button class="btn btn-action text-success shadow-sm convert-appointment" data-id="${t.booking_id}" title="Convert to Booking (deducts films)"><i class="bi bi-calendar2-check"></i></button>`
+            // Convert Appointment → Normal (Conversion #1): only for appointments, never for transferred-in
+            let convertToNormalBtnHtml = (t.is_appointment && !t.is_transferred_in)
+                ? `<button class="btn btn-action text-success shadow-sm convert-appointment" data-id="${t.booking_id}" title="Confirm Appointment → Normal Booking (deducts films)"><i class="bi bi-calendar2-check"></i></button>`
+                : ``;
+
+            // Convert Normal → Appointment (Conversion #2): only for non-appointments, never for transferred-in
+            let convertToApptBtnHtml = (!t.is_appointment && !t.is_transferred_in)
+                ? `<button class="btn btn-action text-primary shadow-sm convert-to-appointment" data-id="${t.booking_id}" title="Revert to Appointment (refunds films)"><i class="bi bi-calendar-plus"></i></button>`
                 : ``;
 
             // 4. ASSEMBLE ACTIONS
@@ -355,10 +362,12 @@ function getAllTestBookings() {
                 <button class="btn btn-action text-dark shadow-sm edit-films" data-id="${t.booking_id}" data-test-ids="${allTestIdsStr}" title="Edit Films"><i class="bi bi-plus-square"></i></button>
                 
                 ${shareBtnHtml}
-                ${convertBtnHtml}
+                ${convertToNormalBtnHtml}
+                ${convertToApptBtnHtml}
                 ${transferBtnHtml}
                 ${refundBtnHtml}
             </div>`;
+
 
             // 5. PUSH TO TABLE ROWS
             rowsToAdd.push([
@@ -386,15 +395,15 @@ function rebindTableEvents() {
     $("#testReg_table").off("click", ".convert-appointment").on("click", ".convert-appointment", function () {
         const bookingId = $(this).data("id");
         Swal.fire({
-            title: "Convert to Booking?",
-            text: "Convert this appointment to a normal booking? Films will be deducted now.",
+            title: "Confirm Appointment?",
+            text: "Convert this appointment to a confirmed booking? Films will be deducted from inventory now.",
             icon: "warning",
             showCancelButton: true,
             confirmButtonColor: "#198754",
-            confirmButtonText: "Yes, Convert",
+            confirmButtonText: "Yes, Confirm Booking",
             showLoaderOnConfirm: true,
             preConfirm: () => {
-                return axios.post(`${baseUrl}/booking/convert-appointment/${bookingId}`)
+                return axios.post(`${baseUrl}/booking/convert/${bookingId}`, { target_type: "normal" })
                     .then(res => res.data)
                     .catch(err => {
                         Swal.showValidationMessage(`Conversion failed: ${err.response?.data?.error || err.message}`);
@@ -403,13 +412,55 @@ function rebindTableEvents() {
             allowOutsideClick: () => !Swal.isLoading()
         }).then((result) => {
             if (result.isConfirmed) {
+                Swal.fire({ title: "Success", text: "Appointment confirmed as a booking.", icon: "success", timer: 2000, showConfirmButton: false });
+                getAllTestBookings();
+            }
+        });
+    });
+
+    $("#testReg_table").off("click", ".convert-to-appointment").on("click", ".convert-to-appointment", function () {
+        const bookingId = $(this).data("id");
+
+        // Client-side guard: check for issued films before hitting the server
+        let bookingData = window.bookingsMap[bookingId];
+        if (bookingData && bookingData.test_booking_details) {
+            let issuedTests = bookingData.test_booking_details.filter(t => t.film_issued === true);
+            if (issuedTests.length > 0) {
                 Swal.fire({
-                    title: "Success",
-                    text: "Converted successfully.",
-                    icon: "success",
-                    timer: 2000,
-                    showConfirmButton: false
+                    icon: 'error',
+                    title: 'Cannot Revert to Appointment',
+                    html: `<b>${issuedTests.length} test(s)</b> have films already marked as <b>ISSUED</b>.<br>` +
+                          `Revert all film statuses to <b>Pending</b> before converting.`,
+                    confirmButtonColor: "#d33"
                 });
+                return;
+            }
+        }
+
+        Swal.fire({
+            title: "Revert to Appointment?",
+            html: "This will <b>refund all consumed films</b> back to inventory and mark this booking as an Appointment again.<br><br>" +
+                  "<small class='text-muted'>No cash is moved. The booking remains on the books.</small>",
+            icon: "question",
+            showCancelButton: true,
+            confirmButtonColor: "#0d6efd",
+            confirmButtonText: "Yes, Revert to Appointment",
+            showLoaderOnConfirm: true,
+            preConfirm: () => {
+                return axios.post(`${baseUrl}/booking/convert/${bookingId}`, { target_type: "appointment" })
+                    .then(res => res.data)
+                    .catch(err => {
+                        Swal.showValidationMessage(`Failed: ${err.response?.data?.error || err.message}`);
+                    });
+            },
+            allowOutsideClick: () => !Swal.isLoading()
+        }).then((result) => {
+            if (result.isConfirmed) {
+                let msg = result.value.message || "Booking reverted to Appointment.";
+                if (result.value.films_refunded > 0) {
+                    msg += ` (${result.value.films_refunded} films returned to inventory)`;
+                }
+                Swal.fire({ title: "Reverted", text: msg, icon: "success", timer: 2500, showConfirmButton: false });
                 getAllTestBookings();
             }
         });
