@@ -2262,3 +2262,178 @@ def add_chat_message(booking_id, user_id, message_text, media_payloads=None):
         db.session.rollback()
         print(f"Error [add_chat_message]: {str(e)}")
         return {"error": "Failed to add chat message"}, 500
+
+
+def get_appointments_and_transfers_service(branch_id=None, user_role=None, filter_type='All', from_date=None, to_date=None, search_term=None):
+    """
+    Returns TestBooking records where is_appointment == True OR is_transferred_in == True.
+    Filters:
+      - filter_type: 'Appointment', 'Transferred', 'All'
+      - from_date / to_date: ISO date strings using get_lab_date_bounds
+      - branch_id: scoped to user's branch for non-admins; admin can filter or view all
+      - search_term: patient name / MR No / contact no
+    Each row includes a resolved 'type' field: 'Appointment', 'Transferred In', or 'both'.
+    """
+    try:
+        start_utc = None
+        end_utc = None
+
+        if from_date and to_date:
+            start_utc, end_utc = get_lab_date_bounds(from_date, to_date, branch_id if branch_id else None)
+        elif from_date or to_date:
+            raise BadRequest("Both from_date and to_date are required for date filtering.")
+
+        query = (
+            db.session.query(
+                TestBooking.id,
+                TestBooking.patient_name,
+                TestBooking.mr_no,
+                TestBooking.contact_no,
+                TestBooking.gender,
+                TestBooking.age,
+                TestBooking.age_unit,
+                Referred.name.label("referred_dr"),
+                TestBooking.net_receivable,
+                TestBooking.total_amount,
+                TestBooking.discount_value,
+                TestBooking.is_transferred_in,
+                TestBooking.is_appointment,
+                TestBooking.paid_amount,
+                TestBooking.due_amount,
+                TestBooking.create_at,
+                TestBooking.update_at,
+                TestBooking.branch_id,
+                Branch.branch_name.label("branch_name"),
+                User.name.label("created_by_name"),
+                func.json_agg(
+                    func.json_build_object(
+                        'id', Test_registration.id,
+                        'test_name', Test_registration.test_name,
+                        'film_issued', TestBookingDetails.film_issued
+                    )
+                ).label("test_booking_details")
+            )
+            .outerjoin(TestBookingDetails, TestBookingDetails.booking_id == TestBooking.id)
+            .outerjoin(Test_registration, Test_registration.id == TestBookingDetails.test_id)
+            .outerjoin(Referred, and_(Referred.id == TestBooking.referred_dr, Referred.is_doctor == True))
+            .outerjoin(Branch, Branch.id == TestBooking.branch_id)
+            .outerjoin(User, User.id == TestBooking.create_by)
+            .group_by(
+                TestBooking.id,
+                Branch.branch_name,
+                User.name,
+                Referred.name
+            )
+        )
+
+        # 1. Type filter
+        t_clean = (filter_type or "").strip().lower()
+        if t_clean == "appointment":
+            query = query.filter(TestBooking.is_appointment == True)
+        elif t_clean in ("transferred", "transferred in", "transfer"):
+            query = query.filter(TestBooking.is_transferred_in == True)
+        else:
+            query = query.filter(or_(TestBooking.is_appointment == True, TestBooking.is_transferred_in == True))
+
+        # 2. Branch scoping
+        if user_role != "admin":
+            if branch_id:
+                query = query.filter(TestBooking.branch_id == branch_id)
+        else:
+            if branch_id and str(branch_id).lower() not in ("all", "", "none"):
+                query = query.filter(TestBooking.branch_id == int(branch_id))
+
+        # 3. Date bounds (using get_lab_date_bounds pattern from get_all_test_bookings)
+        if start_utc and end_utc:
+            query = query.filter(
+                and_(
+                    TestBooking.create_at >= start_utc,
+                    TestBooking.create_at <= end_utc
+                )
+            )
+
+        # 4. Search filter
+        if search_term and search_term.strip():
+            s = f"%{search_term.strip()}%"
+            query = query.filter(
+                or_(
+                    TestBooking.patient_name.ilike(s),
+                    TestBooking.mr_no.ilike(s),
+                    TestBooking.contact_no.ilike(s)
+                )
+            )
+
+        query = query.order_by(TestBooking.create_at.desc())
+        rows = query.all()
+
+        results = []
+        for r in rows:
+            # Resolved type: 'both', 'Appointment', or 'Transferred In'
+            if r.is_appointment and r.is_transferred_in:
+                resolved_type = "both"
+            elif r.is_appointment:
+                resolved_type = "Appointment"
+            elif r.is_transferred_in:
+                resolved_type = "Transferred In"
+            else:
+                resolved_type = "Normal"
+
+            due_val = float(r.due_amount or 0)
+            paid_val = float(r.paid_amount or 0)
+            total_val = float(r.total_amount) if getattr(r, 'total_amount', None) is not None else float((r.net_receivable or 0) + (r.discount_value or 0))
+
+            if due_val <= 0:
+                status = "Paid"
+            elif paid_val > 0:
+                status = "Partial"
+            else:
+                status = "Unpaid"
+
+            transfer_log = None
+            if r.is_transferred_in:
+                log = BookingTransferLog.query.filter_by(new_booking_id=r.id).first()
+                if log:
+                    from_branch = Branch.query.get(log.from_branch_id) if log.from_branch_id else None
+                    transfer_log = {
+                        "log_id": log.id,
+                        "from_branch_id": log.from_branch_id,
+                        "from_branch_name": from_branch.branch_name if from_branch else f"Branch #{log.from_branch_id}",
+                        "transferred_at": to_local(log.transferred_at, "%Y-%m-%d %H:%M") if log.transferred_at else None,
+                        "reason": log.reason,
+                        "cash_held": float(log.transferred_cash_held or 0)
+                    }
+
+            results.append({
+                "booking_id": r.id,
+                "mr_no": r.mr_no,
+                "patient_name": r.patient_name,
+                "contact_no": r.contact_no or "",
+                "gender": r.gender or "",
+                "age": r.age,
+                "age_unit": r.age_unit or "Years",
+                "referred_dr": r.referred_dr or "Self",
+                "branch_id": r.branch_id,
+                "branch_name": r.branch_name or "N/A",
+                "is_appointment": bool(r.is_appointment),
+                "is_transferred_in": bool(r.is_transferred_in),
+                "type": resolved_type,
+                "date": to_local(r.create_at, "%Y-%m-%d") if r.create_at else "",
+                "datetime": to_local(r.create_at, "%Y-%m-%d %I:%M %p") if r.create_at else "",
+                "total_amount": total_val,
+                "paid_amount": paid_val,
+                "due_amount": due_val,
+                "status": status,
+                "test_booking_details": r.test_booking_details,
+                "transfer_log": transfer_log,
+                "created_by": r.created_by_name or ""
+            })
+
+        return results, 200
+
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        return {"error": str(e.__dict__.get("orig", e))}, 500
+    except BadRequest as e:
+        return {"error": str(e)}, 400
+    except Exception as e:
+        return {"error": str(e)}, 500
