@@ -14,7 +14,7 @@ from app.helper import convert_to_utc
 from app.helper import get_lab_date_bounds
 from app.utils.timezone import to_local
 from sqlalchemy.ext.mutable import MutableDict, MutableList
-from app.models.test_booking import TestFilmUsage, TestBooking,FilmInventoryTransaction,BookingTransferLog,TechnicianBookingMedia
+from app.models.test_booking import TestFilmUsage, TestBooking,FilmInventoryTransaction,BookingTransferLog,TechnicianBookingMedia,BookingConversionLog
 from app.models.test_registration import Test_registration
 from app.models.doctor_reporting_details import DoctorReportingdetails
 from app.models.technician_chat_log import TechnicianChatLog
@@ -184,11 +184,18 @@ def create_test_booking(data):
             return {"error": str(e)}, 400
 
 def convert_appointment_to_booking(booking_id, converted_by):
+    """
+    Conversion #1: Appointment → Normal (in-place).
+    Deducts films, writes conversion audit log.
+    Blocked if booking is transferred-in (terminal state).
+    """
     booking = TestBooking.query.get(booking_id)
     if not booking:
         return {"error": "Booking not found"}, 404
     if not booking.is_appointment:
         return {"error": "Booking is not an appointment or already converted"}, 400
+    if booking.is_transferred_in:
+        return {"error": "This booking was transferred in and cannot be converted"}, 403
 
     total_films = db.session.query(func.coalesce(func.sum(TestBookingDetails.no_of_films), 0)).filter(
         TestBookingDetails.booking_id == booking_id).scalar()
@@ -196,6 +203,7 @@ def convert_appointment_to_booking(booking_id, converted_by):
     booking.is_appointment = False
     db.session.flush()
 
+    films_delta = 0
     if total_films and total_films > 0:
         add_film_usage(
             booking_id=booking_id,
@@ -205,9 +213,136 @@ def convert_appointment_to_booking(booking_id, converted_by):
             branch_id=booking.branch_id,
             reason="Converted from Appointment"
         )
+        films_delta = -int(total_films)  # negative = inventory consumed
+
+    # Write conversion audit log
+    conv_log = BookingConversionLog(
+        booking_id=booking_id,
+        mr_no=booking.mr_no,
+        from_type="appointment",
+        to_type="normal",
+        films_delta=films_delta,
+        cash_held_amount=Decimal("0"),
+        reason="Appointment converted to normal booking",
+        converted_by_user_id=converted_by
+    )
+    db.session.add(conv_log)
 
     db.session.commit()
     return {"message": "Appointment converted to booking successfully", "booking_id": booking_id}, 200
+
+
+def convert_normal_to_appointment(booking_id, converted_by):
+    """
+    Conversion #2: Normal → Appointment (in-place).
+    Refunds any consumed films back to branch inventory, resets film state.
+    Writes conversion audit log.
+
+    BLOCKED if:
+      - Any TestBookingDetails.film_issued == True  (films already physically issued)
+      - DoctorReportingdetails exists for this booking (report already sent/assigned)
+      - Booking is already an appointment
+      - Booking is transferred-in (terminal state)
+    """
+    try:
+        booking = TestBooking.query.get(booking_id)
+        if not booking:
+            return {"error": "Booking not found"}, 404
+        if booking.is_appointment:
+            return {"error": "Booking is already an appointment"}, 400
+        if booking.is_transferred_in:
+            return {"error": "This booking was transferred in and cannot be converted"}, 403
+
+        # Guard 1: any film physically issued?
+        issued_count = db.session.query(func.count(TestBookingDetails.id)).filter(
+            TestBookingDetails.booking_id == booking_id,
+            TestBookingDetails.film_issued == True
+        ).scalar() or 0
+        if issued_count > 0:
+            return {
+                "error": f"{issued_count} test(s) have films marked as ISSUED. "
+                         "Revert all film statuses to Pending before converting to Appointment."
+            }, 400
+
+        # Guard 2: doctor report already assigned?
+        doctor_report_exists = db.session.query(DoctorReportingdetails.id).filter(
+            DoctorReportingdetails.booking_id == str(booking_id),
+            DoctorReportingdetails.is_active == True
+        ).first()
+        if doctor_report_exists:
+            return {
+                "error": "This booking has already been sent to a doctor for reporting. "
+                         "Remove the doctor assignment before converting to Appointment."
+            }, 400
+
+        # --- Refund films back to inventory ---
+        film_usages = TestFilmUsage.query.filter_by(booking_id=booking_id).all()
+        total_films_refunded = 0
+        for usage in film_usages:
+            total_films_refunded += usage.films_used
+            # Create inventory IN transaction (returns films to shelf)
+            inventory_transaction(
+                quantity=usage.films_used,
+                transaction_type="IN",
+                handled_by=converted_by,
+                branch_id=booking.branch_id,
+                booking_id=booking_id,
+                reason=f"Refund: Normal→Appointment conversion for MR {booking.mr_no}"
+            )
+            db.session.delete(usage)
+
+        # Also zero out inventory OUT transactions linked to this booking
+        # (detach from booking so the balance ledger doesn't double-count)
+        old_out_txns = FilmInventoryTransaction.query.filter_by(
+            booking_id=booking_id,
+            transaction_type="OUT"
+        ).all()
+        for txn in old_out_txns:
+            txn.booking_id = None
+            db.session.add(txn)
+
+        # Reset film counters on booking and detail rows
+        booking.total_no_of_films_used = 0
+        db.session.add(booking)
+
+        details = TestBookingDetails.query.filter_by(booking_id=booking_id).all()
+        for d in details:
+            d.film_issued = False
+            db.session.add(d)
+
+        # --- Flip booking type ---
+        booking.is_appointment = True
+        booking.update_by = converted_by
+        booking.update_at = datetime.now(timezone.utc)
+        db.session.add(booking)
+
+        # Write conversion audit log
+        conv_log = BookingConversionLog(
+            booking_id=booking_id,
+            mr_no=booking.mr_no,
+            from_type="normal",
+            to_type="appointment",
+            films_delta=total_films_refunded,   # positive = returned to inventory
+            cash_held_amount=Decimal("0"),
+            reason="Normal booking converted back to Appointment",
+            converted_by_user_id=converted_by
+        )
+        db.session.add(conv_log)
+
+        db.session.commit()
+        return {
+            "message": "Booking converted to Appointment successfully",
+            "booking_id": booking_id,
+            "films_refunded": total_films_refunded
+        }, 200
+
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        return {"error": "Database error: " + str(e.__dict__.get("orig", e))}, 500
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error [convert_normal_to_appointment]: {str(e)}")
+        return {"error": str(e)}, 500
 
 def _generate_mr_no():
     now = datetime.now(timezone.utc)
@@ -1505,16 +1640,25 @@ def process_refund_service(booking_id, user_id, branch_id, refund_reason=""):
         print(f"Error processing refund: {str(e)}")
         return {"error": str(e)}, 500
     
-def transfer_and_rebook_service(old_booking_id, target_branch_id, due_amount, reason, user_id, current_branch_id, assigned_to=None):
+def transfer_and_rebook_service(old_booking_id, target_branch_id, due_amount, reason, user_id, current_branch_id, assigned_to=None, source_is_appointment=False):
     """
-    Transfers a booking to a target branch.
+    Transfers a booking to a target branch (Conversion #3 / #4).
     Tests are automatically copied from the original booking's TestBookingDetails —
     no caller-supplied new_tests list needed (catalog is unified across branches).
+
+    source_is_appointment=True  →  Conversion #4: Appointment→Transfer.
+        The new booking arrives at the target branch with BOTH is_transferred_in=True
+        AND is_appointment=True.  No films are deducted at either branch.
+    source_is_appointment=False →  Conversion #3: Normal→Transfer (original behaviour).
     """
     try:
         old_booking = TestBooking.query.get(old_booking_id)
         if not old_booking:
             return {"error": "Original booking not found"}, 404
+
+        # Terminal-state guard: already transferred-in bookings cannot be re-transferred.
+        if old_booking.is_transferred_in:
+            return {"error": "This booking was transferred in from another branch and cannot be transferred again"}, 403
 
         if str(old_booking.branch_id) == str(target_branch_id):
             return {"error": "Booking is already at the selected branch"}, 400
@@ -1546,7 +1690,6 @@ def transfer_and_rebook_service(old_booking_id, target_branch_id, due_amount, re
             }
             for d in old_details
         ]
-        new_total = sum(d.amount for d in old_details)
 
         # Extract old comments to migrate them safely
         old_comments_dict = {"comments": []}
@@ -1559,19 +1702,22 @@ def transfer_and_rebook_service(old_booking_id, target_branch_id, due_amount, re
             except Exception:
                 pass
 
-        # 1. Refund Films to Origin Branch
-        film_usages = TestFilmUsage.query.filter_by(booking_id=old_booking_id).all()
-        for usage in film_usages:
-            refund = FilmInventoryTransaction(
-                quantity=usage.films_used,
-                transaction_type="IN",
-                transaction_date=datetime.now(timezone.utc),
-                handled_by=user_id,
-                branch_id=current_branch_id,
-                reason=f"Refund: Transferred to Branch {target_branch_id}"
-            )
-            db.session.add(refund)
-            db.session.delete(usage)
+        # 1. Refund Films to Origin Branch (skip for appointment→transfer: zero films consumed)
+        total_films_refunded = 0
+        if not source_is_appointment:
+            film_usages = TestFilmUsage.query.filter_by(booking_id=old_booking_id).all()
+            for usage in film_usages:
+                total_films_refunded += usage.films_used
+                refund = FilmInventoryTransaction(
+                    quantity=usage.films_used,
+                    transaction_type="IN",
+                    transaction_date=datetime.now(timezone.utc),
+                    handled_by=user_id,
+                    branch_id=current_branch_id,
+                    reason=f"Refund: Transferred to Branch {target_branch_id}"
+                )
+                db.session.add(refund)
+                db.session.delete(usage)
 
         # Detach old inventory logs to prevent ghost references
         old_inventory_logs = FilmInventoryTransaction.query.filter_by(booking_id=old_booking_id).all()
@@ -1593,6 +1739,16 @@ def transfer_and_rebook_service(old_booking_id, target_branch_id, due_amount, re
         # 3. Clean up old linked entities
         DoctorReportingdetails.query.filter_by(booking_id=str(old_booking_id)).delete()
         TestBookingDetails.query.filter_by(booking_id=old_booking_id).delete()
+
+        # --- BUG FIX: Re-point media and chat logs to new booking BEFORE deleting old one ---
+        # If we delete old_booking while TechnicianBookingMedia / TechnicianChatLog still
+        # reference it via FK we get an IntegrityError (or silent orphan depending on DB config).
+        # We cannot set the new booking ID yet (it doesn’t exist), so we stage the re-point
+        # after flush gives us the new booking’s id.
+
+        # Stage 1: collect orphanable rows BEFORE the delete flush
+        media_to_repoint = TechnicianBookingMedia.query.filter_by(booking_id=old_booking_id).all()
+        chat_to_repoint  = TechnicianChatLog.query.filter_by(booking_id=old_booking_id).all()
 
         # 4. Delete the Old Booking
         db.session.delete(old_booking)
@@ -1625,10 +1781,21 @@ def transfer_and_rebook_service(old_booking_id, target_branch_id, due_amount, re
             due_amount=Decimal(str(due_amount)),
             payment_type=payment_type,
             is_transferred_in=True,
+            # Appointment→Transfer: new booking lands at target branch as an appointment
+            # (zero films deducted). Target staff convert it locally when patient arrives.
+            is_appointment=source_is_appointment,
             technician_comments=json.dumps(old_comments_dict)
         )
         db.session.add(new_booking)
-        db.session.flush()
+        db.session.flush()  # get new_booking.id
+
+        # Stage 2: re-point orphaned media and chat logs to the new booking
+        for media in media_to_repoint:
+            media.booking_id = new_booking.id
+            db.session.add(media)
+        for chat in chat_to_repoint:
+            chat.booking_id = new_booking.id
+            db.session.add(chat)
 
         # 6. Copy original tests & track films — server-side, no UI input needed
         total_new_films = 0
@@ -1644,8 +1811,8 @@ def transfer_and_rebook_service(old_booking_id, target_branch_id, due_amount, re
             )
             db.session.add(detail)
 
-        # 7. Execute Film Usage at Target Branch
-        if total_new_films > 0:
+        # 7. Execute Film Usage at Target Branch (only for Normal→Transfer)
+        if total_new_films > 0 and not source_is_appointment:
             add_film_usage(
                 booking_id=new_booking.id,
                 films_used=total_new_films,
@@ -1655,7 +1822,7 @@ def transfer_and_rebook_service(old_booking_id, target_branch_id, due_amount, re
                 reason="Transferred In Booking"
             )
 
-        # 8. Write to Audit Log
+        # 8. Write to Transfer Audit Log
         transfer_log = BookingTransferLog(
             new_booking_id=new_booking.id,
             old_booking_id=old_booking_id,
@@ -1669,6 +1836,21 @@ def transfer_and_rebook_service(old_booking_id, target_branch_id, due_amount, re
         )
         db.session.add(transfer_log)
 
+        # 9. Write to unified Conversion Audit Log
+        from_type = "appointment_to_transfer" if source_is_appointment else "normal_to_transfer"
+        conv_log = BookingConversionLog(
+            booking_id=old_booking_id,
+            mr_no=mr_no,
+            from_type="appointment" if source_is_appointment else "normal",
+            to_type="transfer",
+            new_booking_id=new_booking.id,
+            films_delta=total_films_refunded,  # films returned to origin branch inventory
+            cash_held_amount=Decimal(str(held_cash)),
+            reason=reason,
+            converted_by_user_id=user_id
+        )
+        db.session.add(conv_log)
+
         db.session.commit()
         return {"message": "Booking transferred successfully", "new_booking_id": new_booking.id}, 200
 
@@ -1680,6 +1862,61 @@ def transfer_and_rebook_service(old_booking_id, target_branch_id, due_amount, re
         db.session.rollback()
         print(f"Error in transfer_and_rebook_service: {str(e)}")
         return {"error": str(e)}, 500
+
+
+def convert_booking(booking_id, target_type, user_id, branch_id, target_branch_id=None, reason=None, due_amount=0):
+    """
+    Unified booking conversion dispatcher.
+
+    target_type must be one of:
+        "normal"       – Convert Appointment → Normal  (Conversion #1)
+        "appointment"  – Convert Normal → Appointment  (Conversion #2)
+        "transfer"     – Transfer Normal/Appointment → another branch (Conversion #3/#4)
+                         requires target_branch_id
+
+    Terminal-state enforcement:
+        - is_transferred_in=True bookings are rejected for ALL target_types.
+        - Transfer is a one-way, terminal operation; no re-transfer, no reverse.
+    """
+    # Fetch booking upfront for the guard
+    booking = TestBooking.query.get(booking_id)
+    if not booking:
+        return {"error": "Booking not found"}, 404
+
+    # TERMINAL STATE GUARD — applies to every conversion type
+    if booking.is_transferred_in:
+        return {
+            "error": "This booking was transferred in from another branch. "
+                     "Transferred bookings are terminal and cannot be converted."
+        }, 403
+
+    if target_type == "normal":
+        # Appointment → Normal
+        return convert_appointment_to_booking(booking_id, converted_by=user_id)
+
+    elif target_type == "appointment":
+        # Normal → Appointment
+        return convert_normal_to_appointment(booking_id, converted_by=user_id)
+
+    elif target_type == "transfer":
+        # Normal/Appointment → Transfer
+        if not target_branch_id:
+            return {"error": "target_branch_id is required for transfer"}, 400
+        if not reason:
+            return {"error": "reason is required for transfer"}, 400
+        source_is_appointment = booking.is_appointment
+        return transfer_and_rebook_service(
+            old_booking_id=booking_id,
+            target_branch_id=target_branch_id,
+            due_amount=due_amount,
+            reason=reason,
+            user_id=user_id,
+            current_branch_id=branch_id,
+            source_is_appointment=source_is_appointment
+        )
+
+    else:
+        return {"error": f"Unknown target_type '{target_type}'. Must be 'normal', 'appointment', or 'transfer'."}, 400
 
 
 def get_transfer_history_service(branch_id, user_role, from_date=None, to_date=None):

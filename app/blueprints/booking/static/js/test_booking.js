@@ -248,7 +248,7 @@ $(document).ready(function () {
     });
 
     // 3. Remove error class when user types
-    $("#new_ref_name").on("input", function () {
+    $("#new_ref_name, #new_ref_contact").on("input", function () {
         if ($(this).val().trim() !== "") {
             $(this).removeClass("input-error");
         }
@@ -257,12 +257,18 @@ $(document).ready(function () {
     // 4. Save New Referred
     $("#save_referred_btn").on("click", async function () {
         let name = $("#new_ref_name").val().trim();
+        let contact = $("#new_ref_contact").val().trim();
         let isDoctor = $("#new_ref_is_doctor").val() === "true";
 
         // UX: Validation
         if (!name) {
             $("#new_ref_name").addClass("input-error");
             $("#new_ref_name").focus();
+            return;
+        }
+        if (!contact) {
+            $("#new_ref_contact").addClass("input-error");
+            $("#new_ref_contact").focus();
             return;
         }
 
@@ -274,20 +280,20 @@ $(document).ready(function () {
                 is_doctor: isDoctor,
                 location: "Main Branch",
                 specialization: "General",
-                contact_no: ""
+                contact_no: contact
             };
 
             let res = await axios.post(baseUrl + "/registrations/referred", payload);
 
             if (res.status === 201 || res.status === 200) {
                 let newId = res.data.id;
-                let newName = name;
+                let newLabel = `${name} - ${contact}`;
 
                 showToastMessage("success", "Added successfully!");
                 $("#addReferredModal").modal("hide");
 
                 let targetSelect = isDoctor ? "#referred_dr" : "#referred_non_dr";
-                let newOption = new Option(newName, newId, true, true);
+                let newOption = new Option(newLabel, newId, true, true);
                 $(targetSelect).append(newOption).trigger('change');
             }
         } catch (err) {
@@ -302,7 +308,7 @@ $(document).ready(function () {
 
 // Helper to open modal and set state
 function openReferredModal(isDoctor) {
-    $("#new_ref_name").val("").removeClass("input-error");
+    $("#new_ref_name, #new_ref_contact").val("").removeClass("input-error");
     $("#new_ref_is_doctor").val(isDoctor);
 
     let title = isDoctor ? "Add New Doctor" : "Add New Referrer";
@@ -342,11 +348,48 @@ function populateReferredDropdowns(data) {
     let $doctorSelect = $("#referred_dr");
     let $nonDoctorSelect = $("#referred_non_dr");
 
+    if ($doctorSelect.hasClass("select2-hidden-accessible")) {
+        $doctorSelect.select2('destroy');
+    }
+    if ($nonDoctorSelect.hasClass("select2-hidden-accessible")) {
+        $nonDoctorSelect.select2('destroy');
+    }
+
     $doctorSelect.empty().append(`<option value="">-- Select Doctor --</option>`);
     $nonDoctorSelect.empty().append(`<option value="">-- Select Non-Doctor --</option>`);
 
-    doctors.forEach(d => $doctorSelect.append(`<option value="${d.id}">${d.name}</option>`));
-    nonDoctors.forEach(nd => $nonDoctorSelect.append(`<option value="${nd.id}">${nd.name}</option>`));
+    doctors.forEach(d => {
+        let label = (d.contact_no && String(d.contact_no).trim() !== "") ? `${d.name} - ${String(d.contact_no).trim()}` : d.name;
+        $doctorSelect.append(`<option value="${d.id}">${label}</option>`);
+    });
+    nonDoctors.forEach(nd => {
+        let label = (nd.contact_no && String(nd.contact_no).trim() !== "") ? `${nd.name} - ${String(nd.contact_no).trim()}` : nd.name;
+        $nonDoctorSelect.append(`<option value="${nd.id}">${label}</option>`);
+    });
+
+    const referredMatcher = function (params, data) {
+        if (!params.term || !data.text) return data;
+        const haystack = data.text.toLowerCase();
+        const tokens = params.term.toLowerCase().split(/\s+/).filter(Boolean);
+        const allMatch = tokens.every(tok => haystack.includes(tok));
+        return allMatch ? data : null;
+    };
+
+    $doctorSelect.select2({
+        theme: "bootstrap-5",
+        placeholder: "-- Select Doctor --",
+        allowClear: true,
+        width: '100%',
+        matcher: referredMatcher
+    });
+
+    $nonDoctorSelect.select2({
+        theme: "bootstrap-5",
+        placeholder: "-- Select Non-Doctor --",
+        allowClear: true,
+        width: '100%',
+        matcher: referredMatcher
+    });
 }
 
 function populateTestDropdown(data) {
@@ -533,8 +576,9 @@ $(document).on("click", "#close_receipt_btn", function () {
     $("#receipt_box").fadeOut(400);
 });
 // 1. Auto-remove error when user types or changes value
-$(document).on("input change", ".input-error", function () {
+$(document).on("input change", ".input-error, #referred_dr, #referred_non_dr", function () {
     $(this).removeClass("input-error");
+    $(this).next(".select2-container").find(".select2-selection").removeClass("border-danger");
 });
 
 // 2. Submit Handler with Error Highlighting
@@ -542,6 +586,7 @@ $(document).on("click", "#submit_booking", async function () {
     try {
         // Clear previous errors
         $(".input-error").removeClass("input-error");
+        $(".select2-selection").removeClass("border-danger");
 
         myshowLoader();
 

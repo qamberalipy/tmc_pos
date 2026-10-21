@@ -200,8 +200,56 @@ def clear_booking_due_api(booking_id):
 @booking_bp.route("/convert-appointment/<int:booking_id>", methods=["POST"])
 @login_required
 def convert_appointment(booking_id):
-    result, status = booking_services.convert_appointment_to_booking(booking_id, session.get("user_id"))
+    """Legacy endpoint kept for backward compat — funnels through the shared dispatcher."""
+    result, status = booking_services.convert_booking(
+        booking_id=booking_id,
+        target_type="normal",
+        user_id=session.get("user_id"),
+        branch_id=session.get("branch_id")
+    )
     return jsonify(result), status
+
+
+@booking_bp.route("/convert/<int:booking_id>", methods=["POST"])
+@login_required
+def convert_booking_api(booking_id):
+    """
+    Unified conversion endpoint.
+
+    Body (JSON):
+      target_type      : "normal" | "appointment" | "transfer"
+      reason           : str  (required for transfers)
+      target_branch_id : int  (required for transfers)
+      due_amount       : float (optional, only for transfers; defaults to 0)
+
+    Returns 403 if booking is_transferred_in == True (terminal state).
+    """
+    user_id   = session.get("user_id")
+    branch_id = session.get("branch_id")
+
+    if not user_id:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    data = request.get_json() or {}
+    target_type      = data.get("target_type")
+    target_branch_id = data.get("target_branch_id")
+    reason           = data.get("reason")
+    due_amount       = data.get("due_amount", 0)
+
+    if not target_type:
+        return jsonify({"error": "target_type is required"}), 400
+
+    result, status = booking_services.convert_booking(
+        booking_id=booking_id,
+        target_type=target_type,
+        user_id=user_id,
+        branch_id=branch_id,
+        target_branch_id=target_branch_id,
+        reason=reason,
+        due_amount=due_amount
+    )
+    return jsonify(result), status
+
 
 # Add this route to your file
 @booking_bp.route("/receipt/due/<int:transaction_id>")

@@ -117,14 +117,13 @@ h2,p{margin:0;padding:0}
 
       <table class="test-table">
         <thead>
-          <tr><th>Title</th><th>Reporting Date</th><th>Sample</th><th style="text-align:right">Payable</th></tr>
+          <tr><th>Investigation</th><th>Reporting Date</th><th style="text-align:right">Payable</th></tr>
         </thead>
         <tbody>
           {% for test in booking.tests %}
           <tr>
             <td class="tname">{{ test.test_name }}</td>
             <td>{{ test.reporting_date or '-' }}</td>
-            <td>{{ test.sample_to_follow or 'In / Out' }}</td>
             <td class="payable">{{ "{:,.0f}".format(test.amount) }}</td>
           </tr>
           {% endfor %}

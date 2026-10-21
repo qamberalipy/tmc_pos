@@ -92,6 +92,43 @@ class BookingTransferLog(db.Model):
     transferred_cash_held = db.Column(db.Numeric(10,2), default=0.0)
     reason = db.Column(db.Text, nullable=True)
 
+class BookingConversionLog(db.Model):
+    """
+    Unified audit log for every booking lifecycle conversion.
+    Covers: Appointment→Normal, Normal→Appointment, Normal→Transfer, Appointment→Transfer.
+    Transfer conversions are terminal; once a booking has is_transferred_in=True it cannot
+    be converted again (enforced at the service layer, not here).
+    """
+    __tablename__ = "booking_conversion_log"
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    # The booking_id of the booking being converted.
+    # For transfer conversions this is the OLD booking id (which is deleted afterward).
+    booking_id = db.Column(db.Integer, nullable=False)
+    mr_no = db.Column(db.String(225), nullable=True)
+
+    # Conversion direction string — one of:
+    # "appointment_to_normal", "normal_to_appointment",
+    # "normal_to_transfer", "appointment_to_transfer"
+    from_type = db.Column(db.String(50), nullable=False)
+    to_type   = db.Column(db.String(50), nullable=False)
+
+    # For transfers: new booking ID created at target branch (null for in-place conversions)
+    new_booking_id = db.Column(db.Integer, nullable=True)
+
+    # Film inventory delta (+n means films returned to inventory, -n means films consumed).
+    # 0 for conversions that don't touch inventory.
+    films_delta = db.Column(db.Integer, default=0)
+
+    # Cash held/moved during a transfer (always 0 for in-place conversions)
+    cash_held_amount = db.Column(db.Numeric(10, 2), default=0)
+
+    reason = db.Column(db.Text, nullable=True)
+    converted_by_user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+
 class TechnicianBookingMedia(db.Model):
     __tablename__ = "technician_booking_media"
 

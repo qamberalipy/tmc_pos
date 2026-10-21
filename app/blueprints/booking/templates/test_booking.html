@@ -293,10 +293,17 @@
       </div>
       <div class="modal-body">
         <input type="hidden" id="new_ref_is_doctor">
-        <div class="mb-3">
-          <label for="new_ref_name" class="form-label fw-bold">Name <span class="text-danger">*</span></label>
-          <input type="text" class="form-control" id="new_ref_name" placeholder="Enter full name" autocomplete="off">
-          <div class="invalid-feedback">Name is required.</div>
+        <div class="row">
+          <div class="col-6 mb-3">
+            <label for="new_ref_name" class="form-label fw-bold">Name <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" id="new_ref_name" placeholder="Enter full name" autocomplete="off">
+            <div class="invalid-feedback">Name is required.</div>
+          </div>
+          <div class="col-6 mb-3">
+            <label for="new_ref_contact" class="form-label fw-bold">Contact No <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" id="new_ref_contact" placeholder="03XX XXXXXXX" autocomplete="off">
+            <div class="invalid-feedback">Contact number is required.</div>
+          </div>
         </div>
       </div>
       <div class="modal-footer">
