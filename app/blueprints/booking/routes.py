@@ -497,7 +497,7 @@ def refund_booking_route(booking_id):
 @booking_bp.route("/transfer-rebook", methods=["POST"])
 @login_required
 def transfer_booking_rebook_route():
-    data = request.get_json()
+    data = request.get_json() or {}
 
     old_booking_id = data.get("booking_id")
     target_branch_id = data.get("target_branch_id")
@@ -513,8 +513,14 @@ def transfer_booking_rebook_route():
     if not reason:
         return jsonify({"error": "Transfer reason is required"}), 400
 
-    result, status = booking_services.transfer_and_rebook_service(
-        old_booking_id, target_branch_id, due_amount, reason, user_id, current_branch_id,
+    result, status = booking_services.convert_booking(
+        booking_id=old_booking_id,
+        target_type="transfer",
+        user_id=user_id,
+        branch_id=current_branch_id,
+        target_branch_id=target_branch_id,
+        reason=reason,
+        due_amount=due_amount,
         assigned_to=assigned_to
     )
     return jsonify(result), status

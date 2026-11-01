@@ -1,4 +1,5 @@
 import json
+import logging
 from flask import session
 from sqlalchemy import func, and_, cast, String,case,Date,or_, exists
 from app.blueprints import booking
@@ -21,6 +22,8 @@ from app.models.technician_chat_log import TechnicianChatLog
 from app.models.expenses import Expenses
 from app.models.referred import ReferralShare
 from app.models.expenses import PaymentTransaction
+
+logger = logging.getLogger(__name__)
 
 def to_decimal(value, field_name="Value"):
     if value is None:
@@ -1640,7 +1643,7 @@ def process_refund_service(booking_id, user_id, branch_id, refund_reason=""):
         print(f"Error processing refund: {str(e)}")
         return {"error": str(e)}, 500
     
-def transfer_and_rebook_service(old_booking_id, target_branch_id, due_amount, reason, user_id, current_branch_id, assigned_to=None, source_is_appointment=False):
+def transfer_and_rebook_service(old_booking_id, target_branch_id, due_amount=0, reason="", user_id=None, current_branch_id=None, assigned_to=None, source_is_appointment=False):
     """
     Transfers a booking to a target branch (Conversion #3 / #4).
     Tests are automatically copied from the original booking's TestBookingDetails —
@@ -1664,7 +1667,21 @@ def transfer_and_rebook_service(old_booking_id, target_branch_id, due_amount, re
             return {"error": "Booking is already at the selected branch"}, 400
 
         # --- Save metadata and cash state before executing delete ---
-        held_cash = old_booking.paid_amount
+        held_cash = Decimal(str(old_booking.paid_amount or 0))
+        old_due = Decimal(str(old_booking.due_amount or 0))
+        old_net = Decimal(str(old_booking.net_receivable or 0))
+
+        # Sanity check: held_cash + old_due must equal net_receivable
+        if (held_cash + old_due) != old_net:
+            logger.warning(
+                f"[Transfer] Financial imbalance for MR {old_booking.mr_no} (Booking #{old_booking_id}): "
+                f"held_cash ({held_cash}) + old_due ({old_due}) != net_receivable ({old_net}). "
+                f"Using net_receivable - held_cash for due_amount."
+            )
+            final_due = old_net - held_cash
+        else:
+            final_due = old_due
+
         mr_no = old_booking.mr_no
         patient_name = old_booking.patient_name
         gender = old_booking.gender
@@ -1672,7 +1689,7 @@ def transfer_and_rebook_service(old_booking_id, target_branch_id, due_amount, re
         age_unit = old_booking.age_unit
         contact_no = old_booking.contact_no
         payment_type = old_booking.payment_type
-        net_receivable = old_booking.net_receivable
+        net_receivable = old_net
         total_amount = old_booking.total_amount
         discount_type = old_booking.discount_type
         discount_value = old_booking.discount_value
@@ -1776,9 +1793,9 @@ def transfer_and_rebook_service(old_booking_id, target_branch_id, due_amount, re
             discount_type=discount_type,
             discount_value=discount_value,
             total_amount=total_amount,
-            net_receivable=net_receivable,
+            net_receivable=old_net,
             paid_amount=held_cash,
-            due_amount=Decimal(str(due_amount)),
+            due_amount=final_due,
             payment_type=payment_type,
             is_transferred_in=True,
             # Appointment→Transfer: new booking lands at target branch as an appointment
@@ -1823,6 +1840,10 @@ def transfer_and_rebook_service(old_booking_id, target_branch_id, due_amount, re
             )
 
         # 8. Write to Transfer Audit Log
+        reason_str = str(reason or "").strip()
+        due_audit_note = f"Due carried forward: {final_due}"
+        audit_reason = f"{reason_str} ({due_audit_note})" if reason_str else due_audit_note
+
         transfer_log = BookingTransferLog(
             new_booking_id=new_booking.id,
             old_booking_id=old_booking_id,
@@ -1832,7 +1853,7 @@ def transfer_and_rebook_service(old_booking_id, target_branch_id, due_amount, re
             patient_name=patient_name,
             mr_no=mr_no,
             transferred_cash_held=held_cash,
-            reason=reason
+            reason=audit_reason
         )
         db.session.add(transfer_log)
 
@@ -1846,7 +1867,7 @@ def transfer_and_rebook_service(old_booking_id, target_branch_id, due_amount, re
             new_booking_id=new_booking.id,
             films_delta=total_films_refunded,  # films returned to origin branch inventory
             cash_held_amount=Decimal(str(held_cash)),
-            reason=reason,
+            reason=audit_reason,
             converted_by_user_id=user_id
         )
         db.session.add(conv_log)
@@ -1864,7 +1885,7 @@ def transfer_and_rebook_service(old_booking_id, target_branch_id, due_amount, re
         return {"error": str(e)}, 500
 
 
-def convert_booking(booking_id, target_type, user_id, branch_id, target_branch_id=None, reason=None, due_amount=0):
+def convert_booking(booking_id, target_type, user_id, branch_id, target_branch_id=None, reason=None, due_amount=0, assigned_to=None):
     """
     Unified booking conversion dispatcher.
 
@@ -1912,7 +1933,8 @@ def convert_booking(booking_id, target_type, user_id, branch_id, target_branch_i
             reason=reason,
             user_id=user_id,
             current_branch_id=branch_id,
-            source_is_appointment=source_is_appointment
+            source_is_appointment=source_is_appointment,
+            assigned_to=assigned_to
         )
 
     else:
