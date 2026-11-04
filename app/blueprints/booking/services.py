@@ -2458,4 +2458,361 @@ def get_appointments_and_transfers_service(branch_id=None, user_role=None, filte
     except BadRequest as e:
         return {"error": str(e)}, 400
     except Exception as e:
-        return {"error": str(e)}, 500
+        return {"error": str(e)}, 500
+# ---------------------------------------------------------------------------
+# get_full_booking_details — read-only full detail fetch for the modal
+# ---------------------------------------------------------------------------
+def get_full_booking_details(booking_id, user_role, branch_id):
+    """
+    Aggregate all booking data for the Full Booking Details modal.
+
+    Branch scoping:
+      - admin  → sees any booking
+      - staff / techician / doctor → only their branch OR any booking that
+        appears in BookingTransferLog for their branch (from_branch_id or
+        to_branch_id == branch_id).
+    """
+    try:
+        # --- 1. Core booking row ---
+        booking = TestBooking.query.get(booking_id)
+        if not booking:
+            return {"error": "Booking not found"}, 404
+
+        # --- 2. Branch scoping ---
+        if user_role not in ("admin",):
+            is_own_branch = (booking.branch_id == branch_id)
+            transfer_match = db.session.query(BookingTransferLog.id).filter(
+                or_(
+                    and_(
+                        BookingTransferLog.old_booking_id == booking_id,
+                        or_(
+                            BookingTransferLog.from_branch_id == branch_id,
+                            BookingTransferLog.to_branch_id == branch_id,
+                        ),
+                    ),
+                    and_(
+                        BookingTransferLog.new_booking_id == booking_id,
+                        or_(
+                            BookingTransferLog.from_branch_id == branch_id,
+                            BookingTransferLog.to_branch_id == branch_id,
+                        ),
+                    ),
+                )
+            ).first()
+            if not is_own_branch and not transfer_match:
+                return {"error": "Access denied"}, 403
+
+        # --- 3. Branch info ---
+        branch = Branch.query.get(booking.branch_id)
+        booking_branch_name = branch.branch_name if branch else "—"
+
+        # --- 4. Creator / updater ---
+        creator = User.query.get(booking.create_by)
+        created_by_name = creator.name if creator else "—"
+        updater = User.query.get(booking.update_by) if booking.update_by else None
+        updated_by_name = updater.name if updater else None
+
+        # --- 5. Referred entities ---
+        referred_dr_name = referred_dr_contact = None
+        if booking.referred_dr:
+            ref_dr = Referred.query.get(booking.referred_dr)
+            if ref_dr:
+                referred_dr_name = ref_dr.name
+                referred_dr_contact = ref_dr.contact_no
+
+        referred_non_dr_name = referred_non_dr_contact = None
+        if booking.referred_non_dr:
+            ref_non = Referred.query.get(booking.referred_non_dr)
+            if ref_non:
+                referred_non_dr_name = ref_non.name
+                referred_non_dr_contact = ref_non.contact_no
+
+        give_share_to_name = None
+        if booking.give_share_to:
+            share_target = Referred.query.get(booking.give_share_to)
+            if share_target:
+                give_share_to_name = share_target.name
+
+        # --- 6. Referral share ---
+        referral_share = None
+        share_rec = ReferralShare.query.filter_by(booking_id=booking_id).first()
+        if share_rec:
+            share_issuer = User.query.get(share_rec.created_by) if share_rec.created_by else None
+            share_target_ref = Referred.query.get(share_rec.referred_id) if share_rec.referred_id else None
+            referral_share = {
+                "share_amount": float(share_rec.share_amount or 0),
+                "is_paid": share_rec.is_paid,
+                "paid_at": to_local(share_rec.paid_at, "%d %b %Y %H:%M") if share_rec.paid_at else None,
+                "issued_to_name": share_target_ref.name if share_target_ref else "—",
+                "created_by_name": share_issuer.name if share_issuer else "—",
+                "expense_id": share_rec.expense_id,
+            }
+
+        # --- 7. Test line items ---
+        test_rows = (
+            db.session.query(
+                Test_registration.test_name,
+                TestBookingDetails.amount,
+                TestBookingDetails.quantity,
+                TestBookingDetails.no_of_films,
+                TestBookingDetails.film_issued,
+            )
+            .join(TestBookingDetails, Test_registration.id == TestBookingDetails.test_id)
+            .filter(TestBookingDetails.booking_id == booking_id)
+            .all()
+        )
+        tests = [
+            {
+                "test_name": r.test_name,
+                "amount": float(r.amount or 0),
+                "quantity": r.quantity or 1,
+                "no_of_films": r.no_of_films or 0,
+                "film_issued": bool(r.film_issued),
+            }
+            for r in test_rows
+        ]
+
+        # --- 8. Film usage records ---
+        film_rows = (
+            db.session.query(
+                TestFilmUsage.usage_type,
+                TestFilmUsage.films_used,
+                TestFilmUsage.reason,
+                TestFilmUsage.used_at,
+                User.name.label("used_by_name"),
+            )
+            .outerjoin(User, User.id == TestFilmUsage.used_by)
+            .filter(TestFilmUsage.booking_id == booking_id)
+            .order_by(TestFilmUsage.used_at)
+            .all()
+        )
+        film_usages = [
+            {
+                "usage_type": r.usage_type,
+                "films_used": r.films_used,
+                "reason": r.reason,
+                "used_at": to_local(r.used_at, "%d %b %Y %H:%M") if r.used_at else "—",
+                "used_by_name": r.used_by_name or "—",
+            }
+            for r in film_rows
+        ]
+
+        # --- 9. Payment transactions (IN direction only: Initial + DueClearance) ---
+        txn_rows = (
+            db.session.query(
+                PaymentTransaction.transaction_type,
+                PaymentTransaction.amount,
+                PaymentTransaction.payment_type,
+                PaymentTransaction.payment_date,
+                User.name.label("created_by_name"),
+                Branch.branch_name,
+            )
+            .outerjoin(User, User.id == PaymentTransaction.created_by)
+            .outerjoin(Branch, Branch.id == PaymentTransaction.branch_id)
+            .filter(
+                PaymentTransaction.booking_id == booking_id,
+                PaymentTransaction.direction == "IN",
+            )
+            .order_by(PaymentTransaction.payment_date)
+            .all()
+        )
+        payment_transactions = [
+            {
+                "transaction_type": r.transaction_type,
+                "amount": float(r.amount or 0),
+                "payment_type": r.payment_type,
+                "payment_date": to_local(r.payment_date, "%d %b %Y %H:%M:%S") if r.payment_date else "—",
+                "created_by_name": r.created_by_name or "—",
+                "branch_name": r.branch_name or "—",
+            }
+            for r in txn_rows
+        ]
+
+        # --- 10. Doctor reporting ---
+        # NOTE: DoctorReportingdetails.booking_id and doctor_id are String(225)
+        doctor_reports = []
+        try:
+            dr_rows = (
+                db.session.query(DoctorReportingdetails)
+                .filter(
+                    DoctorReportingdetails.booking_id == str(booking_id),
+                    DoctorReportingdetails.is_active == True,
+                )
+                .all()
+            )
+            for dr_row in dr_rows:
+                try:
+                    doctor_user = User.query.get(int(dr_row.doctor_id)) if dr_row.doctor_id else None
+                    doctor_name = doctor_user.name if doctor_user else "Doctor #" + str(dr_row.doctor_id)
+                except (ValueError, TypeError):
+                    doctor_name = "Doctor #" + str(dr_row.doctor_id)
+
+                assigner = User.query.get(dr_row.assign_by) if dr_row.assign_by else None
+                assign_by_name = assigner.name if assigner else "—"
+
+                returned_at = None
+                if dr_row.status in ("Reported", "Declined"):
+                    returned_at = to_local(dr_row.report_at, "%d %b %Y %H:%M") if dr_row.report_at else None
+
+                doctor_reports.append(
+                    {
+                        "doctor_name": doctor_name,
+                        "assign_by_name": assign_by_name,
+                        "assigned_at": to_local(dr_row.report_at, "%d %b %Y %H:%M") if dr_row.report_at else "—",
+                        "status": dr_row.status,
+                        "returned_at": returned_at,
+                        "test_id": dr_row.test_id,
+                    }
+                )
+        except Exception as _e:
+            logger.warning("Error fetching doctor reports for booking %s: %s", booking_id, _e)
+
+        # --- 11. Technician comments (JSON text field) ---
+        tech_comments = []
+        try:
+            if booking.technician_comments:
+                parsed = json.loads(booking.technician_comments)
+                tech_comments = parsed.get("comments", [])
+        except (json.JSONDecodeError, TypeError):
+            tech_comments = []
+
+        # --- 12. Chat activity summary ---
+        chat_summary = {"total_messages": 0, "last_activity": None}
+        try:
+            chat_agg = (
+                db.session.query(
+                    func.count(TechnicianChatLog.id).label("total"),
+                    func.max(TechnicianChatLog.created_at).label("last_at"),
+                )
+                .filter(
+                    TechnicianChatLog.booking_id == booking_id,
+                    TechnicianChatLog.is_deleted == False,
+                )
+                .first()
+            )
+            if chat_agg:
+                chat_summary["total_messages"] = chat_agg.total or 0
+                chat_summary["last_activity"] = (
+                    to_local(chat_agg.last_at, "%d %b %Y %H:%M") if chat_agg.last_at else None
+                )
+        except Exception as _e:
+            logger.warning("Error fetching chat summary for booking %s: %s", booking_id, _e)
+
+        # --- 13. Transfer log ---
+        transfer_log = None
+        try:
+            tlog = BookingTransferLog.query.filter(
+                or_(
+                    BookingTransferLog.old_booking_id == booking_id,
+                    BookingTransferLog.new_booking_id == booking_id,
+                )
+            ).first()
+            if tlog:
+                from_branch_obj = Branch.query.get(tlog.from_branch_id)
+                to_branch_obj = Branch.query.get(tlog.to_branch_id)
+                tby = User.query.get(tlog.transferred_by_user_id) if tlog.transferred_by_user_id else None
+                transfer_log = {
+                    "from_branch_name": from_branch_obj.branch_name if from_branch_obj else "—",
+                    "to_branch_name": to_branch_obj.branch_name if to_branch_obj else "—",
+                    "transferred_by_name": tby.name if tby else "—",
+                    "transferred_at": to_local(tlog.transferred_at, "%d %b %Y %H:%M") if tlog.transferred_at else "—",
+                    "cash_held": float(tlog.transferred_cash_held or 0),
+                    "reason": tlog.reason,
+                    "old_booking_id": tlog.old_booking_id,
+                    "new_booking_id": tlog.new_booking_id,
+                }
+        except Exception as _e:
+            logger.warning("Error fetching transfer log for booking %s: %s", booking_id, _e)
+
+        # --- 14. Conversion logs ---
+        conversion_logs = []
+        try:
+            conv_rows = (
+                BookingConversionLog.query.filter(
+                    or_(
+                        BookingConversionLog.booking_id == booking_id,
+                        BookingConversionLog.new_booking_id == booking_id,
+                    )
+                )
+                .order_by(BookingConversionLog.created_at)
+                .all()
+            )
+            for cv in conv_rows:
+                cv_user = User.query.get(cv.converted_by_user_id) if cv.converted_by_user_id else None
+                conversion_logs.append(
+                    {
+                        "from_type": cv.from_type,
+                        "to_type": cv.to_type,
+                        "films_delta": cv.films_delta or 0,
+                        "cash_held_amount": float(cv.cash_held_amount or 0),
+                        "reason": cv.reason,
+                        "converted_by_name": cv_user.name if cv_user else "—",
+                        "created_at": to_local(cv.created_at, "%d %b %Y %H:%M") if cv.created_at else "—",
+                    }
+                )
+        except Exception as _e:
+            logger.warning("Error fetching conversion logs for booking %s: %s", booking_id, _e)
+
+        # --- 15. Assemble and return ---
+        return {
+            # Core
+            "booking_id": booking.id,
+            "mr_no": booking.mr_no,
+            "is_appointment": booking.is_appointment,
+            "is_transferred_in": booking.is_transferred_in,
+            "payment_type": booking.payment_type,
+            "created_at": to_local(booking.create_at, "%A, %d %b %Y %H:%M:%S") if booking.create_at else "—",
+            "updated_at": to_local(booking.update_at, "%A, %d %b %Y %H:%M:%S") if booking.update_at else None,
+            "created_by_name": created_by_name,
+            "updated_by_name": updated_by_name,
+            "booking_branch_name": booking_branch_name,
+            # Patient
+            "patient_name": booking.patient_name,
+            "age": booking.age,
+            "age_unit": booking.age_unit or "Years",
+            "gender": booking.gender,
+            "contact_no": booking.contact_no,
+            # Financial
+            "total_amount": float(booking.total_amount or 0),
+            "discount_type": booking.discount_type or "None",
+            "discount_value": float(booking.discount_value or 0),
+            "net_receivable": float(booking.net_receivable or 0),
+            "paid_amount": float(booking.paid_amount or 0),
+            "due_amount": float(booking.due_amount or 0),
+            # Referral
+            "referred_dr_name": referred_dr_name,
+            "referred_dr_contact": referred_dr_contact,
+            "referred_non_dr_name": referred_non_dr_name,
+            "referred_non_dr_contact": referred_non_dr_contact,
+            "give_share_to_name": give_share_to_name,
+            "referral_share": referral_share,
+            # Tests
+            "tests": tests,
+            # Films
+            "film_usages": film_usages,
+            "total_films_used": booking.total_no_of_films_used or 0,
+            # Payments
+            "payment_transactions": payment_transactions,
+            # Doctor reporting
+            "doctor_reports": doctor_reports,
+            # Technician
+            "technician_comments": tech_comments,
+            "chat_summary": chat_summary,
+            # Transfer & conversion
+            "transfer_log": transfer_log,
+            "conversion_logs": conversion_logs,
+            # --- Items with no data source today ---
+            # process_refund_service hard-deletes the booking, so a live booking never has refund data.
+            # Showing full history would need a dedicated refund_log table (pending schema approval).
+            "refund": None,
+            # UB radio button/status: no such field exists in any model, column, or service.
+            # Open question: needs schema decision before adding a DB column or migration.
+            "ub_status": None,
+        }, 200
+
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        return {"error": "Database error: " + str(e.__dict__.get("orig", e))}, 500
+    except Exception as e:
+        logger.error("Error in get_full_booking_details(booking_id=%s): %s", booking_id, e)
+        return {"error": str(e)}, 500
