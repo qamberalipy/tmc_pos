@@ -354,6 +354,7 @@ function getAllTestBookings() {
             // 4. ASSEMBLE ACTIONS
             let actions = `
             <div class="d-flex gap-1 justify-content-center">
+                <button class="btn btn-action text-info shadow-sm view-full-details" data-id="${t.booking_id}" title="Full Details"><i class="bi bi-info-circle"></i></button>
                 <a href="${baseUrl}/booking/receipt/${t.booking_id}" target="_blank" class="btn btn-action text-success shadow-sm" title="Print Receipt"><i class="bi bi-printer"></i></a>
                 <a href="${baseUrl}/booking/print-sticker/${t.booking_id}" target="_blank" class="btn btn-action text-secondary shadow-sm" title="Print Sticker"><i class="bi bi-tag"></i></a>
                 
@@ -392,6 +393,11 @@ function getAllTestBookings() {
 // 6. TABLE EVENT BINDINGS
 // ---------------------------------------------------------
 function rebindTableEvents() {
+    $("#testReg_table").off("click", ".view-full-details").on("click", ".view-full-details", function () {
+        const bookingId = $(this).data("id");
+        openFullDetailsModal(bookingId);
+    });
+
     $("#testReg_table").off("click", ".convert-appointment").on("click", ".convert-appointment", function () {
         const bookingId = $(this).data("id");
         Swal.fire({
@@ -640,3 +646,276 @@ function loadComments(comments) {
     });
     $("#commentsHistory").html(html);
 }
+
+// ---------------------------------------------------------
+// 8. FULL BOOKING DETAILS MODAL
+// ---------------------------------------------------------
+
+function openFullDetailsModal(bookingId) {
+    // Reset state & show skeleton
+    $('#fdSkeleton').show();
+    $('#fdContent').hide();
+    $('#fdBookingTitle').text('Loading…');
+    $('#fdBadgesRow').html('');
+    $('#fdPrintBtn').attr('href', baseUrl + '/booking/receipt/' + bookingId);
+    $('#fullDetailsModal').modal('show');
+
+    axios.get(baseUrl + '/booking/full-details/' + bookingId)
+        .then(function(res) {
+            renderFullDetails(res.data);
+            $('#fdSkeleton').hide();
+            $('#fdContent').show();
+        })
+        .catch(function(err) {
+            $('#fdSkeleton').hide();
+            $('#fdContent').show().html(
+                '<div class="alert alert-danger"><i class="bi bi-exclamation-triangle-fill me-2"></i>' +
+                (err.response?.data?.error || 'Failed to load booking details.') + '</div>'
+            );
+        });
+}
+
+function renderFullDetails(d) {
+    // --- Header ---
+    const mrText = d.mr_no || '—';
+    $('#fdBookingTitle').html(
+        '<i class="bi bi-bookmark-fill me-1"></i> Booking #' + d.booking_id +
+        ' &nbsp;<span class="text-warning small" style="cursor:pointer;" id="fdCopyMrBtn" title="Click to copy MR No">MR: ' + mrText + ' <i class="bi bi-clipboard-fill" style="font-size:0.75rem;"></i></span>'
+    );
+    $('#fdCopyMrBtn').off('click').on('click', function() {
+        if (d.mr_no) {
+            navigator.clipboard.writeText(d.mr_no).then(function() {
+                showToastMessage('success', 'MR No copied to clipboard: ' + d.mr_no);
+            });
+        }
+    });
+
+    let badges = '';
+    if (d.is_appointment) {
+        badges += '<span class="badge bg-info text-dark"><i class="bi bi-calendar-check me-1"></i>Appointment</span> ';
+    }
+    if (d.is_transferred_in) {
+        badges += '<span class="badge bg-warning text-dark"><i class="bi bi-box-arrow-in-right me-1"></i>Transferred In</span> ';
+    }
+    if (!d.is_appointment && !d.is_transferred_in) {
+        badges += '<span class="badge bg-secondary">Normal</span> ';
+    }
+
+    // Financial status badge
+    let finBadge;
+    if (d.due_amount <= 0) {
+        finBadge = '<span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Paid</span>';
+    } else if (d.paid_amount > 0 && d.due_amount > 0) {
+        finBadge = '<span class="badge bg-warning text-dark"><i class="bi bi-exclamation-circle me-1"></i>Partial</span>';
+    } else {
+        finBadge = '<span class="badge bg-danger"><i class="bi bi-x-circle me-1"></i>Unpaid</span>';
+    }
+    badges += finBadge;
+    $('#fdBadgesRow').html(badges);
+
+    // --- Patient ---
+    $('#fdPatientName').text(d.patient_name || '—');
+    $('#fdPatientMeta').text(
+        (d.age != null ? d.age + ' ' + (d.age_unit || 'Years') : '—') + ' • ' + (d.gender || '—')
+    );
+    $('#fdPatientPhone').text(d.contact_no || '—');
+    $('#fdBookingDate').html('<i class="bi bi-calendar3 me-1"></i>' + (d.created_at || '—'));
+    $('#fdBookingCreatedBy').html('<i class="bi bi-person-check me-1"></i>Created by: <strong>' + (d.created_by_name || '—') + '</strong>');
+    if (d.updated_at) {
+        $('#fdBookingUpdated').html('<i class="bi bi-pencil-square me-1 text-warning"></i>Updated: ' + d.updated_at + (d.updated_by_name ? ' by <strong>' + d.updated_by_name + '</strong>' : '')).show();
+    } else {
+        $('#fdBookingUpdated').text('').hide();
+    }
+    $('#fdBranchName').text(d.booking_branch_name || '—');
+
+    // --- Referral ---
+    $('#fdReferredDr').text(d.referred_dr_name || '—');
+    $('#fdReferredDrContact').text(d.referred_dr_contact ? ' (' + d.referred_dr_contact + ')' : '');
+    $('#fdReferredNonDr').text(d.referred_non_dr_name || '—');
+    $('#fdReferredNonDrContact').text(d.referred_non_dr_contact ? ' (' + d.referred_non_dr_contact + ')' : '');
+    $('#fdGiveShareTo').text(d.give_share_to_name || '—');
+
+    // Share status chip
+    let shareHtml = '<span class="text-muted small fst-italic">No referral share record.</span>';
+    if (d.referral_share) {
+        let s = d.referral_share;
+        let chip = s.is_paid
+            ? '<span class="badge bg-success"><i class="bi bi-check2-all me-1"></i>Issued</span>'
+            : '<span class="badge bg-warning text-dark"><i class="bi bi-hourglass-split me-1"></i>Pending</span>';
+        shareHtml = '<div class="d-flex flex-wrap align-items-center gap-2 small">' +
+            chip +
+            '<span>Rs. <strong>' + s.share_amount.toFixed(2) + '</strong></span>' +
+            '<span class="text-muted">To: <strong>' + (s.issued_to_name || '—') + '</strong></span>' +
+            (s.is_paid ? '<span class="text-muted">on ' + (s.paid_at || '—') + ' by <strong>' + (s.created_by_name || '—') + '</strong></span>' : '') +
+            '</div>';
+    }
+    $('#fdShareStatus').html(shareHtml);
+
+    // --- Financial tiles ---
+    let totalAmt = d.total_amount || 0;
+    let discVal = d.discount_value || 0;
+    let netRec = d.net_receivable || 0;
+    let paidAmt = d.paid_amount || 0;
+    let dueAmt = d.due_amount || 0;
+    let discLabel = (d.discount_type && d.discount_type !== 'None') 
+        ? (d.discount_type === 'Percentage' ? discVal + '%' : 'Rs. ' + discVal.toFixed(2)) 
+        : 'None';
+
+    let tilesHtml = `
+        <div class="col"><div class="fd-stat-tile bg-light border"><div class="fd-stat-label">Total</div><div class="fd-stat-value">Rs. ${totalAmt.toFixed(2)}</div></div></div>
+        <div class="col"><div class="fd-stat-tile bg-light border"><div class="fd-stat-label">Discount</div><div class="fd-stat-value text-warning">${discLabel}</div></div></div>
+        <div class="col"><div class="fd-stat-tile bg-light border"><div class="fd-stat-label">Net</div><div class="fd-stat-value">Rs. ${netRec.toFixed(2)}</div></div></div>
+        <div class="col"><div class="fd-stat-tile bg-success bg-opacity-10 border border-success"><div class="fd-stat-label text-success">Paid</div><div class="fd-stat-value text-success">Rs. ${paidAmt.toFixed(2)}</div></div></div>
+        <div class="col"><div class="fd-stat-tile ${dueAmt > 0 ? 'bg-danger bg-opacity-10 border border-danger' : 'bg-light border'}"><div class="fd-stat-label ${dueAmt > 0 ? 'text-danger' : ''}">Due</div><div class="fd-stat-value ${dueAmt > 0 ? 'text-danger' : ''}">Rs. ${dueAmt.toFixed(2)}</div></div></div>
+    `;
+    $('#fdFinancialTiles').html(tilesHtml);
+
+    // Progress bar
+    let pct = netRec > 0 ? Math.min(100, Math.max(0, (paidAmt / netRec) * 100)) : 0;
+    $('#fdProgressBar').css('width', pct.toFixed(1) + '%');
+    $('#fdProgressLabel').text('Rs. ' + paidAmt.toFixed(2) + ' / Rs. ' + netRec.toFixed(2));
+
+    // Payment timeline table
+    let payHtml = '';
+    if (d.payment_transactions && d.payment_transactions.length > 0) {
+        d.payment_transactions.forEach(function(t) {
+            let typeBadge = t.transaction_type === 'Initial'
+                ? '<span class="badge bg-primary">Initial</span>'
+                : '<span class="badge bg-info text-dark">Due Clearance</span>';
+            payHtml += `<tr>
+                <td>${typeBadge}</td>
+                <td class="fw-bold">Rs. ${(t.amount || 0).toFixed(2)}</td>
+                <td><span class="badge bg-secondary">${t.payment_type || '—'}</span></td>
+                <td class="small">${t.payment_date || '—'}</td>
+                <td class="small">${t.created_by_name || '—'}</td>
+                <td class="small">${t.branch_name || '—'}</td>
+            </tr>`;
+        });
+    }
+    $('#fdPaymentRows').html(payHtml || '<tr><td colspan="6" class="text-muted text-center fst-italic">No payment records.</td></tr>');
+
+    // --- Tests Table ---
+    let testHtml = '';
+    if (d.tests && d.tests.length > 0) {
+        d.tests.forEach(function(t) {
+            let filmBadge = t.film_issued
+                ? '<span class="badge bg-success" style="font-size:0.65rem;">Issued</span>'
+                : '<span class="badge bg-warning text-dark" style="font-size:0.65rem;">Pending</span>';
+            testHtml += `<tr>
+                <td class="small fw-semibold">${t.test_name}</td>
+                <td class="text-end small">Rs. ${(t.amount || 0).toFixed(2)}</td>
+                <td class="text-center small">${t.quantity || 1}</td>
+                <td class="text-center small">${t.no_of_films || 0}</td>
+                <td class="text-center">${filmBadge}</td>
+            </tr>`;
+        });
+    }
+    $('#fdTestRows').html(testHtml || '<tr><td colspan="5" class="text-muted text-center fst-italic">—</td></tr>');
+    $('#fdFilmsChip').text((d.total_films_used || 0) + ' films used');
+
+    // --- Film Usages ---
+    let filmHtml = '';
+    if (d.film_usages && d.film_usages.length > 0) {
+        d.film_usages.forEach(function(f) {
+            filmHtml += `<div class="border-start border-warning border-3 ps-2 mb-2 small">
+                <div class="fw-semibold">${f.usage_type} — ${f.films_used} film(s)</div>
+                <div class="text-muted">${f.reason || '—'} &bull; ${f.used_at} &bull; ${f.used_by_name}</div>
+            </div>`;
+        });
+    }
+    $('#fdFilmUsages').html(filmHtml || '<span class="text-muted small fst-italic">No film usage records.</span>');
+
+    // --- Doctor Reports ---
+    let drHtml = '';
+    if (d.doctor_reports && d.doctor_reports.length > 0) {
+        d.doctor_reports.forEach(function(dr) {
+            let statusBadge = dr.status === 'Reported'
+                ? '<span class="badge bg-success">Reported</span>'
+                : dr.status === 'Declined'
+                    ? '<span class="badge bg-danger">Declined</span>'
+                    : '<span class="badge bg-warning text-dark">Pending</span>';
+            drHtml += `<div class="border rounded p-2 mb-2 small">
+                <div class="fw-semibold">${dr.doctor_name} ${statusBadge}</div>
+                <div class="text-muted">Assigned by: ${dr.assign_by_name} &bull; ${dr.assigned_at}</div>
+                ${dr.returned_at ? '<div class="text-success mt-1"><i class="bi bi-check-circle me-1"></i>Returned: ' + dr.returned_at + '</div>' : '<div class="text-muted mt-1 fst-italic">Not yet returned</div>'}
+            </div>`;
+        });
+    }
+    $('#fdDoctorReports').html(drHtml || '<span class="text-muted small fst-italic">Not assigned to any doctor.</span>');
+
+    // --- Activity Timeline ---
+    let actHtml = '';
+    // Created event
+    actHtml += `<div class="timeline-item mb-3 d-flex align-items-start gap-2">
+        <div class="timeline-dot bg-primary text-white"><i class="bi bi-plus-circle-fill" style="font-size:0.75rem;"></i></div>
+        <div>
+            <div class="small fw-semibold">Booking Created</div>
+            <div class="text-muted" style="font-size:0.75rem;">${d.created_at || '—'} &bull; by <strong>${d.created_by_name || '—'}</strong></div>
+        </div>
+    </div>`;
+
+    // Conversion logs
+    if (d.conversion_logs && d.conversion_logs.length > 0) {
+        d.conversion_logs.forEach(function(cv) {
+            actHtml += `<div class="timeline-item mb-3 d-flex align-items-start gap-2">
+                <div class="timeline-dot bg-secondary text-white"><i class="bi bi-arrow-repeat" style="font-size:0.75rem;"></i></div>
+                <div>
+                    <div class="small fw-semibold">Conversion: ${cv.from_type} → ${cv.to_type}</div>
+                    <div class="text-muted" style="font-size:0.75rem;">${cv.created_at || '—'} &bull; by <strong>${cv.converted_by_name || '—'}</strong></div>
+                    ${cv.reason ? '<div class="text-muted" style="font-size:0.75rem;">' + cv.reason + '</div>' : ''}
+                </div>
+            </div>`;
+        });
+    }
+
+    // Technician comments
+    if (d.technician_comments && d.technician_comments.length > 0) {
+        d.technician_comments.forEach(function(c) {
+            actHtml += `<div class="timeline-item mb-3 d-flex align-items-start gap-2">
+                <div class="timeline-dot bg-success text-white"><i class="bi bi-chat-left-text-fill" style="font-size:0.75rem;"></i></div>
+                <div>
+                    <div class="small fw-semibold">${c.user_name || '—'} <span class="badge bg-secondary" style="font-size:0.65rem;">${c.role || ''}</span></div>
+                    <div class="text-muted" style="font-size:0.75rem;">${c.datetime || '—'}</div>
+                    <div class="small mt-1">${c.comment || ''}</div>
+                </div>
+            </div>`;
+        });
+    }
+
+    // Chat summary
+    if (d.chat_summary && d.chat_summary.total_messages > 0) {
+        actHtml += `<div class="timeline-item mb-3 d-flex align-items-start gap-2">
+            <div class="timeline-dot bg-info text-white"><i class="bi bi-chat-dots-fill" style="font-size:0.75rem;"></i></div>
+            <div>
+                <div class="small fw-semibold">Technician Chat (${d.chat_summary.total_messages} message${d.chat_summary.total_messages === 1 ? '' : 's'})</div>
+                <div class="text-muted" style="font-size:0.75rem;">Last activity: ${d.chat_summary.last_activity || '—'}</div>
+            </div>
+        </div>`;
+    }
+
+    $('#fdActivityTimeline').html(actHtml || '<span class="text-muted small fst-italic">—</span>');
+
+    // --- Transfer Card ---
+    if (d.transfer_log) {
+        let tl = d.transfer_log;
+        let transferHtml = `
+            <div class="small">
+                <div class="mb-1"><i class="bi bi-geo-alt me-1 text-warning"></i><strong>From Branch:</strong> ${tl.from_branch_name}</div>
+                <div class="mb-1"><i class="bi bi-geo-alt-fill me-1 text-success"></i><strong>To Branch:</strong> ${tl.to_branch_name}</div>
+                <div class="mb-1"><i class="bi bi-person-fill me-1"></i><strong>Transferred By:</strong> ${tl.transferred_by_name} &bull; ${tl.transferred_at}</div>
+                <div class="mb-1"><i class="bi bi-cash me-1"></i><strong>Cash Held:</strong> Rs. ${(tl.cash_held || 0).toFixed(2)}</div>
+                ${tl.reason ? '<div class="mb-1"><i class="bi bi-chat-left me-1"></i><strong>Reason:</strong> ' + tl.reason + '</div>' : ''}
+                <div class="text-muted mt-2" style="font-size:0.75rem;">Old Booking #${tl.old_booking_id} ${tl.new_booking_id ? '→ New Booking #' + tl.new_booking_id : ''}</div>
+            </div>`;
+        $('#fdTransferBody').html(transferHtml);
+        $('#fdTransferCardCol').show();
+    } else {
+        $('#fdTransferCardCol').hide();
+    }
+}
+
+// Global click handler delegation
+$(document).on('click', '.view-full-details', function() {
+    const bookingId = $(this).data('id');
+    openFullDetailsModal(bookingId);
+});

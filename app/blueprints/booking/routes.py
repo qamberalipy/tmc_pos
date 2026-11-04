@@ -697,3 +697,12 @@ def api_post_chat_message(booking_id):
         media_payloads=media_payloads
     )
     return jsonify(result), status
+
+@booking_bp.route("/full-details/<int:booking_id>", methods=["GET"])
+@login_required
+def get_full_booking_details_api(booking_id):
+    """Full booking details for the read-only modal."""
+    user_role = session.get("user_role", "")
+    branch_id = session.get("branch_id")
+    result, status = booking_services.get_full_booking_details(booking_id, user_role, branch_id)
+    return jsonify(result), status
