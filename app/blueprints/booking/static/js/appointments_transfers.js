@@ -25,6 +25,25 @@ $(document).ready(function () {
         $("#count_trans").text(tabCounts.trans);
     }
 
+    function formatDiscount(discountType, discountValue, totalAmount, netReceivable) {
+        const discVal = Number(discountValue) || 0;
+        if (!discountType || discountType === 'None' || discVal <= 0) {
+            return "-";
+        }
+        if (discountType === 'Percentage') {
+            const total = Number(totalAmount) || 0;
+            const net = Number(netReceivable) || 0;
+            let computedRs = 0;
+            if (total > 0 && net > 0 && total >= net) {
+                computedRs = total - net;
+            } else if (total > 0) {
+                computedRs = (total * discVal) / 100;
+            }
+            return `${discVal}% (Rs. ${computedRs.toFixed(2)})`;
+        }
+        return `Rs. ${discVal.toFixed(2)}`;
+    }
+
     function initTooltips() {
         if (typeof bootstrap !== 'undefined' && bootstrap.Tooltip) {
             var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
@@ -82,7 +101,7 @@ $(document).ready(function () {
             if (data.length === 0) {
                 tbody.html(`
                     <tr>
-                        <td colspan="8" class="text-center py-5 border-0">
+                        <td colspan="9" class="text-center py-5 border-0">
                             <div class="d-flex flex-column align-items-center justify-content-center py-3">
                                 <div class="empty-state-icon-circle mb-3">
                                     <i class="bi bi-calendar-x text-secondary" style="font-size: 2rem; opacity: 0.6;"></i>
@@ -146,6 +165,8 @@ $(document).ready(function () {
                         </div>
                     </div>`;
 
+                let discFormatted = formatDiscount(r.discount_type, r.discount_value, r.total_amount, r.net_receivable);
+
                 // Status badge: consistent sizing and padding with Type badge
                 let statusBadge = '';
                 if (r.status === 'Paid') {
@@ -186,6 +207,7 @@ $(document).ready(function () {
                         <td class="text-center">${typeBadge}</td>
                         <td><span class="small text-secondary">${r.date || '—'}</span></td>
                         <td>${amountHtml}</td>
+                        <td><span class="${discFormatted !== '-' ? 'fw-bold text-dark font-monospace' : 'text-muted'}">${discFormatted}</span></td>
                         <td class="text-center">${statusBadge}</td>
                         <td class="text-center">
                             <div class="d-flex justify-content-center align-items-center gap-1 action-btn-group" style="min-width: 140px;">

@@ -122,6 +122,7 @@ def get_all_test_bookings():
     branch_id = None if role == "admin" else session.get("branch_id")
     from_date = request.args.get("from_date")
     to_date = request.args.get("to_date")
+    booking_types = request.args.get("types") or request.args.get("booking_types")
     if role != 'admin':
         # Calculate date 40 days ago
         limit_date_obj = datetime.now(timezone.utc) - timedelta(days=40)
@@ -131,7 +132,7 @@ def get_all_test_bookings():
         if not from_date or from_date < limit_date_str:
             from_date = limit_date_str
 
-    result, status = booking_services.get_all_test_bookings(branch_id, from_date, to_date)
+    result, status = booking_services.get_all_test_bookings(branch_id, from_date, to_date, booking_types)
     print("All Bookings Data:", result)
     return jsonify(result), status
 

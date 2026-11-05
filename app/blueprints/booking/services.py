@@ -1144,6 +1144,8 @@ def _format_test_booking(row):
         "total_amount": float(row.total_amount) if getattr(row, 'total_amount', None) is not None else float((row.net_receivable or 0) + (row.discount_value or 0)),
         "total_films": row.total_no_of_films_used,
         "discount": float(row.discount_value or 0),
+        "discount_type": row.discount_type or "None",
+        "discount_value": float(row.discount_value or 0),
         "net_amount": float(row.net_receivable or 0),
         "received": float(row.paid_amount or 0),
         "balance": float(row.due_amount or 0),
@@ -1158,7 +1160,7 @@ def _format_test_booking(row):
 
 
 
-def get_all_test_bookings(branch_id=None, from_date=None, to_date=None):
+def get_all_test_bookings(branch_id=None, from_date=None, to_date=None, booking_types=None):
     try:
         start_utc = None
         end_utc = None
@@ -1178,6 +1180,7 @@ def get_all_test_bookings(branch_id=None, from_date=None, to_date=None):
                 TestBooking.net_receivable,
                 TestBooking.total_amount,
                 TestBooking.discount_value,
+                TestBooking.discount_type,
                 TestBooking.is_transferred_in,
                 TestBooking.is_appointment,
                 TestBooking.paid_amount,
@@ -1218,6 +1221,28 @@ def get_all_test_bookings(branch_id=None, from_date=None, to_date=None):
         
         if branch_id:
             query = query.filter(TestBooking.branch_id == branch_id)
+
+        # --- BOOKING TYPE FILTER ---
+        if booking_types:
+            if isinstance(booking_types, str):
+                type_list = [t.strip().lower() for t in booking_types.split(",") if t.strip()]
+            else:
+                type_list = [t.strip().lower() for t in booking_types if t]
+
+            type_conds = []
+            if "transferred" in type_list:
+                type_conds.append(TestBooking.is_transferred_in == True)
+            if "appointment" in type_list:
+                type_conds.append(and_(TestBooking.is_appointment == True, or_(TestBooking.is_transferred_in == False, TestBooking.is_transferred_in == None)))
+            if "normal" in type_list:
+                type_conds.append(and_(
+                    or_(TestBooking.is_appointment == False, TestBooking.is_appointment == None),
+                    or_(TestBooking.is_transferred_in == False, TestBooking.is_transferred_in == None)
+                ))
+            if type_conds:
+                query = query.filter(or_(*type_conds))
+            else:
+                query = query.filter(db.false())
 
         # --- APPLY UTC BOUNDS ---
         if start_utc and end_utc:
@@ -2318,6 +2343,7 @@ def get_appointments_and_transfers_service(branch_id=None, user_role=None, filte
                 TestBooking.net_receivable,
                 TestBooking.total_amount,
                 TestBooking.discount_value,
+                TestBooking.discount_type,
                 TestBooking.is_transferred_in,
                 TestBooking.is_appointment,
                 TestBooking.paid_amount,
@@ -2444,6 +2470,9 @@ def get_appointments_and_transfers_service(branch_id=None, user_role=None, filte
                 "total_amount": total_val,
                 "paid_amount": paid_val,
                 "due_amount": due_val,
+                "discount_type": r.discount_type or "None",
+                "discount_value": float(r.discount_value or 0),
+                "net_receivable": float(r.net_receivable or 0),
                 "status": status,
                 "test_booking_details": r.test_booking_details,
                 "transfer_log": transfer_log,

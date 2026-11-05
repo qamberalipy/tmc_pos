@@ -292,130 +292,236 @@ $(document).ready(function () {
             .catch(err => handleAxiosError(err))
             .finally(() => myhideLoader());
     });
+
+    // ---------------------------------------------------------
+    // 5. BOOKING TYPE FILTER LISTENERS
+    // ---------------------------------------------------------
+    $(document).on("change", ".booking-type-chk", function () {
+        updateBookingTypeDropdownLabel();
+        renderTestBookingsTable();
+    });
+
+    $(document).on("change", "#typeSelectAll", function () {
+        const isChecked = $(this).is(":checked");
+        $(".booking-type-chk").prop("checked", isChecked);
+        updateBookingTypeDropdownLabel();
+        renderTestBookingsTable();
+    });
 });
 
 let grandTotalFilms = 0;
+window.rawBookingsData = [];
+
+// Helper: Format discount amount
+function formatDiscount(discountType, discountValue, totalAmount, netAmount) {
+    const discVal = Number(discountValue) || 0;
+    if (!discountType || discountType === 'None' || discVal <= 0) {
+        return "-";
+    }
+    if (discountType === 'Percentage') {
+        const total = Number(totalAmount) || 0;
+        const net = Number(netAmount) || 0;
+        let computedRs = 0;
+        if (total > 0 && net > 0 && total >= net) {
+            computedRs = total - net;
+        } else if (total > 0) {
+            computedRs = (total * discVal) / 100;
+        }
+        return `${discVal}% (Rs. ${computedRs.toFixed(2)})`;
+    }
+    return `Rs. ${discVal.toFixed(2)}`;
+}
+
+// Helper: Resolve booking type for filtering
+function getBookingType(t) {
+    if (t.is_transferred_in) return "transferred";
+    if (t.is_appointment) return "appointment";
+    return "normal";
+}
+
+function getSelectedBookingTypes() {
+    let selected = [];
+    $(".booking-type-chk:checked").each(function () {
+        selected.push($(this).val());
+    });
+    return selected;
+}
+
+function updateBookingTypeDropdownLabel() {
+    const total = $(".booking-type-chk").length;
+    const checked = $(".booking-type-chk:checked").length;
+    if (checked === total) {
+        $("#bookingTypeLabel").html('<i class="bi bi-funnel me-1"></i>All Types (' + total + ')');
+        $("#typeSelectAll").prop("checked", true).prop("indeterminate", false);
+    } else if (checked === 0) {
+        $("#bookingTypeLabel").html('<i class="bi bi-funnel me-1"></i>None Selected (0)');
+        $("#typeSelectAll").prop("checked", false).prop("indeterminate", false);
+    } else {
+        $("#typeSelectAll").prop("checked", false).prop("indeterminate", true);
+        if (checked === 1) {
+            const val = $(".booking-type-chk:checked").val();
+            let name = val === 'normal' ? 'Normal Booking' : (val === 'appointment' ? 'Appointment' : 'Transferred In');
+            $("#bookingTypeLabel").html('<i class="bi bi-funnel me-1"></i>' + name + ' (1)');
+        } else {
+            $("#bookingTypeLabel").html('<i class="bi bi-funnel me-1"></i>' + checked + ' Types Selected');
+        }
+    }
+}
 
 // ---------------------------------------------------------
-// 4. MAIN TABLE RENDERER (UPDATED FOR TRANSFER BOOKING)
+// 4. MAIN TABLE RENDERER (UPDATED FOR TRANSFER BOOKING & TYPE FILTER)
 // ---------------------------------------------------------
 function getAllTestBookings() {
     myshowLoader();
     const from_date = $("#from_date").val();
     const to_date = $("#to_date").val();
     let url = baseUrl + "/booking/test-booking";
-    if (from_date && to_date) url += `?from_date=${from_date}&to_date=${to_date}`;
+    let params = [];
+    if (from_date && to_date) {
+        params.push(`from_date=${encodeURIComponent(from_date)}`);
+        params.push(`to_date=${encodeURIComponent(to_date)}`);
+    }
+    const selectedTypes = getSelectedBookingTypes();
+    if (selectedTypes.length > 0 && selectedTypes.length < 3) {
+        params.push(`types=${encodeURIComponent(selectedTypes.join(','))}`);
+    }
+    if (params.length > 0) {
+        url += '?' + params.join('&');
+    }
 
     axios.get(url).then(res => {
-        let dtable = $("#testReg_table").DataTable({
-            destroy: true, responsive: true, pageLength: 15, ordering: false, lengthChange: false
+        window.rawBookingsData = res.data || [];
+        renderTestBookingsTable();
+    }).catch(err => {
+        console.error(err);
+        handleAxiosError(err);
+    }).finally(() => myhideLoader());
+}
+
+function renderTestBookingsTable() {
+    let dtable = $("#testReg_table").DataTable({
+        destroy: true, responsive: true, pageLength: 15, ordering: false, lengthChange: false
+    });
+    dtable.clear();
+
+    const selectedTypes = new Set(getSelectedBookingTypes());
+    const data = (window.rawBookingsData || []).filter(t => selectedTypes.has(getBookingType(t)));
+
+    // Reset Map with visible items
+    window.bookingsMap = {};
+
+    // Keep bulk-select state consistent: clear selections hidden by the filter
+    const visibleIds = new Set(data.map(t => String(t.booking_id)));
+    for (let id of Array.from(window.selectedBookingIds)) {
+        if (!visibleIds.has(String(id))) {
+            window.selectedBookingIds.delete(id);
+        }
+    }
+    updateBulkButtonState();
+
+    // Check if select-all should remain checked
+    const eligibleVisible = data.filter(t => !t.is_appointment);
+    if (eligibleVisible.length > 0 && eligibleVisible.every(t => window.selectedBookingIds.has(String(t.booking_id)))) {
+        $("#selectAllBookings").prop("checked", true);
+    } else {
+        $("#selectAllBookings").prop("checked", false);
+    }
+
+    let rowsToAdd = [];
+    $.each(data, function (i, t) {
+        window.bookingsMap[t.booking_id] = t;
+
+        let tests = t.test_booking_details || [];
+        let allTestIdsStr = tests.map(obj => obj.id).join(",");
+
+        // 1. TESTS & STATUS RENDERING
+        let testHtml = `<div class="d-flex flex-column gap-2 py-1">`;
+        tests.forEach(obj => {
+            testHtml += renderTestStatusCard(t.booking_id, obj.id, obj.film_issued, obj.test_name);
         });
-        dtable.clear();
-        window.selectedBookingIds.clear();
-        updateBulkButtonState();
-        
-        // --- NEW: Reset Map ---
-        window.bookingsMap = {}; 
+        testHtml += `</div>`;
 
-        let rowsToAdd = [];
-        $.each(res.data, function (i, t) {
-            // --- NEW: Store Data in Map ---
-            window.bookingsMap[t.booking_id] = t;
+        let currentShareId = t.give_share_to || "";
 
-            let tests = t.test_booking_details || [];
+        // --- 2. Badges ---
+        let transferBadge = "";
+        if (t.is_transferred_in) {
+            let logInfo = t.transfer_in_log
+                ? ` <small class="opacity-75">(${t.transfer_in_log.transferred_at || ''})</small>`
+                : "";
+            transferBadge = `<a href="${baseUrl}/booking/transfers" class="badge bg-warning text-dark ms-1 text-decoration-none" style="font-size:0.65rem;" title="View Transfer History">
+                <i class="bi bi-box-arrow-in-right"></i> Transferred In${logInfo}</a>`;
+        }
+
+        let sentBadge = t.sent_to_doctor
+            ? `<br><span class="badge bg-info text-dark ms-1" style="font-size:0.65rem;"><i class="bi bi-send-check"></i> Sent to Dr</span><br>`
+            : ``;
+
+        let apptBadge = t.is_appointment
+            ? `<span class="badge bg-info ms-1">Appointment</span>`
+            : ``;
+
+        // --- 3. Action Buttons ---
+        let transferBtnHtml = (!t.is_transferred_in)
+            ? `<a href="${baseUrl}/booking/transfer/${t.booking_id}" class="btn btn-action text-info shadow-sm" title="Transfer to Another Branch"><i class="bi bi-arrow-left-right"></i></a>` 
+            : ``;
+
+        let refundBtnHtml = (!t.is_transferred_in)
+            ? `<button class="btn btn-action text-danger shadow-sm refund-booking" data-id="${t.booking_id}" title="Refund &amp; Delete"><i class="bi bi-arrow-counterclockwise"></i></button>`
+            : ``;
+
+        let shareBtnHtml = `<button class="btn btn-action text-warning shadow-sm edit-share" data-id="${t.booking_id}" data-share="${currentShareId}" title="Update Share"><i class="bi bi-person-gear"></i></button>`;
+
+        let convertToNormalBtnHtml = (t.is_appointment && !t.is_transferred_in)
+            ? `<button class="btn btn-action text-success shadow-sm convert-appointment" data-id="${t.booking_id}" title="Confirm Appointment → Normal Booking (deducts films)"><i class="bi bi-calendar2-check"></i></button>`
+            : ``;
+
+        let convertToApptBtnHtml = (!t.is_appointment && !t.is_transferred_in)
+            ? `<button class="btn btn-action text-primary shadow-sm convert-to-appointment" data-id="${t.booking_id}" title="Revert to Appointment (refunds films)"><i class="bi bi-calendar-plus"></i></button>`
+            : ``;
+
+        // 4. ASSEMBLE ACTIONS
+        let actions = `
+        <div class="d-flex gap-1 justify-content-center">
+            <button class="btn btn-action text-info shadow-sm view-full-details" data-id="${t.booking_id}" title="Full Details"><i class="bi bi-info-circle"></i></button>
+            <a href="${baseUrl}/booking/receipt/${t.booking_id}" target="_blank" class="btn btn-action text-success shadow-sm" title="Print Receipt"><i class="bi bi-printer"></i></a>
+            <a href="${baseUrl}/booking/print-sticker/${t.booking_id}" target="_blank" class="btn btn-action text-secondary shadow-sm" title="Print Sticker"><i class="bi bi-tag"></i></a>
             
-            let allTestIdsStr = tests.map(obj => obj.id).join(",");
+            <button class="btn btn-action text-primary shadow-sm comment-booking" data-id="${t.booking_id}" title="Comments"><i class="bi bi-chat-left-text"></i></button>
+            
+            <button class="btn btn-action text-dark shadow-sm edit-films" data-id="${t.booking_id}" data-test-ids="${allTestIdsStr}" title="Edit Films"><i class="bi bi-plus-square"></i></button>
+            
+            ${shareBtnHtml}
+            ${convertToNormalBtnHtml}
+            ${convertToApptBtnHtml}
+            ${transferBtnHtml}
+            ${refundBtnHtml}
+        </div>`;
 
-            // 1. TESTS & STATUS RENDERING
-            let testHtml = `<div class="d-flex flex-column gap-2 py-1">`;
-            tests.forEach(obj => {
-                testHtml += renderTestStatusCard(t.booking_id, obj.id, obj.film_issued, obj.test_name);
-            });
-            testHtml += `</div>`; // Closed div
+        // 5. PUSH TO TABLE ROWS (Includes Discount column)
+        const isSelected = window.selectedBookingIds.has(String(t.booking_id));
+        let chkHtml = t.is_appointment 
+            ? `<input type="checkbox" class="chk-booking custom-chk" value="${t.booking_id}" disabled title="Appointments cannot be assigned to a doctor" style="opacity: 0.35; cursor: not-allowed;">`
+            : `<input type="checkbox" class="chk-booking custom-chk" value="${t.booking_id}" ${isSelected ? 'checked' : ''}>`;
 
-            let currentShareId = t.give_share_to || "";
+        const discFormatted = formatDiscount(t.discount_type, t.discount_value, t.total_amount, t.net_amount);
 
-            // --- 2. Badges ---
-            let transferBadge = "";
-            if (t.is_transferred_in) {
-                let logInfo = t.transfer_in_log
-                    ? ` <small class="opacity-75">(${t.transfer_in_log.transferred_at || ''})</small>`
-                    : "";
-                transferBadge = `<a href="${baseUrl}/booking/transfers" class="badge bg-warning text-dark ms-1 text-decoration-none" style="font-size:0.65rem;" title="View Transfer History">
-                    <i class="bi bi-box-arrow-in-right"></i> Transferred In${logInfo}</a>`;
-            }
+        rowsToAdd.push([
+            chkHtml,
+            `<div><div class="fw-bold">#${t.booking_id}</div><div class="text-muted text-xs">${t.date}</div></div>`,
+            `<div><div class="fw-bold text-primary">${t.patient_name} ${transferBadge}${sentBadge}${apptBadge}</div><div class="text-muted text-xs">MR: ${t.mr_no || 'N/A'}</div></div>`,
+            testHtml,
+            `<div class="text-xs fw-medium">${t.referred_dr || 'Self'}</div>`,
+            `<div class="text-xs">${t.total_amount}</div>`,
+            `<div class="text-xs ${discFormatted !== '-' ? 'text-warning fw-semibold' : 'text-muted'}">${discFormatted}</div>`,
+            `<div class="fw-bold text-success">${t.received}</div>`,
+            `<div class="fw-bold ${t.balance > 0 ? 'text-danger' : 'text-success'}">${t.balance}</div>`,
+            actions
+        ]);
+    });
 
-            let sentBadge = t.sent_to_doctor
-                ? `<br><span class="badge bg-info text-dark ms-1" style="font-size:0.65rem;"><i class="bi bi-send-check"></i> Sent to Dr</span><br>`
-                : ``;
-
-            let apptBadge = t.is_appointment
-                ? `<span class="badge bg-info ms-1">Appointment</span>`
-                : ``;
-
-            // --- 3. UPDATE: Action Buttons with full terminal-state enforcement ---
-            // If is_transferred_in == True the booking is terminal: NO convert/transfer/refund (share is allowed so target branch can assign commission).
-
-            let transferBtnHtml = (!t.is_transferred_in)
-                ? `<a href="${baseUrl}/booking/transfer/${t.booking_id}" class="btn btn-action text-info shadow-sm" title="Transfer to Another Branch"><i class="bi bi-arrow-left-right"></i></a>` 
-                : ``;
-
-            let refundBtnHtml = (!t.is_transferred_in)
-                ? `<button class="btn btn-action text-danger shadow-sm refund-booking" data-id="${t.booking_id}" title="Refund &amp; Delete"><i class="bi bi-arrow-counterclockwise"></i></button>`
-                : ``;
-
-            let shareBtnHtml = `<button class="btn btn-action text-warning shadow-sm edit-share" data-id="${t.booking_id}" data-share="${currentShareId}" title="Update Share"><i class="bi bi-person-gear"></i></button>`;
-
-            // Convert Appointment → Normal (Conversion #1): only for appointments, never for transferred-in
-            let convertToNormalBtnHtml = (t.is_appointment && !t.is_transferred_in)
-                ? `<button class="btn btn-action text-success shadow-sm convert-appointment" data-id="${t.booking_id}" title="Confirm Appointment → Normal Booking (deducts films)"><i class="bi bi-calendar2-check"></i></button>`
-                : ``;
-
-            // Convert Normal → Appointment (Conversion #2): only for non-appointments, never for transferred-in
-            let convertToApptBtnHtml = (!t.is_appointment && !t.is_transferred_in)
-                ? `<button class="btn btn-action text-primary shadow-sm convert-to-appointment" data-id="${t.booking_id}" title="Revert to Appointment (refunds films)"><i class="bi bi-calendar-plus"></i></button>`
-                : ``;
-
-            // 4. ASSEMBLE ACTIONS
-            let actions = `
-            <div class="d-flex gap-1 justify-content-center">
-                <button class="btn btn-action text-info shadow-sm view-full-details" data-id="${t.booking_id}" title="Full Details"><i class="bi bi-info-circle"></i></button>
-                <a href="${baseUrl}/booking/receipt/${t.booking_id}" target="_blank" class="btn btn-action text-success shadow-sm" title="Print Receipt"><i class="bi bi-printer"></i></a>
-                <a href="${baseUrl}/booking/print-sticker/${t.booking_id}" target="_blank" class="btn btn-action text-secondary shadow-sm" title="Print Sticker"><i class="bi bi-tag"></i></a>
-                
-                <button class="btn btn-action text-primary shadow-sm comment-booking" data-id="${t.booking_id}" title="Comments"><i class="bi bi-chat-left-text"></i></button>
-                
-                <button class="btn btn-action text-dark shadow-sm edit-films" data-id="${t.booking_id}" data-test-ids="${allTestIdsStr}" title="Edit Films"><i class="bi bi-plus-square"></i></button>
-                
-                ${shareBtnHtml}
-                ${convertToNormalBtnHtml}
-                ${convertToApptBtnHtml}
-                ${transferBtnHtml}
-                ${refundBtnHtml}
-            </div>`;
-
-
-            // 5. PUSH TO TABLE ROWS
-            let chkHtml = t.is_appointment 
-                ? `<input type="checkbox" class="chk-booking custom-chk" value="${t.booking_id}" disabled title="Appointments cannot be assigned to a doctor" style="opacity: 0.35; cursor: not-allowed;">`
-                : `<input type="checkbox" class="chk-booking custom-chk" value="${t.booking_id}">`;
-
-            rowsToAdd.push([
-                chkHtml,
-                `<div><div class="fw-bold">#${t.booking_id}</div><div class="text-muted text-xs">${t.date}</div></div>`,
-                `<div><div class="fw-bold text-primary">${t.patient_name} ${transferBadge}${sentBadge}${apptBadge}</div><div class="text-muted text-xs">MR: ${t.mr_no || 'N/A'}</div></div>`,
-                testHtml,
-                `<div class="text-xs fw-medium">${t.referred_dr || 'Self'}</div>`,
-                `<div class=" text-xs">${t.total_amount}</div>`,
-                `<div class=" fw-bold text-success">${t.received}</div>`,
-                `<div class=" fw-bold ${t.balance > 0 ? 'text-danger' : 'text-success'}">${t.balance}</div>`,
-                actions
-            ]);
-        });
-
-        dtable.rows.add(rowsToAdd).draw(false);
-        rebindTableEvents();
-    }).catch(err => console.error(err)).finally(() => myhideLoader());
+    dtable.rows.add(rowsToAdd).draw(false);
+    rebindTableEvents();
 }
 
 // ---------------------------------------------------------
