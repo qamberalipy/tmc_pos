@@ -2551,6 +2551,7 @@ def get_full_booking_details(booking_id, user_role, branch_id):
         # --- 7. Test line items ---
         test_rows = (
             db.session.query(
+                Test_registration.id.label("test_id"),
                 Test_registration.test_name,
                 TestBookingDetails.amount,
                 TestBookingDetails.quantity,
@@ -2563,6 +2564,7 @@ def get_full_booking_details(booking_id, user_role, branch_id):
         )
         tests = [
             {
+                "test_id": r.test_id,
                 "test_name": r.test_name,
                 "amount": float(r.amount or 0),
                 "quantity": r.quantity or 1,

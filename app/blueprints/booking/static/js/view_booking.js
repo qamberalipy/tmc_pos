@@ -176,9 +176,16 @@ $(document).ready(function () {
     // ---------------------------------------------------------
     $("#selectAllBookings").on("change", function () {
         const isChecked = $(this).is(":checked");
-        $(".chk-booking").prop("checked", isChecked);
+        const $activeChks = $(".chk-booking:not(:disabled)");
+        $activeChks.prop("checked", isChecked);
         if (isChecked) {
-            $(".chk-booking").each(function () { window.selectedBookingIds.add($(this).val()); });
+            $activeChks.each(function () {
+                const bId = $(this).val();
+                let bData = window.bookingsMap[bId];
+                if (!bData || !bData.is_appointment) {
+                    window.selectedBookingIds.add(bId);
+                }
+            });
         } else {
             window.selectedBookingIds.clear();
         }
@@ -187,6 +194,14 @@ $(document).ready(function () {
 
     $("#testReg_table").on("change", ".chk-booking", function () {
         const id = $(this).val();
+        let bData = window.bookingsMap[id];
+        if (bData && bData.is_appointment) {
+            $(this).prop("checked", false);
+            window.selectedBookingIds.delete(id);
+            showToastMessage("warning", "Appointments cannot be assigned to a doctor.");
+            updateBulkButtonState();
+            return;
+        }
         if ($(this).is(":checked")) { window.selectedBookingIds.add(id); }
         else { window.selectedBookingIds.delete(id); $("#selectAllBookings").prop("checked", false); }
         updateBulkButtonState();
@@ -194,6 +209,23 @@ $(document).ready(function () {
 
     $("#btnBulkAssign").on("click", function () {
         if (window.selectedBookingIds.size === 0) return;
+
+        let skippedApptCount = 0;
+        window.selectedBookingIds.forEach(function (bId) {
+            let bData = window.bookingsMap[bId];
+            if (bData && bData.is_appointment) {
+                window.selectedBookingIds.delete(bId);
+                $(`.chk-booking[value="${bId}"]`).prop("checked", false);
+                skippedApptCount++;
+            }
+        });
+        if (skippedApptCount > 0) {
+            showToastMessage("warning", `${skippedApptCount} appointment booking(s) skipped (cannot be assigned to a doctor).`);
+            updateBulkButtonState();
+        }
+
+        if (window.selectedBookingIds.size === 0) return;
+
         $("#modalSelectedCount").text(window.selectedBookingIds.size);
         $("#doctorSelectDropdown").html('<option value="" selected disabled>Loading Doctors...</option>');
         $("#assignDoctorModal").modal("show");
@@ -212,25 +244,32 @@ $(document).ready(function () {
         if (!doctorId) return showToastMessage("error", "Please select a doctor.");
 
         let bookingDetails = [];
-        let hasIssuedSkipped = false; // Changed flag to track skipped 'Issued' tests
+        let hasIssuedSkipped = false;
+        let hasApptSkipped = false;
 
-        // --- CHANGED LOGIC: Iterate Global Map Instead of DOM ---
         window.selectedBookingIds.forEach(function (bId) {
             let bookingData = window.bookingsMap[bId];
 
+            if (bookingData && bookingData.is_appointment) {
+                hasApptSkipped = true;
+                return;
+            }
+
             if (bookingData && bookingData.test_booking_details) {
-                // Filter for PENDING (unissued) tests directly from data object
                 let pendingTests = bookingData.test_booking_details.filter(t => t.film_issued === false || !t.film_issued);
                 
                 if (pendingTests.length > 0) {
                     let idsArray = pendingTests.map(t => t.id);
                     bookingDetails.push({ booking_id: bId, test_ids: idsArray });
                 } else {
-                    hasIssuedSkipped = true; // All tests in this booking are issued, so we skip it
+                    hasIssuedSkipped = true;
                 }
             }
         });
-        // -------------------------------------------------------
+
+        if (hasApptSkipped) {
+            showToastMessage("warning", "Appointment booking(s) skipped (cannot be assigned).");
+        }
 
         if (bookingDetails.length === 0) {
             showToastMessage("warning", "None of the selected bookings have PENDING tests to assign.");
@@ -240,8 +279,8 @@ $(document).ready(function () {
         myshowLoader();
         axios.post(baseUrl + "/reports/assign-bookings", { doctor_id: doctorId, bookings: bookingDetails })
             .then(res => {
-                let msg = "Bookings assigned successfully!";
-                if(hasIssuedSkipped) msg += " (Issued tests were skipped)";
+                let msg = res.data?.message || "Bookings assigned successfully!";
+                if(hasIssuedSkipped && !msg.includes("skipped")) msg += " (Issued tests were skipped)";
                 showToastMessage("success", msg);
                 
                 $("#assignDoctorModal").modal("hide");
@@ -290,19 +329,7 @@ function getAllTestBookings() {
             // 1. TESTS & STATUS RENDERING
             let testHtml = `<div class="d-flex flex-column gap-2 py-1">`;
             tests.forEach(obj => {
-                const isChecked = obj.film_issued ? 'checked' : '';
-                const theme = obj.film_issued ? 'status-issued' : 'status-pending';
-                testHtml += `
-                <div class="test-status-card ${theme} d-flex align-items-center justify-content-between px-2 py-1 rounded-2">
-                    <div class="d-flex flex-column">
-                        <span class="test-title fw-bold text-uppercase">${obj.test_name}</span>
-                        <span class="status-indicator small fw-bold">${obj.film_issued ? 'ISSUED' : 'PENDING'}</span>
-                    </div>
-                    <div class="form-check form-switch m-0">
-                        <input class="form-check-input film-issue-toggle modern-switch" type="checkbox" 
-                            ${isChecked} data-booking-id="${t.booking_id}" data-test-id="${obj.id}">
-                    </div>
-                </div>`;
+                testHtml += renderTestStatusCard(t.booking_id, obj.id, obj.film_issued, obj.test_name);
             });
             testHtml += `</div>`; // Closed div
 
@@ -369,8 +396,12 @@ function getAllTestBookings() {
 
 
             // 5. PUSH TO TABLE ROWS
+            let chkHtml = t.is_appointment 
+                ? `<input type="checkbox" class="chk-booking custom-chk" value="${t.booking_id}" disabled title="Appointments cannot be assigned to a doctor" style="opacity: 0.35; cursor: not-allowed;">`
+                : `<input type="checkbox" class="chk-booking custom-chk" value="${t.booking_id}">`;
+
             rowsToAdd.push([
-                `<input type="checkbox" class="chk-booking custom-chk" value="${t.booking_id}">`,
+                chkHtml,
                 `<div><div class="fw-bold">#${t.booking_id}</div><div class="text-muted text-xs">${t.date}</div></div>`,
                 `<div><div class="fw-bold text-primary">${t.patient_name} ${transferBadge}${sentBadge}${apptBadge}</div><div class="text-muted text-xs">MR: ${t.mr_no || 'N/A'}</div></div>`,
                 testHtml,
@@ -537,10 +568,54 @@ function loadShareProviders() {
         .catch(err => console.error("Failed to load providers", err));
 }
 
+function renderTestStatusCard(bookingId, testId, isIssued, testTitle = null) {
+    const isChecked = isIssued ? 'checked' : '';
+    const theme = isIssued ? 'status-issued' : 'status-pending';
+    const titleHtml = testTitle 
+        ? `<span class="test-title fw-bold text-uppercase">${testTitle}</span>` 
+        : '';
+    return `
+    <div class="test-status-card ${theme} d-flex align-items-center justify-content-between px-2 py-1 rounded-2" data-booking-id="${bookingId}" data-test-id="${testId}">
+        <div class="d-flex flex-column">
+            ${titleHtml}
+            <span class="status-indicator small fw-bold">${isIssued ? 'ISSUED' : 'PENDING'}</span>
+        </div>
+        <div class="form-check form-switch m-0 ms-2">
+            <input class="form-check-input film-issue-toggle modern-switch" type="checkbox" 
+                ${isChecked} data-booking-id="${bookingId}" data-test-id="${testId}">
+        </div>
+    </div>`;
+}
+
+function updateFilmIssueUI(bookingId, testId, isIssued) {
+    const $cards = $(`.test-status-card[data-booking-id="${bookingId}"][data-test-id="${testId}"]`);
+    $cards.each(function () {
+        const $card = $(this);
+        const $statusLabel = $card.find('.status-indicator');
+        const $toggle = $card.find('.film-issue-toggle');
+
+        $toggle.prop('checked', isIssued);
+        if (isIssued) {
+            $card.removeClass('status-pending').addClass('status-issued');
+            $statusLabel.text('ISSUED');
+        } else {
+            $card.removeClass('status-issued').addClass('status-pending');
+            $statusLabel.text('PENDING');
+        }
+    });
+
+    // Also update window.bookingsMap if present
+    if (window.bookingsMap && window.bookingsMap[bookingId]) {
+        let tests = window.bookingsMap[bookingId].test_booking_details;
+        if (tests) {
+            let tObj = tests.find(x => x.id === testId);
+            if (tObj) tObj.film_issued = isIssued;
+        }
+    }
+}
+
 $(document).on("change", ".film-issue-toggle", function () {
     const $toggle = $(this);
-    const $card = $toggle.closest('.test-status-card');
-    const $statusLabel = $card.find('.status-indicator');
     const bookingId = $toggle.data("booking-id");
     const testId = $toggle.data("test-id");
     const isIssued = $toggle.is(":checked");
@@ -556,41 +631,21 @@ $(document).on("change", ".film-issue-toggle", function () {
         cancelButtonText: 'No'
     }).then((result) => {
         if (result.isConfirmed) {
-            // Apply the checkbox and UI changes
-            $toggle.prop('checked', isIssued);
-            if (isIssued) {
-                $card.removeClass('status-pending').addClass('status-issued');
-                $statusLabel.text('ISSUED');
-            } else {
-                $card.removeClass('status-issued').addClass('status-pending');
-                $statusLabel.text('PENDING');
-            }
+            updateFilmIssueUI(bookingId, testId, isIssued);
+            const $cards = $(`.test-status-card[data-booking-id="${bookingId}"][data-test-id="${testId}"]`);
+            $cards.css('opacity', '0.6');
 
-            $card.css('opacity', '0.6');
             axios.post(baseUrl + "/booking/update-film-status", {
                 booking_id: bookingId, test_id: testId, film_issued: isIssued
             })
                 .then(() => {
                     showToastMessage("success", "Film status updated");
-                    // Also update the local map so if user clicks Bulk Assign immediately, data is fresh
-                    if(window.bookingsMap[bookingId]) {
-                         let tests = window.bookingsMap[bookingId].test_booking_details;
-                         let tObj = tests.find(x => x.id === testId);
-                         if(tObj) tObj.film_issued = isIssued;
-                    }
                 })
                 .catch(err => {
-                    $toggle.prop('checked', !isIssued);
-                    if (isIssued) {
-                        $card.removeClass('status-issued').addClass('status-pending');
-                        $statusLabel.text('PENDING');
-                    } else {
-                        $card.removeClass('status-pending').addClass('status-issued');
-                        $statusLabel.text('ISSUED');
-                    }
+                    updateFilmIssueUI(bookingId, testId, !isIssued);
                     handleAxiosError(err);
                 })
-                .finally(() => $card.css('opacity', '1'));
+                .finally(() => $cards.css('opacity', '1'));
         }
         // On cancel/dismiss: checkbox already reverted, do nothing
     });
@@ -655,7 +710,7 @@ function openFullDetailsModal(bookingId) {
     $('#fdContent').hide();
     $('#fdBookingTitle').text('Loading…');
     $('#fdBadgesRow').html('');
-    $('#fdPrintBtn').attr('href', baseUrl + '/booking/receipt/' + bookingId);
+    $('#fdPrintBtn').attr('href', baseUrl + '/booking/print-details/' + bookingId);
     $('#fullDetailsModal').modal('show');
 
     axios.get(baseUrl + '/booking/full-details/' + bookingId)
@@ -796,15 +851,12 @@ function renderFullDetails(d) {
     let testHtml = '';
     if (d.tests && d.tests.length > 0) {
         d.tests.forEach(function(t) {
-            let filmBadge = t.film_issued
-                ? '<span class="badge bg-success" style="font-size:0.65rem;">Issued</span>'
-                : '<span class="badge bg-warning text-dark" style="font-size:0.65rem;">Pending</span>';
             testHtml += `<tr>
-                <td class="small fw-semibold">${t.test_name}</td>
-                <td class="text-end small">Rs. ${(t.amount || 0).toFixed(2)}</td>
-                <td class="text-center small">${t.quantity || 1}</td>
-                <td class="text-center small">${t.no_of_films || 0}</td>
-                <td class="text-center">${filmBadge}</td>
+                <td class="small fw-semibold align-middle">${t.test_name}</td>
+                <td class="text-end small align-middle">Rs. ${(t.amount || 0).toFixed(2)}</td>
+                <td class="text-center small align-middle">${t.quantity || 1}</td>
+                <td class="text-center small align-middle">${t.no_of_films || 0}</td>
+                <td class="text-center align-middle">${renderTestStatusCard(d.booking_id, t.test_id, t.film_issued)}</td>
             </tr>`;
         });
     }

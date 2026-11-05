@@ -7,6 +7,8 @@ from zoneinfo import ZoneInfo
 from app.models.user import User
 from app.models.branch import Branch
 from app.models.shift import ShiftSession
+from app.models.test_booking import TestBooking
+from app.extensions import db
 
 @reports_bp.route('/view/test-report')
 @login_required
@@ -202,9 +204,34 @@ def assign_bookings():
         return jsonify({"error": "bookings data and doctor_id are required"}), 400
 
     try:
+        # Server-side guard: filter out or reject appointments
+        booking_ids = []
+        for item in bookings_payload:
+            try:
+                booking_ids.append(int(item.get("booking_id")))
+            except (ValueError, TypeError):
+                pass
+
+        skipped_appointments = []
+        valid_payload = bookings_payload
+        if booking_ids:
+            appt_rows = db.session.query(TestBooking.id).filter(
+                TestBooking.id.in_(booking_ids),
+                TestBooking.is_appointment == True
+            ).all()
+            appt_id_set = {str(row[0]) for row in appt_rows}
+            if appt_id_set:
+                skipped_appointments = list(appt_id_set)
+                valid_payload = [item for item in bookings_payload if str(item.get("booking_id")) not in appt_id_set]
+
+        if not valid_payload:
+            return jsonify({
+                "error": "Appointments cannot be assigned to a doctor. Please convert to a normal booking first."
+            }), 400
+
         # Pass the list of objects to the service
         result_count = report_services.assign_bookings_to_doctor(
-            bookings_payload=bookings_payload,
+            bookings_payload=valid_payload,
             doctor_id=doctor_id,
             assigned_by=user_id,
             branch_id=branch_id
@@ -213,10 +240,13 @@ def assign_bookings():
         msg = f"{result_count} tests assigned successfully"
         if result_count == 0:
             msg = "No new tests were assigned (all selected tests were already assigned)."
+        if skipped_appointments:
+            msg += f" ({len(skipped_appointments)} appointment booking(s) skipped)"
 
         return jsonify({
             "message": msg, 
-            "assigned_count": result_count
+            "assigned_count": result_count,
+            "skipped_appointments": skipped_appointments
         }), 200
 
     except Exception as e:
