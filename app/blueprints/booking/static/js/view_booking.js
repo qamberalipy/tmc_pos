@@ -327,7 +327,7 @@ function getAllTestBookings() {
                 : ``;
 
             // --- 3. UPDATE: Action Buttons with full terminal-state enforcement ---
-            // If is_transferred_in == True the booking is terminal: NO convert/transfer/refund/share.
+            // If is_transferred_in == True the booking is terminal: NO convert/transfer/refund (share is allowed so target branch can assign commission).
 
             let transferBtnHtml = (!t.is_transferred_in)
                 ? `<a href="${baseUrl}/booking/transfer/${t.booking_id}" class="btn btn-action text-info shadow-sm" title="Transfer to Another Branch"><i class="bi bi-arrow-left-right"></i></a>` 
@@ -337,9 +337,7 @@ function getAllTestBookings() {
                 ? `<button class="btn btn-action text-danger shadow-sm refund-booking" data-id="${t.booking_id}" title="Refund &amp; Delete"><i class="bi bi-arrow-counterclockwise"></i></button>`
                 : ``;
 
-            let shareBtnHtml = (!t.is_transferred_in)
-                ? `<button class="btn btn-action text-warning shadow-sm edit-share" data-id="${t.booking_id}" data-share="${currentShareId}" title="Update Share"><i class="bi bi-person-gear"></i></button>`
-                : ``;
+            let shareBtnHtml = `<button class="btn btn-action text-warning shadow-sm edit-share" data-id="${t.booking_id}" data-share="${currentShareId}" title="Update Share"><i class="bi bi-person-gear"></i></button>`;
 
             // Convert Appointment → Normal (Conversion #1): only for appointments, never for transferred-in
             let convertToNormalBtnHtml = (t.is_appointment && !t.is_transferred_in)
