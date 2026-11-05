@@ -122,6 +122,7 @@ def get_all_test_bookings():
     branch_id = None if role == "admin" else session.get("branch_id")
     from_date = request.args.get("from_date")
     to_date = request.args.get("to_date")
+    booking_types = request.args.get("types") or request.args.get("booking_types")
     if role != 'admin':
         # Calculate date 40 days ago
         limit_date_obj = datetime.now(timezone.utc) - timedelta(days=40)
@@ -131,7 +132,7 @@ def get_all_test_bookings():
         if not from_date or from_date < limit_date_str:
             from_date = limit_date_str
 
-    result, status = booking_services.get_all_test_bookings(branch_id, from_date, to_date)
+    result, status = booking_services.get_all_test_bookings(branch_id, from_date, to_date, booking_types)
     print("All Bookings Data:", result)
     return jsonify(result), status
 
@@ -706,3 +707,18 @@ def get_full_booking_details_api(booking_id):
     branch_id = session.get("branch_id")
     result, status = booking_services.get_full_booking_details(booking_id, user_role, branch_id)
     return jsonify(result), status
+
+@booking_bp.route("/print-details/<int:booking_id>")
+@login_required
+def print_booking_details(booking_id):
+    """Printable page for full booking details (opens in new tab, auto-triggers print)."""
+    try:
+        user_role = session.get("user_role", "")
+        branch_id = session.get("branch_id")
+        data, status = booking_services.get_full_booking_details(booking_id, user_role, branch_id)
+        if status != 200:
+            return render_template("error_page.html", message=data.get("error", "Booking not found")), status
+        return render_template("booking_details_print.html", d=data)
+    except Exception as e:
+        print(f"Error in print_booking_details: {str(e)}")
+        return redirect(url_for("main.error_page"))

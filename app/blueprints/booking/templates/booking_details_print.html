@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Booking Details #{{ d.booking_id }} - {{ d.patient_name }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css"
+        integrity="sha384-4LISF5TTJX/fLmGSxO53rV4miRxdg84mZsxmO8Rx5jGtp/LbrixFETvWa5a6sESd" crossorigin="anonymous">
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            color: #212529;
+            background-color: #f8f9fa;
+        }
+
+        .print-container {
+            max-width: 1000px;
+            margin: 20px auto;
+            background: #fff;
+            padding: 24px;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .fd-stat-tile {
+            text-align: center;
+            padding: 0.6rem 0.4rem;
+            border-radius: 8px;
+        }
+        .fd-stat-tile .fd-stat-label {
+            font-size: 0.68rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #6c757d;
+        }
+        .fd-stat-tile .fd-stat-value {
+            font-size: 1.1rem;
+            font-weight: 700;
+        }
+
+        .timeline-dot {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            font-size: 0.75rem;
+        }
+
+        .test-status-chip {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+        .status-chip-issued {
+            background-color: #f0fff4;
+            color: #2f855a;
+            border: 1px solid #c6f6d5;
+        }
+        .status-chip-pending {
+            background-color: #fffaf0;
+            color: #dd6b20;
+            border: 1px solid #feebc8;
+        }
+
+        @media print {
+            .d-print-none {
+                display: none !important;
+            }
+            body {
+                background: #fff !important;
+                padding: 0 !important;
+            }
+            .print-container {
+                max-width: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                box-shadow: none !important;
+                border: none !important;
+            }
+            .card {
+                break-inside: avoid;
+                page-break-inside: avoid;
+                border: 1px solid #dee2e6 !important;
+                box-shadow: none !important;
+                margin-bottom: 1rem !important;
+            }
+            .card-header {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            .badge {
+                border: 1px solid #ccc !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="print-container">
+    <!-- Top Action Bar (hidden in print) -->
+    <div class="d-print-none d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
+        <div>
+            <h5 class="mb-0 text-dark"><i class="bi bi-file-earmark-text me-1 text-primary"></i> Booking Details Printout</h5>
+            <small class="text-muted">Booking #{{ d.booking_id }} &bull; MR: {{ d.mr_no or '—' }}</small>
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-primary btn-sm px-3 shadow-sm" onclick="window.print()">
+                <i class="bi bi-printer me-1"></i> Print
+            </button>
+            <button class="btn btn-outline-secondary btn-sm px-3" onclick="window.close()">
+                <i class="bi bi-x-lg me-1"></i> Close
+            </button>
+        </div>
+    </div>
+
+    <!-- Header Strip -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center bg-dark text-white p-3 rounded mb-3">
+        <div>
+            <div class="d-flex align-items-center gap-2 mb-1">
+                <span class="fs-5 fw-bold"><i class="bi bi-bookmark-fill me-1 text-warning"></i> Booking #{{ d.booking_id }}</span>
+                <span class="text-warning fw-semibold">MR: {{ d.mr_no or '—' }}</span>
+            </div>
+            <div class="d-flex flex-wrap gap-1 align-items-center">
+                {% if d.is_appointment %}
+                    <span class="badge bg-info text-dark"><i class="bi bi-calendar-check me-1"></i>Appointment</span>
+                {% elif d.is_transferred_in %}
+                    <span class="badge bg-warning text-dark"><i class="bi bi-box-arrow-in-right me-1"></i>Transferred In</span>
+                {% else %}
+                    <span class="badge bg-secondary">Normal</span>
+                {% endif %}
+
+                {% if d.due_amount <= 0 %}
+                    <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Paid</span>
+                {% elif d.paid_amount > 0 and d.due_amount > 0 %}
+                    <span class="badge bg-warning text-dark"><i class="bi bi-exclamation-circle me-1"></i>Partial</span>
+                {% else %}
+                    <span class="badge bg-danger"><i class="bi bi-x-circle me-1"></i>Unpaid</span>
+                {% endif %}
+            </div>
+        </div>
+        <div class="text-end text-light small mt-2 mt-md-0">
+            <div><i class="bi bi-geo-alt-fill me-1 text-warning"></i><strong>{{ d.booking_branch_name or '—' }}</strong></div>
+            <div class="opacity-75"><i class="bi bi-clock me-1"></i>{{ d.created_at or '—' }}</div>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <!-- Patient Card -->
+        <div class="col-md-6">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-header bg-primary text-white py-2 d-flex align-items-center gap-2">
+                    <i class="bi bi-person-fill"></i> <span class="fw-semibold small text-uppercase">Patient Details</span>
+                </div>
+                <div class="card-body py-2 px-3">
+                    <div class="fw-bold fs-6 mb-1 text-primary">{{ d.patient_name or '—' }}</div>
+                    <div class="text-muted small">
+                        {% if d.age is not none %}{{ d.age }} {{ d.age_unit or 'Years' }}{% else %}—{% endif %} &bull; {{ d.gender or '—' }}
+                    </div>
+                    <div class="mt-1"><i class="bi bi-telephone-fill text-success me-1"></i>{{ d.contact_no or '—' }}</div>
+                    <hr class="my-2">
+                    <div class="small text-muted"><i class="bi bi-calendar3 me-1"></i>Booking Date: <strong>{{ d.created_at or '—' }}</strong></div>
+                    <div class="small text-muted"><i class="bi bi-person-check me-1"></i>Created by: <strong>{{ d.created_by_name or '—' }}</strong></div>
+                    {% if d.updated_at %}
+                        <div class="small text-muted"><i class="bi bi-pencil-square me-1 text-warning"></i>Updated: {{ d.updated_at }} {% if d.updated_by_name %}by <strong>{{ d.updated_by_name }}</strong>{% endif %}</div>
+                    {% endif %}
+                    <div class="small text-muted"><i class="bi bi-geo-alt-fill me-1"></i>Branch: <strong>{{ d.booking_branch_name or '—' }}</strong></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Referral Card -->
+        <div class="col-md-6">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-header bg-info text-white py-2 d-flex align-items-center gap-2">
+                    <i class="bi bi-person-lines-fill"></i> <span class="fw-semibold small text-uppercase">Referral</span>
+                </div>
+                <div class="card-body py-2 px-3">
+                    <div class="small mb-1">
+                        <span class="text-muted">Referring Doctor:</span>
+                        <span class="fw-semibold">{{ d.referred_dr_name or '—' }}</span>
+                        {% if d.referred_dr_contact %}<span class="text-muted">({{ d.referred_dr_contact }})</span>{% endif %}
+                    </div>
+                    <div class="small mb-1">
+                        <span class="text-muted">Non-Doctor:</span>
+                        <span class="fw-semibold">{{ d.referred_non_dr_name or '—' }}</span>
+                        {% if d.referred_non_dr_contact %}<span class="text-muted">({{ d.referred_non_dr_contact }})</span>{% endif %}
+                    </div>
+                    <div class="small mb-2">
+                        <span class="text-muted">Give Share To:</span>
+                        <span class="fw-semibold">{{ d.give_share_to_name or '—' }}</span>
+                    </div>
+                    <hr class="my-2">
+                    <div>
+                        {% if d.referral_share %}
+                            <div class="d-flex flex-wrap align-items-center gap-2 small">
+                                {% if d.referral_share.is_paid %}
+                                    <span class="badge bg-success"><i class="bi bi-check2-all me-1"></i>Issued</span>
+                                {% else %}
+                                    <span class="badge bg-warning text-dark"><i class="bi bi-hourglass-split me-1"></i>Pending</span>
+                                {% endif %}
+                                <span>Rs. <strong>{{ "%.2f"|format(d.referral_share.share_amount or 0) }}</strong></span>
+                                <span class="text-muted">To: <strong>{{ d.referral_share.issued_to_name or '—' }}</strong></span>
+                                {% if d.referral_share.is_paid %}
+                                    <span class="text-muted">on {{ d.referral_share.paid_at or '—' }} by <strong>{{ d.referral_share.created_by_name or '—' }}</strong></span>
+                                {% endif %}
+                            </div>
+                        {% else %}
+                            <span class="text-muted small fst-italic">No referral share record.</span>
+                        {% endif %}
+                    </div>
+                    <!-- UB status placeholder -->
+                    <div class="mt-2 p-2 rounded bg-light border small text-muted">
+                        <i class="bi bi-question-circle me-1"></i> UB: <em>not tracked</em>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Financial Summary -->
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-success text-white py-2 d-flex align-items-center gap-2">
+                    <i class="bi bi-cash-stack"></i> <span class="fw-semibold small text-uppercase">Financial Summary</span>
+                </div>
+                <div class="card-body py-2 px-3">
+                    <div class="row g-2 mb-3">
+                        <div class="col"><div class="fd-stat-tile bg-light border"><div class="fd-stat-label">Total</div><div class="fd-stat-value">Rs. {{ "%.2f"|format(d.total_amount or 0) }}</div></div></div>
+                        <div class="col"><div class="fd-stat-tile bg-light border"><div class="fd-stat-label">Discount</div><div class="fd-stat-value text-warning">{% if d.discount_type and d.discount_type != 'None' %}{% if d.discount_type == 'Percentage' %}{{ d.discount_value }}%{% else %}Rs. {{ "%.2f"|format(d.discount_value or 0) }}{% endif %}{% else %}None{% endif %}</div></div></div>
+                        <div class="col"><div class="fd-stat-tile bg-light border"><div class="fd-stat-label">Net</div><div class="fd-stat-value">Rs. {{ "%.2f"|format(d.net_receivable or 0) }}</div></div></div>
+                        <div class="col"><div class="fd-stat-tile bg-success bg-opacity-10 border border-success"><div class="fd-stat-label text-success">Paid</div><div class="fd-stat-value text-success">Rs. {{ "%.2f"|format(d.paid_amount or 0) }}</div></div></div>
+                        <div class="col"><div class="fd-stat-tile {% if d.due_amount > 0 %}bg-danger bg-opacity-10 border border-danger{% else %}bg-light border{% endif %}"><div class="fd-stat-label {% if d.due_amount > 0 %}text-danger{% endif %}">Due</div><div class="fd-stat-value {% if d.due_amount > 0 %}text-danger{% endif %}">Rs. {{ "%.2f"|format(d.due_amount or 0) }}</div></div></div>
+                    </div>
+                    <div>
+                        <div class="small fw-semibold text-muted text-uppercase mb-1">Payment Timeline</div>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr><th>Type</th><th>Amount</th><th>Mode</th><th>Date &amp; Time</th><th>Cleared By</th><th>Branch</th></tr>
+                                </thead>
+                                <tbody>
+                                    {% if d.payment_transactions and d.payment_transactions|length > 0 %}
+                                        {% for t in d.payment_transactions %}
+                                            <tr>
+                                                <td>
+                                                    {% if t.transaction_type == 'Initial' %}
+                                                        <span class="badge bg-primary">Initial</span>
+                                                    {% else %}
+                                                        <span class="badge bg-info text-dark">Due Clearance</span>
+                                                    {% endif %}
+                                                </td>
+                                                <td class="fw-bold">Rs. {{ "%.2f"|format(t.amount or 0) }}</td>
+                                                <td><span class="badge bg-secondary">{{ t.payment_type or '—' }}</span></td>
+                                                <td class="small">{{ t.payment_date or '—' }}</td>
+                                                <td class="small">{{ t.created_by_name or '—' }}</td>
+                                                <td class="small">{{ t.branch_name or '—' }}</td>
+                                            </tr>
+                                        {% endfor %}
+                                    {% else %}
+                                        <tr><td colspan="6" class="text-muted text-center fst-italic">No payment records.</td></tr>
+                                    {% endif %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tests Table -->
+        <div class="col-md-7">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-secondary text-white py-2 d-flex align-items-center justify-content-between">
+                    <span><i class="bi bi-clipboard2-pulse-fill me-1"></i> <span class="fw-semibold small text-uppercase">Tests</span></span>
+                    <span class="badge bg-dark">{{ d.total_films_used or 0 }} films used</span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover mb-0">
+                            <thead class="table-light">
+                                <tr><th>Test</th><th class="text-end">Price</th><th class="text-center">Qty</th><th class="text-center">Films</th><th class="text-center">Status</th></tr>
+                            </thead>
+                            <tbody>
+                                {% if d.tests and d.tests|length > 0 %}
+                                    {% for t in d.tests %}
+                                        <tr>
+                                            <td class="small fw-semibold align-middle">{{ t.test_name }}</td>
+                                            <td class="text-end small align-middle">Rs. {{ "%.2f"|format(t.amount or 0) }}</td>
+                                            <td class="text-center small align-middle">{{ t.quantity or 1 }}</td>
+                                            <td class="text-center small align-middle">{{ t.no_of_films or 0 }}</td>
+                                            <td class="text-center align-middle">
+                                                {% if t.film_issued %}
+                                                    <span class="test-status-chip status-chip-issued">ISSUED</span>
+                                                {% else %}
+                                                    <span class="test-status-chip status-chip-pending">PENDING</span>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                {% else %}
+                                    <tr><td colspan="5" class="text-muted text-center fst-italic">—</td></tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Film Usage + Doctor Reporting -->
+        <div class="col-md-5">
+            <!-- Film Usages -->
+            <div class="card border-0 shadow-sm mb-3">
+                <div class="card-header bg-warning text-dark py-2 d-flex align-items-center gap-2">
+                    <i class="bi bi-film"></i> <span class="fw-semibold small text-uppercase">Film Usage</span>
+                </div>
+                <div class="card-body p-2">
+                    {% if d.film_usages and d.film_usages|length > 0 %}
+                        {% for f in d.film_usages %}
+                            <div class="border-start border-warning border-3 ps-2 mb-2 small">
+                                <div class="fw-semibold">{{ f.usage_type }} — {{ f.films_used }} film(s)</div>
+                                <div class="text-muted">{{ f.reason or '—' }} &bull; {{ f.used_at }} &bull; {{ f.used_by_name }}</div>
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        <span class="text-muted small fst-italic">No film usage records.</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Doctor Reporting -->
+            <div class="card border-0 shadow-sm">
+                <div class="card-header text-white py-2 d-flex align-items-center gap-2" style="background-color:#6f42c1;">
+                    <i class="bi bi-file-medical-fill"></i> <span class="fw-semibold small text-uppercase">Doctor Reporting</span>
+                </div>
+                <div class="card-body p-2">
+                    {% if d.doctor_reports and d.doctor_reports|length > 0 %}
+                        {% for dr in d.doctor_reports %}
+                            <div class="border rounded p-2 mb-2 small">
+                                <div class="fw-semibold">
+                                    {{ dr.doctor_name }}
+                                    {% if dr.status == 'Reported' %}
+                                        <span class="badge bg-success">Reported</span>
+                                    {% elif dr.status == 'Declined' %}
+                                        <span class="badge bg-danger">Declined</span>
+                                    {% else %}
+                                        <span class="badge bg-warning text-dark">Pending</span>
+                                    {% endif %}
+                                </div>
+                                <div class="text-muted">Assigned by: {{ dr.assign_by_name }} &bull; {{ dr.assigned_at }}</div>
+                                {% if dr.returned_at %}
+                                    <div class="text-success mt-1"><i class="bi bi-check-circle me-1"></i>Returned: {{ dr.returned_at }}</div>
+                                {% else %}
+                                    <div class="text-muted mt-1 fst-italic">Not yet returned</div>
+                                {% endif %}
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        <span class="text-muted small fst-italic">Not assigned to any doctor.</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Activity / Timeline -->
+        <div class="col-md-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-dark text-white py-2 d-flex align-items-center gap-2">
+                    <i class="bi bi-clock-history"></i> <span class="fw-semibold small text-uppercase">Activity</span>
+                </div>
+                <div class="card-body p-3">
+                    <div class="timeline-item mb-3 d-flex align-items-start gap-2">
+                        <div class="timeline-dot bg-primary text-white"><i class="bi bi-plus-circle-fill"></i></div>
+                        <div>
+                            <div class="small fw-semibold">Booking Created</div>
+                            <div class="text-muted small">{{ d.created_at or '—' }} &bull; by <strong>{{ d.created_by_name or '—' }}</strong></div>
+                        </div>
+                    </div>
+
+                    {% if d.conversion_logs and d.conversion_logs|length > 0 %}
+                        {% for cv in d.conversion_logs %}
+                            <div class="timeline-item mb-3 d-flex align-items-start gap-2">
+                                <div class="timeline-dot bg-secondary text-white"><i class="bi bi-arrow-repeat"></i></div>
+                                <div>
+                                    <div class="small fw-semibold">Conversion: {{ cv.from_type }} &rarr; {{ cv.to_type }}</div>
+                                    <div class="text-muted small">{{ cv.created_at or '—' }} &bull; by <strong>{{ cv.converted_by_name or '—' }}</strong></div>
+                                    {% if cv.reason %}<div class="text-muted small">{{ cv.reason }}</div>{% endif %}
+                                </div>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+
+                    {% if d.technician_comments and d.technician_comments|length > 0 %}
+                        {% for c in d.technician_comments %}
+                            <div class="timeline-item mb-3 d-flex align-items-start gap-2">
+                                <div class="timeline-dot bg-success text-white"><i class="bi bi-chat-left-text-fill"></i></div>
+                                <div>
+                                    <div class="small fw-semibold">{{ c.user_name or '—' }} {% if c.role %}<span class="badge bg-secondary" style="font-size:0.65rem;">{{ c.role }}</span>{% endif %}</div>
+                                    <div class="text-muted small">{{ c.datetime or '—' }}</div>
+                                    <div class="small mt-1">{{ c.comment or '' }}</div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+
+                    {% if d.chat_summary and d.chat_summary.total_messages > 0 %}
+                        <div class="timeline-item mb-3 d-flex align-items-start gap-2">
+                            <div class="timeline-dot bg-info text-white"><i class="bi bi-chat-dots-fill"></i></div>
+                            <div>
+                                <div class="small fw-semibold">Technician Chat ({{ d.chat_summary.total_messages }} message{% if d.chat_summary.total_messages != 1 %}s{% endif %})</div>
+                                <div class="text-muted small">Last activity: {{ d.chat_summary.last_activity or '—' }}</div>
+                            </div>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Transfer Card (if applicable) -->
+        {% if d.transfer_log %}
+            <div class="col-md-6">
+                <div class="card border-0 shadow-sm h-100 border-warning">
+                    <div class="card-header text-dark py-2 d-flex align-items-center gap-2" style="background-color:#ffc107;">
+                        <i class="bi bi-arrow-left-right"></i> <span class="fw-semibold small text-uppercase">Transfer Details</span>
+                    </div>
+                    <div class="card-body p-3 small">
+                        <div class="mb-1"><i class="bi bi-geo-alt me-1 text-warning"></i><strong>From Branch:</strong> {{ d.transfer_log.from_branch_name }}</div>
+                        <div class="mb-1"><i class="bi bi-geo-alt-fill me-1 text-success"></i><strong>To Branch:</strong> {{ d.transfer_log.to_branch_name }}</div>
+                        <div class="mb-1"><i class="bi bi-person-fill me-1"></i><strong>Transferred By:</strong> {{ d.transfer_log.transferred_by_name }} &bull; {{ d.transfer_log.transferred_at }}</div>
+                        <div class="mb-1"><i class="bi bi-cash me-1"></i><strong>Cash Held:</strong> Rs. {{ "%.2f"|format(d.transfer_log.cash_held or 0) }}</div>
+                        {% if d.transfer_log.reason %}<div class="mb-1"><i class="bi bi-chat-left me-1"></i><strong>Reason:</strong> {{ d.transfer_log.reason }}</div>{% endif %}
+                        <div class="text-muted mt-2" style="font-size:0.75rem;">Old Booking #{{ d.transfer_log.old_booking_id }} {% if d.transfer_log.new_booking_id %}&rarr; New Booking #{{ d.transfer_log.new_booking_id }}{% endif %}</div>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+
+        <!-- Refund Status -->
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-light py-2 d-flex align-items-center gap-2">
+                    <i class="bi bi-arrow-counterclockwise text-danger"></i> <span class="fw-semibold small text-uppercase text-danger">Refund</span>
+                </div>
+                <div class="card-body py-2 px-3">
+                    <span class="text-muted small fst-italic"><i class="bi bi-info-circle me-1"></i>No refund recorded. (Refund history requires a dedicated log table — pending schema approval.)</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Automatically trigger print on load
+    window.addEventListener('load', function() {
+        setTimeout(function() {
+            window.print();
+        }, 300);
+    });
+</script>
+</body>
+</html>
+

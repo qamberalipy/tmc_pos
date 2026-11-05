@@ -2,6 +2,7 @@ import json
 import logging
 from flask import session
 from sqlalchemy import func, and_, cast, String,case,Date,or_, exists
+from sqlalchemy.orm import aliased
 from app.blueprints import booking
 from app.blueprints.reports.services import _to_float
 from app.extensions import db
@@ -1144,6 +1145,8 @@ def _format_test_booking(row):
         "total_amount": float(row.total_amount) if getattr(row, 'total_amount', None) is not None else float((row.net_receivable or 0) + (row.discount_value or 0)),
         "total_films": row.total_no_of_films_used,
         "discount": float(row.discount_value or 0),
+        "discount_type": row.discount_type or "None",
+        "discount_value": float(row.discount_value or 0),
         "net_amount": float(row.net_receivable or 0),
         "received": float(row.paid_amount or 0),
         "balance": float(row.due_amount or 0),
@@ -1158,7 +1161,7 @@ def _format_test_booking(row):
 
 
 
-def get_all_test_bookings(branch_id=None, from_date=None, to_date=None):
+def get_all_test_bookings(branch_id=None, from_date=None, to_date=None, booking_types=None):
     try:
         start_utc = None
         end_utc = None
@@ -1178,6 +1181,7 @@ def get_all_test_bookings(branch_id=None, from_date=None, to_date=None):
                 TestBooking.net_receivable,
                 TestBooking.total_amount,
                 TestBooking.discount_value,
+                TestBooking.discount_type,
                 TestBooking.is_transferred_in,
                 TestBooking.is_appointment,
                 TestBooking.paid_amount,
@@ -1218,6 +1222,28 @@ def get_all_test_bookings(branch_id=None, from_date=None, to_date=None):
         
         if branch_id:
             query = query.filter(TestBooking.branch_id == branch_id)
+
+        # --- BOOKING TYPE FILTER ---
+        if booking_types:
+            if isinstance(booking_types, str):
+                type_list = [t.strip().lower() for t in booking_types.split(",") if t.strip()]
+            else:
+                type_list = [t.strip().lower() for t in booking_types if t]
+
+            type_conds = []
+            if "transferred" in type_list:
+                type_conds.append(TestBooking.is_transferred_in == True)
+            if "appointment" in type_list:
+                type_conds.append(and_(TestBooking.is_appointment == True, or_(TestBooking.is_transferred_in == False, TestBooking.is_transferred_in == None)))
+            if "normal" in type_list:
+                type_conds.append(and_(
+                    or_(TestBooking.is_appointment == False, TestBooking.is_appointment == None),
+                    or_(TestBooking.is_transferred_in == False, TestBooking.is_transferred_in == None)
+                ))
+            if type_conds:
+                query = query.filter(or_(*type_conds))
+            else:
+                query = query.filter(db.false())
 
         # --- APPLY UTC BOUNDS ---
         if start_utc and end_utc:
@@ -2288,13 +2314,14 @@ def add_chat_message(booking_id, user_id, message_text, media_payloads=None):
 
 def get_appointments_and_transfers_service(branch_id=None, user_role=None, filter_type='All', from_date=None, to_date=None, search_term=None):
     """
-    Returns TestBooking records where is_appointment == True OR is_transferred_in == True.
+    Returns TestBooking records where is_appointment == True OR is_transferred_in == True,
+    or BookingTransferLog records when filter_type is 'TransferredOut'.
     Filters:
-      - filter_type: 'Appointment', 'Transferred', 'All'
+      - filter_type: 'Appointment', 'Transferred', 'TransferredOut', 'All'
       - from_date / to_date: ISO date strings using get_lab_date_bounds
       - branch_id: scoped to user's branch for non-admins; admin can filter or view all
       - search_term: patient name / MR No / contact no
-    Each row includes a resolved 'type' field: 'Appointment', 'Transferred In', or 'both'.
+    Each row includes a resolved 'type' field: 'Appointment', 'Transferred In', 'Transferred Out', or 'both'.
     """
     try:
         start_utc = None
@@ -2304,6 +2331,124 @@ def get_appointments_and_transfers_service(branch_id=None, user_role=None, filte
             start_utc, end_utc = get_lab_date_bounds(from_date, to_date, branch_id if branch_id else None)
         elif from_date or to_date:
             raise BadRequest("Both from_date and to_date are required for date filtering.")
+
+        t_clean = (filter_type or "").strip().lower()
+
+        # Handle Transferred Out tab (source = this branch, transferred to another branch)
+        if t_clean in ("transferredout", "transferred out", "transferred_out"):
+            DestBranch = aliased(Branch)
+            q_out = (
+                db.session.query(
+                    BookingTransferLog.id.label("log_id"),
+                    BookingTransferLog.new_booking_id,
+                    BookingTransferLog.old_booking_id,
+                    BookingTransferLog.patient_name,
+                    BookingTransferLog.mr_no,
+                    BookingTransferLog.transferred_cash_held,
+                    BookingTransferLog.reason,
+                    BookingTransferLog.transferred_at,
+                    BookingTransferLog.from_branch_id,
+                    BookingTransferLog.to_branch_id,
+                    DestBranch.branch_name.label("to_branch_name"),
+                    User.name.label("transferred_by_name"),
+                    TestBooking.total_amount,
+                    TestBooking.paid_amount,
+                    TestBooking.due_amount,
+                    TestBooking.discount_type,
+                    TestBooking.discount_value,
+                    TestBooking.net_receivable,
+                    TestBooking.contact_no,
+                    TestBooking.gender,
+                    TestBooking.age,
+                    TestBooking.age_unit,
+                )
+                .outerjoin(DestBranch, DestBranch.id == BookingTransferLog.to_branch_id)
+                .outerjoin(User, User.id == BookingTransferLog.transferred_by_user_id)
+                .outerjoin(TestBooking, TestBooking.id == BookingTransferLog.new_booking_id)
+                .order_by(BookingTransferLog.transferred_at.desc())
+            )
+
+            # Branch scoping: source = current branch
+            if user_role != "admin":
+                if branch_id:
+                    q_out = q_out.filter(BookingTransferLog.from_branch_id == branch_id)
+            else:
+                if branch_id and str(branch_id).lower() not in ("all", "", "none"):
+                    q_out = q_out.filter(BookingTransferLog.from_branch_id == int(branch_id))
+
+            # Date bounds (using get_lab_date_bounds)
+            if start_utc and end_utc:
+                q_out = q_out.filter(
+                    BookingTransferLog.transferred_at >= start_utc,
+                    BookingTransferLog.transferred_at <= end_utc
+                )
+
+            # Search filter
+            if search_term and search_term.strip():
+                s = f"%{search_term.strip()}%"
+                q_out = q_out.filter(
+                    or_(
+                        BookingTransferLog.patient_name.ilike(s),
+                        BookingTransferLog.mr_no.ilike(s),
+                        TestBooking.contact_no.ilike(s)
+                    )
+                )
+
+            out_rows = q_out.all()
+            results = []
+            for r in out_rows:
+                due_val = float(r.due_amount or 0)
+                paid_val = float(r.paid_amount or 0)
+                total_val = float(r.total_amount) if getattr(r, 'total_amount', None) is not None else float((r.net_receivable or 0) + (r.discount_value or 0))
+
+                if due_val <= 0 and total_val > 0:
+                    status = "Paid"
+                elif paid_val > 0:
+                    status = "Partial"
+                else:
+                    status = "Unpaid"
+
+                transfer_log = {
+                    "log_id": r.log_id,
+                    "from_branch_id": r.from_branch_id,
+                    "to_branch_id": r.to_branch_id,
+                    "to_branch_name": r.to_branch_name or f"Branch #{r.to_branch_id}",
+                    "transferred_at": to_local(r.transferred_at, "%Y-%m-%d %H:%M") if r.transferred_at else None,
+                    "reason": r.reason,
+                    "cash_held": float(r.transferred_cash_held or 0)
+                }
+
+                results.append({
+                    "booking_id": r.new_booking_id or r.old_booking_id or r.log_id,
+                    "mr_no": r.mr_no,
+                    "patient_name": r.patient_name,
+                    "contact_no": r.contact_no or "",
+                    "gender": r.gender or "",
+                    "age": r.age,
+                    "age_unit": r.age_unit or "Years",
+                    "referred_dr": "Self",
+                    "branch_id": r.to_branch_id,
+                    "branch_name": r.to_branch_name or f"Branch #{r.to_branch_id}",
+                    "is_appointment": False,
+                    "is_transferred_in": False,
+                    "is_transferred_out": True,
+                    "type": "Transferred Out",
+                    "date": to_local(r.transferred_at, "%Y-%m-%d") if r.transferred_at else "",
+                    "datetime": to_local(r.transferred_at, "%Y-%m-%d %I:%M %p") if r.transferred_at else "",
+                    "created_at": to_local(r.transferred_at, "%Y-%m-%d %I:%M %p") if r.transferred_at else "",
+                    "created_by": r.transferred_by_name or "",
+                    "total_amount": total_val,
+                    "paid_amount": paid_val,
+                    "due_amount": due_val,
+                    "discount_type": r.discount_type or "None",
+                    "discount_value": float(r.discount_value or 0),
+                    "net_receivable": float(r.net_receivable or 0),
+                    "status": status,
+                    "test_booking_details": [],
+                    "transfer_log": transfer_log
+                })
+
+            return results, 200
 
         query = (
             db.session.query(
@@ -2318,6 +2463,7 @@ def get_appointments_and_transfers_service(branch_id=None, user_role=None, filte
                 TestBooking.net_receivable,
                 TestBooking.total_amount,
                 TestBooking.discount_value,
+                TestBooking.discount_type,
                 TestBooking.is_transferred_in,
                 TestBooking.is_appointment,
                 TestBooking.paid_amount,
@@ -2441,9 +2587,13 @@ def get_appointments_and_transfers_service(branch_id=None, user_role=None, filte
                 "type": resolved_type,
                 "date": to_local(r.create_at, "%Y-%m-%d") if r.create_at else "",
                 "datetime": to_local(r.create_at, "%Y-%m-%d %I:%M %p") if r.create_at else "",
+                "created_at": to_local(r.create_at, "%Y-%m-%d %I:%M %p") if r.create_at else "",
                 "total_amount": total_val,
                 "paid_amount": paid_val,
                 "due_amount": due_val,
+                "discount_type": r.discount_type or "None",
+                "discount_value": float(r.discount_value or 0),
+                "net_receivable": float(r.net_receivable or 0),
                 "status": status,
                 "test_booking_details": r.test_booking_details,
                 "transfer_log": transfer_log,
@@ -2551,6 +2701,7 @@ def get_full_booking_details(booking_id, user_role, branch_id):
         # --- 7. Test line items ---
         test_rows = (
             db.session.query(
+                Test_registration.id.label("test_id"),
                 Test_registration.test_name,
                 TestBookingDetails.amount,
                 TestBookingDetails.quantity,
@@ -2563,6 +2714,7 @@ def get_full_booking_details(booking_id, user_role, branch_id):
         )
         tests = [
             {
+                "test_id": r.test_id,
                 "test_name": r.test_name,
                 "amount": float(r.amount or 0),
                 "quantity": r.quantity or 1,

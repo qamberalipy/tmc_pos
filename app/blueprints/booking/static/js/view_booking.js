@@ -176,9 +176,16 @@ $(document).ready(function () {
     // ---------------------------------------------------------
     $("#selectAllBookings").on("change", function () {
         const isChecked = $(this).is(":checked");
-        $(".chk-booking").prop("checked", isChecked);
+        const $activeChks = $(".chk-booking:not(:disabled)");
+        $activeChks.prop("checked", isChecked);
         if (isChecked) {
-            $(".chk-booking").each(function () { window.selectedBookingIds.add($(this).val()); });
+            $activeChks.each(function () {
+                const bId = $(this).val();
+                let bData = window.bookingsMap[bId];
+                if (!bData || !bData.is_appointment) {
+                    window.selectedBookingIds.add(bId);
+                }
+            });
         } else {
             window.selectedBookingIds.clear();
         }
@@ -187,6 +194,14 @@ $(document).ready(function () {
 
     $("#testReg_table").on("change", ".chk-booking", function () {
         const id = $(this).val();
+        let bData = window.bookingsMap[id];
+        if (bData && bData.is_appointment) {
+            $(this).prop("checked", false);
+            window.selectedBookingIds.delete(id);
+            showToastMessage("warning", "Appointments cannot be assigned to a doctor.");
+            updateBulkButtonState();
+            return;
+        }
         if ($(this).is(":checked")) { window.selectedBookingIds.add(id); }
         else { window.selectedBookingIds.delete(id); $("#selectAllBookings").prop("checked", false); }
         updateBulkButtonState();
@@ -194,6 +209,23 @@ $(document).ready(function () {
 
     $("#btnBulkAssign").on("click", function () {
         if (window.selectedBookingIds.size === 0) return;
+
+        let skippedApptCount = 0;
+        window.selectedBookingIds.forEach(function (bId) {
+            let bData = window.bookingsMap[bId];
+            if (bData && bData.is_appointment) {
+                window.selectedBookingIds.delete(bId);
+                $(`.chk-booking[value="${bId}"]`).prop("checked", false);
+                skippedApptCount++;
+            }
+        });
+        if (skippedApptCount > 0) {
+            showToastMessage("warning", `${skippedApptCount} appointment booking(s) skipped (cannot be assigned to a doctor).`);
+            updateBulkButtonState();
+        }
+
+        if (window.selectedBookingIds.size === 0) return;
+
         $("#modalSelectedCount").text(window.selectedBookingIds.size);
         $("#doctorSelectDropdown").html('<option value="" selected disabled>Loading Doctors...</option>');
         $("#assignDoctorModal").modal("show");
@@ -212,25 +244,32 @@ $(document).ready(function () {
         if (!doctorId) return showToastMessage("error", "Please select a doctor.");
 
         let bookingDetails = [];
-        let hasIssuedSkipped = false; // Changed flag to track skipped 'Issued' tests
+        let hasIssuedSkipped = false;
+        let hasApptSkipped = false;
 
-        // --- CHANGED LOGIC: Iterate Global Map Instead of DOM ---
         window.selectedBookingIds.forEach(function (bId) {
             let bookingData = window.bookingsMap[bId];
 
+            if (bookingData && bookingData.is_appointment) {
+                hasApptSkipped = true;
+                return;
+            }
+
             if (bookingData && bookingData.test_booking_details) {
-                // Filter for PENDING (unissued) tests directly from data object
                 let pendingTests = bookingData.test_booking_details.filter(t => t.film_issued === false || !t.film_issued);
                 
                 if (pendingTests.length > 0) {
                     let idsArray = pendingTests.map(t => t.id);
                     bookingDetails.push({ booking_id: bId, test_ids: idsArray });
                 } else {
-                    hasIssuedSkipped = true; // All tests in this booking are issued, so we skip it
+                    hasIssuedSkipped = true;
                 }
             }
         });
-        // -------------------------------------------------------
+
+        if (hasApptSkipped) {
+            showToastMessage("warning", "Appointment booking(s) skipped (cannot be assigned).");
+        }
 
         if (bookingDetails.length === 0) {
             showToastMessage("warning", "None of the selected bookings have PENDING tests to assign.");
@@ -240,8 +279,8 @@ $(document).ready(function () {
         myshowLoader();
         axios.post(baseUrl + "/reports/assign-bookings", { doctor_id: doctorId, bookings: bookingDetails })
             .then(res => {
-                let msg = "Bookings assigned successfully!";
-                if(hasIssuedSkipped) msg += " (Issued tests were skipped)";
+                let msg = res.data?.message || "Bookings assigned successfully!";
+                if(hasIssuedSkipped && !msg.includes("skipped")) msg += " (Issued tests were skipped)";
                 showToastMessage("success", msg);
                 
                 $("#assignDoctorModal").modal("hide");
@@ -253,140 +292,236 @@ $(document).ready(function () {
             .catch(err => handleAxiosError(err))
             .finally(() => myhideLoader());
     });
+
+    // ---------------------------------------------------------
+    // 5. BOOKING TYPE FILTER LISTENERS
+    // ---------------------------------------------------------
+    $(document).on("change", ".booking-type-chk", function () {
+        updateBookingTypeDropdownLabel();
+        renderTestBookingsTable();
+    });
+
+    $(document).on("change", "#typeSelectAll", function () {
+        const isChecked = $(this).is(":checked");
+        $(".booking-type-chk").prop("checked", isChecked);
+        updateBookingTypeDropdownLabel();
+        renderTestBookingsTable();
+    });
 });
 
 let grandTotalFilms = 0;
+window.rawBookingsData = [];
+
+// Helper: Format discount amount
+function formatDiscount(discountType, discountValue, totalAmount, netAmount) {
+    const discVal = Number(discountValue) || 0;
+    if (!discountType || discountType === 'None' || discVal <= 0) {
+        return "-";
+    }
+    if (discountType === 'Percentage') {
+        const total = Number(totalAmount) || 0;
+        const net = Number(netAmount) || 0;
+        let computedRs = 0;
+        if (total > 0 && net > 0 && total >= net) {
+            computedRs = total - net;
+        } else if (total > 0) {
+            computedRs = (total * discVal) / 100;
+        }
+        return `${discVal}% (Rs. ${computedRs.toFixed(2)})`;
+    }
+    return `Rs. ${discVal.toFixed(2)}`;
+}
+
+// Helper: Resolve booking type for filtering
+function getBookingType(t) {
+    if (t.is_transferred_in) return "transferred";
+    if (t.is_appointment) return "appointment";
+    return "normal";
+}
+
+function getSelectedBookingTypes() {
+    let selected = [];
+    $(".booking-type-chk:checked").each(function () {
+        selected.push($(this).val());
+    });
+    return selected;
+}
+
+function updateBookingTypeDropdownLabel() {
+    const total = $(".booking-type-chk").length;
+    const checked = $(".booking-type-chk:checked").length;
+    if (checked === total) {
+        $("#bookingTypeLabel").html('<i class="bi bi-funnel me-1"></i>All Types (' + total + ')');
+        $("#typeSelectAll").prop("checked", true).prop("indeterminate", false);
+    } else if (checked === 0) {
+        $("#bookingTypeLabel").html('<i class="bi bi-funnel me-1"></i>None Selected (0)');
+        $("#typeSelectAll").prop("checked", false).prop("indeterminate", false);
+    } else {
+        $("#typeSelectAll").prop("checked", false).prop("indeterminate", true);
+        if (checked === 1) {
+            const val = $(".booking-type-chk:checked").val();
+            let name = val === 'normal' ? 'Normal Booking' : (val === 'appointment' ? 'Appointment' : 'Transferred In');
+            $("#bookingTypeLabel").html('<i class="bi bi-funnel me-1"></i>' + name + ' (1)');
+        } else {
+            $("#bookingTypeLabel").html('<i class="bi bi-funnel me-1"></i>' + checked + ' Types Selected');
+        }
+    }
+}
 
 // ---------------------------------------------------------
-// 4. MAIN TABLE RENDERER (UPDATED FOR TRANSFER BOOKING)
+// 4. MAIN TABLE RENDERER (UPDATED FOR TRANSFER BOOKING & TYPE FILTER)
 // ---------------------------------------------------------
 function getAllTestBookings() {
     myshowLoader();
     const from_date = $("#from_date").val();
     const to_date = $("#to_date").val();
     let url = baseUrl + "/booking/test-booking";
-    if (from_date && to_date) url += `?from_date=${from_date}&to_date=${to_date}`;
+    let params = [];
+    if (from_date && to_date) {
+        params.push(`from_date=${encodeURIComponent(from_date)}`);
+        params.push(`to_date=${encodeURIComponent(to_date)}`);
+    }
+    const selectedTypes = getSelectedBookingTypes();
+    if (selectedTypes.length > 0 && selectedTypes.length < 3) {
+        params.push(`types=${encodeURIComponent(selectedTypes.join(','))}`);
+    }
+    if (params.length > 0) {
+        url += '?' + params.join('&');
+    }
 
     axios.get(url).then(res => {
-        let dtable = $("#testReg_table").DataTable({
-            destroy: true, responsive: true, pageLength: 15, ordering: false, lengthChange: false
+        window.rawBookingsData = res.data || [];
+        renderTestBookingsTable();
+    }).catch(err => {
+        console.error(err);
+        handleAxiosError(err);
+    }).finally(() => myhideLoader());
+}
+
+function renderTestBookingsTable() {
+    let dtable = $("#testReg_table").DataTable({
+        destroy: true, responsive: true, pageLength: 15, ordering: false, lengthChange: false
+    });
+    dtable.clear();
+
+    const selectedTypes = new Set(getSelectedBookingTypes());
+    const data = (window.rawBookingsData || []).filter(t => selectedTypes.has(getBookingType(t)));
+
+    // Reset Map with visible items
+    window.bookingsMap = {};
+
+    // Keep bulk-select state consistent: clear selections hidden by the filter
+    const visibleIds = new Set(data.map(t => String(t.booking_id)));
+    for (let id of Array.from(window.selectedBookingIds)) {
+        if (!visibleIds.has(String(id))) {
+            window.selectedBookingIds.delete(id);
+        }
+    }
+    updateBulkButtonState();
+
+    // Check if select-all should remain checked
+    const eligibleVisible = data.filter(t => !t.is_appointment);
+    if (eligibleVisible.length > 0 && eligibleVisible.every(t => window.selectedBookingIds.has(String(t.booking_id)))) {
+        $("#selectAllBookings").prop("checked", true);
+    } else {
+        $("#selectAllBookings").prop("checked", false);
+    }
+
+    let rowsToAdd = [];
+    $.each(data, function (i, t) {
+        window.bookingsMap[t.booking_id] = t;
+
+        let tests = t.test_booking_details || [];
+        let allTestIdsStr = tests.map(obj => obj.id).join(",");
+
+        // 1. TESTS & STATUS RENDERING
+        let testHtml = `<div class="d-flex flex-column gap-2 py-1">`;
+        tests.forEach(obj => {
+            testHtml += renderTestStatusCard(t.booking_id, obj.id, obj.film_issued, obj.test_name);
         });
-        dtable.clear();
-        window.selectedBookingIds.clear();
-        updateBulkButtonState();
-        
-        // --- NEW: Reset Map ---
-        window.bookingsMap = {}; 
+        testHtml += `</div>`;
 
-        let rowsToAdd = [];
-        $.each(res.data, function (i, t) {
-            // --- NEW: Store Data in Map ---
-            window.bookingsMap[t.booking_id] = t;
+        let currentShareId = t.give_share_to || "";
 
-            let tests = t.test_booking_details || [];
+        // --- 2. Badges ---
+        let transferBadge = "";
+        if (t.is_transferred_in) {
+            let logInfo = t.transfer_in_log
+                ? ` <small class="opacity-75">(${t.transfer_in_log.transferred_at || ''})</small>`
+                : "";
+            transferBadge = `<a href="${baseUrl}/booking/transfers" class="badge bg-warning text-dark ms-1 text-decoration-none" style="font-size:0.65rem;" title="View Transfer History">
+                <i class="bi bi-box-arrow-in-right"></i> Transferred In${logInfo}</a>`;
+        }
+
+        let sentBadge = t.sent_to_doctor
+            ? `<br><span class="badge bg-info text-dark ms-1" style="font-size:0.65rem;"><i class="bi bi-send-check"></i> Sent to Dr</span><br>`
+            : ``;
+
+        let apptBadge = t.is_appointment
+            ? `<span class="badge bg-info ms-1">Appointment</span>`
+            : ``;
+
+        // --- 3. Action Buttons ---
+        let transferBtnHtml = (!t.is_transferred_in)
+            ? `<a href="${baseUrl}/booking/transfer/${t.booking_id}" class="btn btn-action text-info shadow-sm" title="Transfer to Another Branch"><i class="bi bi-arrow-left-right"></i></a>` 
+            : ``;
+
+        let refundBtnHtml = (!t.is_transferred_in)
+            ? `<button class="btn btn-action text-danger shadow-sm refund-booking" data-id="${t.booking_id}" title="Refund &amp; Delete"><i class="bi bi-arrow-counterclockwise"></i></button>`
+            : ``;
+
+        let shareBtnHtml = `<button class="btn btn-action text-warning shadow-sm edit-share" data-id="${t.booking_id}" data-share="${currentShareId}" title="Update Share"><i class="bi bi-person-gear"></i></button>`;
+
+        let convertToNormalBtnHtml = (t.is_appointment && !t.is_transferred_in)
+            ? `<button class="btn btn-action text-success shadow-sm convert-appointment" data-id="${t.booking_id}" title="Confirm Appointment → Normal Booking (deducts films)"><i class="bi bi-calendar2-check"></i></button>`
+            : ``;
+
+        let convertToApptBtnHtml = (!t.is_appointment && !t.is_transferred_in)
+            ? `<button class="btn btn-action text-primary shadow-sm convert-to-appointment" data-id="${t.booking_id}" title="Revert to Appointment (refunds films)"><i class="bi bi-calendar-plus"></i></button>`
+            : ``;
+
+        // 4. ASSEMBLE ACTIONS
+        let actions = `
+        <div class="d-flex gap-1 justify-content-center">
+            <button class="btn btn-action text-info shadow-sm view-full-details" data-id="${t.booking_id}" title="Full Details"><i class="bi bi-info-circle"></i></button>
+            <a href="${baseUrl}/booking/receipt/${t.booking_id}" target="_blank" class="btn btn-action text-success shadow-sm" title="Print Receipt"><i class="bi bi-printer"></i></a>
+            <a href="${baseUrl}/booking/print-sticker/${t.booking_id}" target="_blank" class="btn btn-action text-secondary shadow-sm" title="Print Sticker"><i class="bi bi-tag"></i></a>
             
-            let allTestIdsStr = tests.map(obj => obj.id).join(",");
+            <button class="btn btn-action text-primary shadow-sm comment-booking" data-id="${t.booking_id}" title="Comments"><i class="bi bi-chat-left-text"></i></button>
+            
+            <button class="btn btn-action text-dark shadow-sm edit-films" data-id="${t.booking_id}" data-test-ids="${allTestIdsStr}" title="Edit Films"><i class="bi bi-plus-square"></i></button>
+            
+            ${shareBtnHtml}
+            ${convertToNormalBtnHtml}
+            ${convertToApptBtnHtml}
+            ${transferBtnHtml}
+            ${refundBtnHtml}
+        </div>`;
 
-            // 1. TESTS & STATUS RENDERING
-            let testHtml = `<div class="d-flex flex-column gap-2 py-1">`;
-            tests.forEach(obj => {
-                const isChecked = obj.film_issued ? 'checked' : '';
-                const theme = obj.film_issued ? 'status-issued' : 'status-pending';
-                testHtml += `
-                <div class="test-status-card ${theme} d-flex align-items-center justify-content-between px-2 py-1 rounded-2">
-                    <div class="d-flex flex-column">
-                        <span class="test-title fw-bold text-uppercase">${obj.test_name}</span>
-                        <span class="status-indicator small fw-bold">${obj.film_issued ? 'ISSUED' : 'PENDING'}</span>
-                    </div>
-                    <div class="form-check form-switch m-0">
-                        <input class="form-check-input film-issue-toggle modern-switch" type="checkbox" 
-                            ${isChecked} data-booking-id="${t.booking_id}" data-test-id="${obj.id}">
-                    </div>
-                </div>`;
-            });
-            testHtml += `</div>`; // Closed div
+        // 5. PUSH TO TABLE ROWS (Includes Discount column)
+        const isSelected = window.selectedBookingIds.has(String(t.booking_id));
+        let chkHtml = t.is_appointment 
+            ? `<input type="checkbox" class="chk-booking custom-chk" value="${t.booking_id}" disabled title="Appointments cannot be assigned to a doctor" style="opacity: 0.35; cursor: not-allowed;">`
+            : `<input type="checkbox" class="chk-booking custom-chk" value="${t.booking_id}" ${isSelected ? 'checked' : ''}>`;
 
-            let currentShareId = t.give_share_to || "";
+        const discFormatted = formatDiscount(t.discount_type, t.discount_value, t.total_amount, t.net_amount);
 
-            // --- 2. Badges ---
-            let transferBadge = "";
-            if (t.is_transferred_in) {
-                let logInfo = t.transfer_in_log
-                    ? ` <small class="opacity-75">(${t.transfer_in_log.transferred_at || ''})</small>`
-                    : "";
-                transferBadge = `<a href="${baseUrl}/booking/transfers" class="badge bg-warning text-dark ms-1 text-decoration-none" style="font-size:0.65rem;" title="View Transfer History">
-                    <i class="bi bi-box-arrow-in-right"></i> Transferred In${logInfo}</a>`;
-            }
+        rowsToAdd.push([
+            chkHtml,
+            `<div><div class="fw-bold">#${t.booking_id}</div><div class="text-muted text-xs">${t.date}</div></div>`,
+            `<div><div class="fw-bold text-primary">${t.patient_name} ${transferBadge}${sentBadge}${apptBadge}</div><div class="text-muted text-xs">MR: ${t.mr_no || 'N/A'}</div></div>`,
+            testHtml,
+            `<div class="text-xs fw-medium">${t.referred_dr || 'Self'}</div>`,
+            `<div class="text-xs">${t.total_amount}</div>`,
+            `<div class="text-xs ${discFormatted !== '-' ? 'text-warning fw-semibold' : 'text-muted'}">${discFormatted}</div>`,
+            `<div class="fw-bold text-success">${t.received}</div>`,
+            `<div class="fw-bold ${t.balance > 0 ? 'text-danger' : 'text-success'}">${t.balance}</div>`,
+            actions
+        ]);
+    });
 
-            let sentBadge = t.sent_to_doctor
-                ? `<br><span class="badge bg-info text-dark ms-1" style="font-size:0.65rem;"><i class="bi bi-send-check"></i> Sent to Dr</span><br>`
-                : ``;
-
-            let apptBadge = t.is_appointment
-                ? `<span class="badge bg-info ms-1">Appointment</span>`
-                : ``;
-
-            // --- 3. UPDATE: Action Buttons with full terminal-state enforcement ---
-            // If is_transferred_in == True the booking is terminal: NO convert/transfer/refund/share.
-
-            let transferBtnHtml = (!t.is_transferred_in)
-                ? `<a href="${baseUrl}/booking/transfer/${t.booking_id}" class="btn btn-action text-info shadow-sm" title="Transfer to Another Branch"><i class="bi bi-arrow-left-right"></i></a>` 
-                : ``;
-
-            let refundBtnHtml = (!t.is_transferred_in)
-                ? `<button class="btn btn-action text-danger shadow-sm refund-booking" data-id="${t.booking_id}" title="Refund &amp; Delete"><i class="bi bi-arrow-counterclockwise"></i></button>`
-                : ``;
-
-            let shareBtnHtml = (!t.is_transferred_in)
-                ? `<button class="btn btn-action text-warning shadow-sm edit-share" data-id="${t.booking_id}" data-share="${currentShareId}" title="Update Share"><i class="bi bi-person-gear"></i></button>`
-                : ``;
-
-            // Convert Appointment → Normal (Conversion #1): only for appointments, never for transferred-in
-            let convertToNormalBtnHtml = (t.is_appointment && !t.is_transferred_in)
-                ? `<button class="btn btn-action text-success shadow-sm convert-appointment" data-id="${t.booking_id}" title="Confirm Appointment → Normal Booking (deducts films)"><i class="bi bi-calendar2-check"></i></button>`
-                : ``;
-
-            // Convert Normal → Appointment (Conversion #2): only for non-appointments, never for transferred-in
-            let convertToApptBtnHtml = (!t.is_appointment && !t.is_transferred_in)
-                ? `<button class="btn btn-action text-primary shadow-sm convert-to-appointment" data-id="${t.booking_id}" title="Revert to Appointment (refunds films)"><i class="bi bi-calendar-plus"></i></button>`
-                : ``;
-
-            // 4. ASSEMBLE ACTIONS
-            let actions = `
-            <div class="d-flex gap-1 justify-content-center">
-                <button class="btn btn-action text-info shadow-sm view-full-details" data-id="${t.booking_id}" title="Full Details"><i class="bi bi-info-circle"></i></button>
-                <a href="${baseUrl}/booking/receipt/${t.booking_id}" target="_blank" class="btn btn-action text-success shadow-sm" title="Print Receipt"><i class="bi bi-printer"></i></a>
-                <a href="${baseUrl}/booking/print-sticker/${t.booking_id}" target="_blank" class="btn btn-action text-secondary shadow-sm" title="Print Sticker"><i class="bi bi-tag"></i></a>
-                
-                <button class="btn btn-action text-primary shadow-sm comment-booking" data-id="${t.booking_id}" title="Comments"><i class="bi bi-chat-left-text"></i></button>
-                
-                <button class="btn btn-action text-dark shadow-sm edit-films" data-id="${t.booking_id}" data-test-ids="${allTestIdsStr}" title="Edit Films"><i class="bi bi-plus-square"></i></button>
-                
-                ${shareBtnHtml}
-                ${convertToNormalBtnHtml}
-                ${convertToApptBtnHtml}
-                ${transferBtnHtml}
-                ${refundBtnHtml}
-            </div>`;
-
-
-            // 5. PUSH TO TABLE ROWS
-            rowsToAdd.push([
-                `<input type="checkbox" class="chk-booking custom-chk" value="${t.booking_id}">`,
-                `<div><div class="fw-bold">#${t.booking_id}</div><div class="text-muted text-xs">${t.date}</div></div>`,
-                `<div><div class="fw-bold text-primary">${t.patient_name} ${transferBadge}${sentBadge}${apptBadge}</div><div class="text-muted text-xs">MR: ${t.mr_no || 'N/A'}</div></div>`,
-                testHtml,
-                `<div class="text-xs fw-medium">${t.referred_dr || 'Self'}</div>`,
-                `<div class=" text-xs">${t.total_amount}</div>`,
-                `<div class=" fw-bold text-success">${t.received}</div>`,
-                `<div class=" fw-bold ${t.balance > 0 ? 'text-danger' : 'text-success'}">${t.balance}</div>`,
-                actions
-            ]);
-        });
-
-        dtable.rows.add(rowsToAdd).draw(false);
-        rebindTableEvents();
-    }).catch(err => console.error(err)).finally(() => myhideLoader());
+    dtable.rows.add(rowsToAdd).draw(false);
+    rebindTableEvents();
 }
 
 // ---------------------------------------------------------
@@ -539,10 +674,54 @@ function loadShareProviders() {
         .catch(err => console.error("Failed to load providers", err));
 }
 
+function renderTestStatusCard(bookingId, testId, isIssued, testTitle = null) {
+    const isChecked = isIssued ? 'checked' : '';
+    const theme = isIssued ? 'status-issued' : 'status-pending';
+    const titleHtml = testTitle 
+        ? `<span class="test-title fw-bold text-uppercase">${testTitle}</span>` 
+        : '';
+    return `
+    <div class="test-status-card ${theme} d-flex align-items-center justify-content-between px-2 py-1 rounded-2" data-booking-id="${bookingId}" data-test-id="${testId}">
+        <div class="d-flex flex-column">
+            ${titleHtml}
+            <span class="status-indicator small fw-bold">${isIssued ? 'ISSUED' : 'PENDING'}</span>
+        </div>
+        <div class="form-check form-switch m-0 ms-2">
+            <input class="form-check-input film-issue-toggle modern-switch" type="checkbox" 
+                ${isChecked} data-booking-id="${bookingId}" data-test-id="${testId}">
+        </div>
+    </div>`;
+}
+
+function updateFilmIssueUI(bookingId, testId, isIssued) {
+    const $cards = $(`.test-status-card[data-booking-id="${bookingId}"][data-test-id="${testId}"]`);
+    $cards.each(function () {
+        const $card = $(this);
+        const $statusLabel = $card.find('.status-indicator');
+        const $toggle = $card.find('.film-issue-toggle');
+
+        $toggle.prop('checked', isIssued);
+        if (isIssued) {
+            $card.removeClass('status-pending').addClass('status-issued');
+            $statusLabel.text('ISSUED');
+        } else {
+            $card.removeClass('status-issued').addClass('status-pending');
+            $statusLabel.text('PENDING');
+        }
+    });
+
+    // Also update window.bookingsMap if present
+    if (window.bookingsMap && window.bookingsMap[bookingId]) {
+        let tests = window.bookingsMap[bookingId].test_booking_details;
+        if (tests) {
+            let tObj = tests.find(x => x.id === testId);
+            if (tObj) tObj.film_issued = isIssued;
+        }
+    }
+}
+
 $(document).on("change", ".film-issue-toggle", function () {
     const $toggle = $(this);
-    const $card = $toggle.closest('.test-status-card');
-    const $statusLabel = $card.find('.status-indicator');
     const bookingId = $toggle.data("booking-id");
     const testId = $toggle.data("test-id");
     const isIssued = $toggle.is(":checked");
@@ -558,41 +737,21 @@ $(document).on("change", ".film-issue-toggle", function () {
         cancelButtonText: 'No'
     }).then((result) => {
         if (result.isConfirmed) {
-            // Apply the checkbox and UI changes
-            $toggle.prop('checked', isIssued);
-            if (isIssued) {
-                $card.removeClass('status-pending').addClass('status-issued');
-                $statusLabel.text('ISSUED');
-            } else {
-                $card.removeClass('status-issued').addClass('status-pending');
-                $statusLabel.text('PENDING');
-            }
+            updateFilmIssueUI(bookingId, testId, isIssued);
+            const $cards = $(`.test-status-card[data-booking-id="${bookingId}"][data-test-id="${testId}"]`);
+            $cards.css('opacity', '0.6');
 
-            $card.css('opacity', '0.6');
             axios.post(baseUrl + "/booking/update-film-status", {
                 booking_id: bookingId, test_id: testId, film_issued: isIssued
             })
                 .then(() => {
                     showToastMessage("success", "Film status updated");
-                    // Also update the local map so if user clicks Bulk Assign immediately, data is fresh
-                    if(window.bookingsMap[bookingId]) {
-                         let tests = window.bookingsMap[bookingId].test_booking_details;
-                         let tObj = tests.find(x => x.id === testId);
-                         if(tObj) tObj.film_issued = isIssued;
-                    }
                 })
                 .catch(err => {
-                    $toggle.prop('checked', !isIssued);
-                    if (isIssued) {
-                        $card.removeClass('status-issued').addClass('status-pending');
-                        $statusLabel.text('PENDING');
-                    } else {
-                        $card.removeClass('status-pending').addClass('status-issued');
-                        $statusLabel.text('ISSUED');
-                    }
+                    updateFilmIssueUI(bookingId, testId, !isIssued);
                     handleAxiosError(err);
                 })
-                .finally(() => $card.css('opacity', '1'));
+                .finally(() => $cards.css('opacity', '1'));
         }
         // On cancel/dismiss: checkbox already reverted, do nothing
     });
@@ -657,7 +816,7 @@ function openFullDetailsModal(bookingId) {
     $('#fdContent').hide();
     $('#fdBookingTitle').text('Loading…');
     $('#fdBadgesRow').html('');
-    $('#fdPrintBtn').attr('href', baseUrl + '/booking/receipt/' + bookingId);
+    $('#fdPrintBtn').attr('href', baseUrl + '/booking/print-details/' + bookingId);
     $('#fullDetailsModal').modal('show');
 
     axios.get(baseUrl + '/booking/full-details/' + bookingId)
@@ -798,15 +957,12 @@ function renderFullDetails(d) {
     let testHtml = '';
     if (d.tests && d.tests.length > 0) {
         d.tests.forEach(function(t) {
-            let filmBadge = t.film_issued
-                ? '<span class="badge bg-success" style="font-size:0.65rem;">Issued</span>'
-                : '<span class="badge bg-warning text-dark" style="font-size:0.65rem;">Pending</span>';
             testHtml += `<tr>
-                <td class="small fw-semibold">${t.test_name}</td>
-                <td class="text-end small">Rs. ${(t.amount || 0).toFixed(2)}</td>
-                <td class="text-center small">${t.quantity || 1}</td>
-                <td class="text-center small">${t.no_of_films || 0}</td>
-                <td class="text-center">${filmBadge}</td>
+                <td class="small fw-semibold align-middle">${t.test_name}</td>
+                <td class="text-end small align-middle">Rs. ${(t.amount || 0).toFixed(2)}</td>
+                <td class="text-center small align-middle">${t.quantity || 1}</td>
+                <td class="text-center small align-middle">${t.no_of_films || 0}</td>
+                <td class="text-center align-middle">${renderTestStatusCard(d.booking_id, t.test_id, t.film_issued)}</td>
             </tr>`;
         });
     }
