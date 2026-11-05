@@ -17,12 +17,13 @@ $(document).ready(function () {
     let dtable = null;
 
     // Track tab counts locally from fetched datasets (no extra API calls)
-    let tabCounts = { all: 0, appt: 0, trans: 0 };
+    let tabCounts = { all: 0, appt: 0, trans: 0, transOut: 0 };
 
     function updateTabBadges() {
         $("#count_all").text(tabCounts.all);
         $("#count_appt").text(tabCounts.appt);
         $("#count_trans").text(tabCounts.trans);
+        $("#count_trans_out").text(tabCounts.transOut);
     }
 
     function formatDiscount(discountType, discountValue, totalAmount, netReceivable) {
@@ -91,17 +92,27 @@ $(document).ready(function () {
                 tabCounts.all = data.length;
                 tabCounts.appt = data.filter(r => r.is_appointment).length;
                 tabCounts.trans = data.filter(r => r.is_transferred_in).length;
+                // Fetch transferred-out count for the current branch and filters
+                let outParams = Object.assign({}, params, { type: 'TransferredOut' });
+                axios.get(`${baseUrl}/booking/appointments-transfers/data`, { params: outParams })
+                    .then(outRes => {
+                        tabCounts.transOut = (outRes.data || []).length;
+                        updateTabBadges();
+                    })
+                    .catch(() => {});
             } else if (activeFilterType === 'appointment') {
                 tabCounts.appt = data.length;
             } else if (activeFilterType === 'transferred') {
                 tabCounts.trans = data.length;
+            } else if (activeFilterType === 'transferredout') {
+                tabCounts.transOut = data.length;
             }
             updateTabBadges();
 
             if (data.length === 0) {
                 tbody.html(`
                     <tr>
-                        <td colspan="9" class="text-center py-5 border-0">
+                        <td colspan="12" class="text-center py-5 border-0">
                             <div class="d-flex flex-column align-items-center justify-content-center py-3">
                                 <div class="empty-state-icon-circle mb-3">
                                     <i class="bi bi-calendar-x text-secondary" style="font-size: 2rem; opacity: 0.6;"></i>
@@ -124,9 +135,14 @@ $(document).ready(function () {
             $("#tableRecordCount").text(`${data.length} record(s) found`);
 
             data.forEach(function (r) {
-                // Type badge: softer pill shape, subordinate origin branch text
+                // Type badge: softer pill shape, subordinate origin/destination branch text
                 let typeBadge = '';
-                if (r.type === 'both') {
+                if (r.is_transferred_out || r.type === 'Transferred Out') {
+                    let toNote = (r.transfer_log && r.transfer_log.to_branch_name)
+                        ? `<div class="origin-branch-text"><i class="bi bi-geo-alt opacity-75"></i> To: ${r.transfer_log.to_branch_name}</div>`
+                        : '';
+                    typeBadge = `<span class="badge badge-pill-soft badge-trans-out-soft"><i class="bi bi-box-arrow-up-right"></i> Transferred Out</span>${toNote}`;
+                } else if (r.type === 'both') {
                     typeBadge = `<div class="d-flex flex-column align-items-center gap-1">` +
                                 `<span class="badge badge-pill-soft badge-appt-soft"><i class="bi bi-calendar-event"></i> Appointment</span>` +
                                 `<span class="badge badge-pill-soft badge-trans-soft"><i class="bi bi-box-arrow-in-right"></i> Transferred In</span>` +
@@ -140,6 +156,14 @@ $(document).ready(function () {
                     typeBadge = `<span class="badge badge-pill-soft badge-trans-soft"><i class="bi bi-box-arrow-in-right"></i> Transferred In</span>${fromNote}`;
                 } else {
                     typeBadge = `<span class="badge badge-pill-soft bg-light text-secondary border">${r.type || 'Normal'}</span>`;
+                }
+
+                // Branch column: for Transferred Out show destination labeled with "To:"
+                let branchCellHtml = '';
+                if (r.is_transferred_out || r.type === 'Transferred Out') {
+                    branchCellHtml = `<span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle px-2 py-1"><i class="bi bi-arrow-right-short me-1"></i>To: ${r.branch_name || 'N/A'}</span>`;
+                } else {
+                    branchCellHtml = `<span class="badge bg-secondary-subtle text-secondary-emphasis border px-2 py-1">${r.branch_name || 'N/A'}</span>`;
                 }
 
                 // Amount breakdown: compact 3-line stack with muted labels vs bold colored values
@@ -178,9 +202,9 @@ $(document).ready(function () {
                 }
 
                 // Action buttons: View link to view_booking + Convert button
-                // Terminal transfer rule: is_transferred_in bookings NEVER show convert actions
+                // Terminal transfer rule: is_transferred_in or is_transferred_out bookings NEVER show convert actions
                 let convertBtnHtml = '';
-                if (r.is_appointment && !r.is_transferred_in) {
+                if (r.is_appointment && !r.is_transferred_in && !r.is_transferred_out) {
                     convertBtnHtml = `
                         <button type="button" class="btn btn-sm btn-outline-success convert-appointment-btn" 
                                 data-id="${r.booking_id}" 
@@ -198,17 +222,20 @@ $(document).ready(function () {
 
                 let rowHtml = `
                     <tr>
+                        <td><span class="fw-bold text-dark">#${r.booking_id}</span></td>
                         <td><span class="badge bg-light text-dark border font-monospace px-2 py-1">${r.mr_no || 'N/A'}</span></td>
                         <td>
                             <div class="fw-bold text-dark">${r.patient_name || '—'}</div>
                             <div class="text-muted small">${r.contact_no || ''} ${r.age ? '(' + r.age + ' ' + (r.age_unit || 'Y') + ')' : ''}</div>
                         </td>
-                        <td><span class="badge bg-secondary-subtle text-secondary-emphasis border px-2 py-1">${r.branch_name || 'N/A'}</span></td>
+                        <td>${branchCellHtml}</td>
                         <td class="text-center">${typeBadge}</td>
                         <td><span class="small text-secondary">${r.date || '—'}</span></td>
                         <td>${amountHtml}</td>
                         <td><span class="${discFormatted !== '-' ? 'fw-bold text-dark font-monospace' : 'text-muted'}">${discFormatted}</span></td>
                         <td class="text-center">${statusBadge}</td>
+                        <td><span class="small fw-semibold text-dark"><i class="bi bi-person me-1 text-muted"></i>${r.created_by || '—'}</span></td>
+                        <td><span class="small text-muted font-monospace">${r.datetime || r.created_at || '—'}</span></td>
                         <td class="text-center">
                             <div class="d-flex justify-content-center align-items-center gap-1 action-btn-group" style="min-width: 140px;">
                                 ${viewBtnHtml}
@@ -226,7 +253,7 @@ $(document).ready(function () {
                 responsive: true,
                 pageLength: 20,
                 ordering: true,
-                order: [[4, 'desc']], // Sort by Date descending
+                order: [[10, 'desc']], // Sort by Timestamp descending
                 lengthChange: false,
                 language: {
                     emptyTable: `
