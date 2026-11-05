@@ -287,6 +287,7 @@ def assign_bookings_to_doctor(bookings_payload, doctor_id, assigned_by, branch_i
     existing_combinations = {(row.booking_id, row.test_id) for row in existing_records}
 
     assigned_count = 0
+    newly_assigned_pairs = []
 
     # 4. Nested Loop: Booking -> Test IDs
     for item in bookings_payload:
@@ -309,6 +310,7 @@ def assign_bookings_to_doctor(bookings_payload, doctor_id, assigned_by, branch_i
                 )
                 db.session.add(new_record)
                 assigned_count += 1
+                newly_assigned_pairs.append((b_id, t_id_int))
                 
                 # Update our local set so we don't add the same one twice in this loop
                 existing_combinations.add((b_id, t_id_int))
@@ -322,7 +324,7 @@ def assign_bookings_to_doctor(bookings_payload, doctor_id, assigned_by, branch_i
             print(f"Error committing to DB: {e}")
             raise e
 
-    return assigned_count
+    return assigned_count, newly_assigned_pairs
 
 def get_doctor_assigned_reports_service(branch_id=None, status=None, from_date=None, to_date=None):
     try:
