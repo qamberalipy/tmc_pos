@@ -1,0 +1,1014 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Daily Closing Sheet — TMC Garden Branch</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+@page { size: A4 portrait; margin: 6mm; }
+
+:root {
+    --navy:#0b1e3f;
+    --navy-2:#1a3160;
+    --navy-soft:#eef3fb;
+    --navy-line:#c3d2ec;
+    --ink:#0a0f1a;
+    --ink2:#1c2537;
+    --paper:#ffffff;
+    --fill-2:#f1f5f9;
+    --rule:#e2e8f0;
+    --rule-2:#cbd5e1;
+    --green:#047857;
+    --green-bg:#ecfdf5;
+    --red:#be123c;
+    --red-bg:#fff1f3;
+    --amber:#b45309;
+    --amber-bg:#fffbeb;
+    --muted:#64748b;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+    font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+    font-size: 11px;
+    line-height: 1.4;
+    color: var(--ink);
+    background: #d9dee5;
+    padding: 14px;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+}
+
+.toolbar { position: fixed; top: 14px; right: 14px; z-index: 999; }
+.btn-print {
+    padding: 11px 22px;
+    background: var(--navy);
+    color: #fff;
+    border: 0;
+    border-radius: 7px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 800;
+    box-shadow: 0 6px 20px rgba(11,30,63,.35);
+}
+.btn-print:hover { transform: translateY(-1px); }
+
+/* FIXED A4 SHEET */
+.sheet {
+    width: 210mm;
+    height: 297mm;
+    margin: 0 auto 10mm auto;
+    background: var(--paper);
+    box-shadow: 0 24px 60px -20px rgba(11,30,63,.35);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* MASTHEAD */
+.masthead {
+    background: linear-gradient(135deg, var(--navy) 0%, var(--navy-2) 100%);
+    color: #fff;
+    padding: 10px 14px;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 12px;
+    align-items: center;
+    flex-shrink: 0;
+}
+.masthead-badge {
+    background: linear-gradient(135deg, #b8860b 0%, #78350f 100%);
+    border: 1px solid rgba(255,255,255,.5);
+    color: #fff;
+    padding: 7px 12px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    line-height: 1;
+    text-align: center;
+}
+.masthead-badge small {
+    display: block; font-size: 7px; letter-spacing: 2px;
+    color: rgba(255,255,255,.85); margin-top: 3px; font-weight: 800;
+}
+.masthead-center { display: flex; flex-direction: column; gap: 3px; }
+.masthead-center .brand { font-size: 15px; font-weight: 900; letter-spacing: -.3px; line-height: 1; }
+.masthead-center .sub {
+    font-size: 7.5px; letter-spacing: 2px; text-transform: uppercase;
+    color: rgba(255,255,255,.7); font-weight: 800;
+}
+.day-date-strip { display: flex; gap: 7px; margin-top: 2px; }
+.dd-block {
+    background: rgba(255,255,255,.10);
+    border: 1px solid rgba(255,255,255,.25);
+    border-radius: 4px; padding: 3px 8px;
+    display: flex; align-items: baseline; gap: 5px;
+}
+.dd-block .k { font-size: 7px; letter-spacing: 1px; text-transform: uppercase; color: rgba(255,255,255,.75); font-weight: 800; }
+.dd-block .v { font-size: 11px; font-weight: 900; color: #fff; line-height: 1; }
+.dd-block.date .v { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; }
+.masthead-right {
+    display: grid; grid-template-columns: auto auto;
+    column-gap: 10px; row-gap: 2px;
+}
+.masthead-right .k { font-size: 7px; letter-spacing: 1px; text-transform: uppercase; color: rgba(255,255,255,.75); font-weight: 800; }
+.masthead-right .v { font-size: 9px; color: #fff; font-weight: 800; text-align: right; }
+
+/* DOC META */
+.doc-meta {
+    background: var(--fill-2);
+    border-bottom: 1px solid var(--rule);
+    padding: 4px 14px;
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 7.5px;
+    flex-wrap: wrap; gap: 4px;
+    flex-shrink: 0;
+}
+.doc-meta .item { display: inline-flex; gap: 4px; align-items: baseline; }
+.doc-meta .k { font-weight: 800; text-transform: uppercase; font-size: 6.5px; color: var(--ink2); letter-spacing: .5px; }
+.doc-meta .v { font-family: 'JetBrains Mono', monospace; font-weight: 700; }
+
+/* PAGE STRIP */
+.page-strip {
+    background: var(--navy);
+    color: #fff;
+    padding: 3px 14px;
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 7.5px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    flex-shrink: 0;
+}
+.page-strip .label { color: rgba(255,255,255,.7); }
+.page-strip .page-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px;
+    background: rgba(255,255,255,.15);
+    padding: 1px 6px;
+    border-radius: 2px;
+}
+
+.content {
+    padding: 7px 12px;
+    display: flex; flex-direction: column;
+    gap: 6px;
+    flex: 1;
+    overflow: hidden;
+}
+
+/* ═══ GRAND TOTALS — BIGGER & BOLDER ═══ */
+.grand-totals {
+    display: grid; grid-template-columns: 1fr 1fr 1.15fr;
+    border: 1.5px solid var(--navy);
+    border-radius: 4px;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+.gt-cell {
+    padding: 12px 16px;
+    display: flex; flex-direction: column; gap: 4px;
+    border-right: 1.5px solid var(--navy);
+    background: #fff;
+}
+.gt-cell:last-child { border-right: 0; }
+.gt-cell.handover-amount {
+    background: linear-gradient(135deg, var(--navy) 0%, var(--navy-2) 100%);
+    color: #fff;
+}
+.gt-cell.handover-amount .k { color: rgba(255,255,255,.8); }
+.gt-cell.handover-amount .v { color: #fff; }
+.gt-cell.handover-amount .hint { color: rgba(255,255,255,.75); }
+.gt-cell .k { font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--ink2); font-weight: 900; }
+.gt-cell .v {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 32px; font-weight: 900; color: var(--navy);
+    letter-spacing: -1px; line-height: 1; white-space: nowrap;
+}
+.gt-cell .v.danger { color: var(--red); }
+.gt-cell .hint { font-size: 10px; color: var(--muted); font-weight: 700; margin-top: 2px; }
+
+/* SECTION */
+.sec {
+    border: 1px solid var(--navy-line);
+    border-radius: 4px;
+    padding: 6px 9px 7px;
+    background: #fff;
+    flex-shrink: 0;
+}
+.sec-hd {
+    display: flex; align-items: baseline; gap: 8px;
+    margin-bottom: 4px; padding-bottom: 3px;
+    border-bottom: 1px solid var(--navy-soft);
+    flex-wrap: wrap;
+}
+.sec-hd .num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px; font-weight: 700;
+    color: #fff; background: var(--navy);
+    padding: 1px 5px; border-radius: 2px;
+}
+.sec-hd .num.gold { background: linear-gradient(135deg, #b8860b, #78350f); }
+.sec-hd h2 {
+    font-size: 10px; font-weight: 900;
+    letter-spacing: .3px; text-transform: uppercase;
+    color: var(--navy);
+}
+.sec-hd .rule { flex: 1; height: 0; border-bottom: 1px solid var(--rule); margin-bottom: 2px; min-width: 15px; }
+.sec-hd .tag { font-size: 7px; letter-spacing: .7px; text-transform: uppercase; color: var(--muted); font-weight: 800; }
+
+.cols-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+
+/* TABLES */
+table.data { width: 100%; border-collapse: collapse; table-layout: fixed; }
+table.data th {
+    font-size: 8px; letter-spacing: .5px; text-transform: uppercase;
+    color: var(--ink2); font-weight: 800; text-align: left;
+    padding: 0 0 3px; border-bottom: 1px solid var(--navy-line);
+}
+table.data th.num { text-align: right; }
+table.data td {
+    padding: 3px 0; border-bottom: 1px solid var(--rule);
+    font-weight: 600; font-size: 10px;
+}
+table.data tr:last-child td { border-bottom: 0; }
+table.data td.num {
+    text-align: right;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+}
+table.data tr.total td {
+    border-top: 1.2px solid var(--navy); border-bottom: 0;
+    background: var(--navy-soft);
+    font-weight: 900; color: var(--navy);
+    padding: 4px 3px;
+    font-size: 10px;
+}
+
+/* BOX 04 — Other Tests */
+table.data.box04 th:nth-child(1), table.data.box04 td:nth-child(1) { width: 20px; }
+table.data.box04 th:nth-child(3), table.data.box04 td:nth-child(3) { width: 35px; }
+table.data.box04 th:nth-child(4), table.data.box04 td:nth-child(4) { width: 55px; }
+
+/* BOX 06 — Referrals */
+table.data.box06 th:nth-child(1), table.data.box06 td:nth-child(1) { width: auto; }
+table.data.box06 th:nth-child(2), table.data.box06 td:nth-child(2) { width: 35px; }
+table.data.box06 th:nth-child(3), table.data.box06 td:nth-child(3) { width: 55px; }
+
+/* ═══ BOX 05 — BIGGER EXPENSES ═══ */
+table.exp { width: 100%; border-collapse: collapse; table-layout: fixed; }
+table.exp td {
+    padding: 5px 0; /* Increased padding for taller rows */
+    border-bottom: 1px solid var(--rule);
+    font-size: 11px; /* Increased font size */
+    font-weight: 600;
+}
+table.exp tr:last-child td { border-bottom: 0; }
+table.exp td.idx {
+    width: 24px; font-weight: 800;
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+}
+table.exp td.amt {
+    text-align: right;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 800;
+    color: var(--red);
+    width: 75px;
+    font-size: 11.5px; /* Bigger amount */
+}
+table.exp tr.total td {
+    border-top: 1.5px solid var(--red);
+    background: var(--red-bg); color: var(--red);
+    font-weight: 900; padding: 7px 0;
+    font-size: 12.5px;
+}
+
+/* EXCEL GRID */
+table.grid {
+    width: 100%; border-collapse: collapse;
+    border: 1.2px solid var(--navy);
+    font-size: 9.5px;
+}
+table.grid th {
+    font-size: 7.5px; letter-spacing: .4px; text-transform: uppercase;
+    color: #fff; background: var(--navy);
+    font-weight: 800; text-align: left;
+    padding: 3px 4px;
+    border: 1px solid var(--navy);
+}
+table.grid th.num { text-align: right; }
+table.grid td {
+    padding: 2.5px 4px;
+    border: 1px solid var(--navy-line);
+    font-weight: 600;
+}
+table.grid td.num {
+    text-align: right;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+}
+table.grid tr:nth-child(even) td { background: #fafcff; }
+table.grid tr.total td {
+    background: var(--navy-soft); color: var(--navy);
+    font-weight: 900; border-top: 1.2px solid var(--navy);
+}
+table.grid tr.unassigned td {
+    background: var(--amber-bg);
+    color: var(--amber);
+    font-weight: 800;
+    font-style: italic;
+    border-top: 1px dashed var(--amber);
+}
+
+table.kv { width: 100%; border-collapse: collapse; }
+table.kv td {
+    padding: 3.5px 0; border-bottom: 1px dashed var(--rule);
+    font-size: 10px;
+}
+table.kv tr:last-child td { border-bottom: 0; }
+table.kv td.k { font-weight: 700; }
+table.kv td.v {
+    text-align: right;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 800;
+}
+
+/* ═══ MODALITY — BIGGER ═══ */
+.modality-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+.mod-box {
+    border: 1.2px solid var(--navy);
+    border-radius: 3px;
+    padding: 8px 12px 10px;
+}
+.mod-box .k {
+    font-size: 11px; letter-spacing: 1px; text-transform: uppercase;
+    font-weight: 900; color: var(--navy);
+    padding-bottom: 5px; margin-bottom: 4px;
+    border-bottom: 1px solid var(--rule);
+}
+.mod-box .r {
+    display: flex; justify-content: space-between;
+    align-items: baseline; padding: 3px 0;
+}
+.mod-box .r .l { font-size: 9px; color: var(--ink2); font-weight: 700; text-transform: uppercase; }
+.mod-box .r .v {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 900; font-size: 16px;
+}
+
+/* PILLS / BADGES */
+.pill {
+    display: inline-block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8.5px; font-weight: 800;
+    color: var(--navy); background: var(--navy-soft);
+    padding: 1px 5px; border-radius: 2px;
+}
+.pill.active { color: var(--green); background: var(--green-bg); }
+.pill.tech { color: #6d28d9; background: #ede9fe; }
+
+.badge {
+    display: inline-block; padding: 1px 4px; border-radius: 2px;
+    font-size: 6.5px; font-weight: 800; letter-spacing: .3px;
+    text-transform: uppercase; margin-left: 3px; vertical-align: 1px;
+}
+.badge.ref  { background: var(--green-bg); color: var(--green); }
+.badge.non  { background: var(--amber-bg); color: var(--amber); }
+.badge.tele { background: var(--navy-soft); color: var(--navy); }
+.badge.house{ background: var(--green-bg); color: var(--green); }
+
+/* Rank badge for Top 5 */
+.rank {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 16px; height: 16px; border-radius: 50%;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8.5px; font-weight: 900;
+    background: var(--navy-soft); color: var(--navy);
+    border: 1px solid var(--navy-line);
+}
+.rank.gold   { background: linear-gradient(135deg, #facc15, #b8860b); color: #fff; border-color: #78350f; }
+.rank.silver { background: linear-gradient(135deg, #cbd5e1, #64748b); color: #fff; border-color: #334155; }
+.rank.bronze { background: linear-gradient(135deg, #d97706, #92400e); color: #fff; border-color: #7c2d12; }
+
+.idx {
+    width: 16px; font-weight: 800;
+    font-family: 'JetBrains Mono', monospace; font-size: 8.5px;
+    text-align: center;
+}
+
+/* INVENTORY */
+.inv-stack { display: flex; flex-direction: column; gap: 5px; }
+.inv-card {
+    border: 1.2px solid var(--navy);
+    border-radius: 3px;
+    overflow: hidden;
+}
+.inv-card .inv-title {
+    background: var(--navy); color: #fff;
+    font-size: 9px; font-weight: 900;
+    letter-spacing: 1px; text-transform: uppercase;
+    padding: 3px 9px;
+}
+.inv-card .inv-body { padding: 2px 9px 5px; }
+.inv-card table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.inv-card table td {
+    padding: 2.5px 0; font-size: 9.5px;
+    border-bottom: 1px dashed var(--rule);
+}
+.inv-card table tr:last-child td { border-bottom: 0; }
+.inv-card table td.k { font-weight: 700; }
+.inv-card table td.v {
+    text-align: right;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 800; font-size: 10.5px;
+    width: 55px;
+}
+.inv-card table tr.total td {
+    border-top: 1.2px solid var(--navy); border-bottom: 0;
+    background: var(--navy-soft); color: var(--navy);
+    padding: 3px 3px; font-weight: 900; font-size: 10px;
+}
+.inv-card table tr.total td.v.green { color: var(--green); }
+
+/* HANDOVER */
+.handover {
+    background: linear-gradient(135deg, var(--navy) 0%, var(--navy-2) 100%);
+    color: #fff; padding: 6px 12px; border-radius: 4px;
+    display: flex; justify-content: space-between; align-items: center;
+    flex-shrink: 0;
+}
+.handover .l { font-size: 9.5px; font-weight: 800; }
+.handover .l small {
+    display: block; font-size: 7px;
+    color: rgba(255,255,255,.75);
+    letter-spacing: 1px; text-transform: uppercase;
+    margin-top: 2px; font-weight: 700;
+}
+.handover .amt {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px; font-weight: 800;
+}
+
+/* SIGNATURES */
+.sig-row {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+    margin-top: 4px;
+    padding-top: 22px;
+    border-top: 1px dashed var(--rule-2);
+    flex-shrink: 0;
+}
+.sig-line {
+    text-align: center; padding-top: 5px;
+    border-top: 1.2px solid var(--ink); position: relative;
+}
+.sig-line::before {
+    content: ''; position: absolute;
+    left: 0; top: -2.5px; width: 18px; height: 2.5px;
+    background: var(--navy);
+}
+.sig-line .role { font-size: 8.5px; letter-spacing: 1px; text-transform: uppercase; font-weight: 900; }
+.sig-line .name { font-size: 8px; font-weight: 800; text-transform: uppercase; margin-top: 2px; min-height: 10px; }
+
+/* NOTES */
+.notes-area {
+    margin-top: 4px; padding: 4px 8px;
+    border: 1px dashed var(--rule-2);
+    border-radius: 3px;
+    background: #fbfcfe;
+    flex-shrink: 0;
+}
+.notes-area .lbl {
+    font-size: 7px; font-weight: 800;
+    letter-spacing: .7px; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 2px; display: block;
+}
+.notes-area .line {
+    border-bottom: 1px dotted var(--rule);
+    height: 12px; margin-bottom: 2px;
+}
+.notes-area .line:last-child { margin-bottom: 0; }
+
+/* PRINT */
+@media print {
+    @page { size: A4 portrait; margin: 6mm; }
+
+    html, body {
+        background: #fff !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+    .toolbar { display: none !important; }
+
+    .sheet {
+        width: 100% !important;
+        height: 285mm !important;
+        margin: 0 !important;
+        box-shadow: none !important;
+        page-break-after: always !important;
+        break-after: page !important;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+        overflow: hidden !important;
+    }
+    .sheet:last-child {
+        page-break-after: auto !important;
+        break-after: auto !important;
+    }
+
+    .content { padding: 5px 10px !important; gap: 5px !important; }
+    .sec { padding: 5px 8px 6px !important; }
+    .sec-hd h2 { font-size: 9.5px !important; }
+    table.data td { padding: 2.5px 0 !important; font-size: 9.5px !important; }
+    table.kv td { padding: 2.5px 0 !important; font-size: 9.5px !important; }
+    table.grid td { padding: 2px 4px !important; font-size: 9px !important; }
+    table.grid th { padding: 2px 4px !important; font-size: 7px !important; }
+    
+    /* Print-specific sizes */
+    .gt-cell { padding: 8px 12px !important; }
+    .gt-cell .v { font-size: 24px !important; }
+    .gt-cell .k { font-size: 9px !important; }
+    .gt-cell .hint { font-size: 8px !important; }
+    
+    .mod-box { padding: 6px 10px 8px !important; }
+    .mod-box .r .v { font-size: 14px !important; }
+
+    table.exp td { padding: 3px 0 !important; font-size: 10px !important; }
+    table.exp td.amt { font-size: 10.5px !important; }
+
+    .add-row { display: none !important; }
+    .sig-row { padding-top: 16px !important; margin-top: 2px !important; }
+    .notes-area { margin-top: 2px !important; padding: 3px 7px !important; }
+    .notes-area .line { height: 10px !important; margin-bottom: 1.5px !important; }
+    .rank { width: 14px !important; height: 14px !important; font-size: 7.5px !important; }
+
+    .sec, .grand-totals, .gt-cell, .mod-box, .inv-card,
+    table.grid, table.grid th, table.grid td,
+    table.data th, table.data td,
+    .inv-card table tr.total td, table.exp tr.total td,
+    .sig-line, .notes-area, .masthead-badge, .dd-block {
+        border-width: 1px !important;
+    }
+    table.kv td, .inv-card table td, table.exp td, .notes-area .line {
+        border-width: 1px !important;
+        border-style: solid !important;
+        border-color: var(--rule) !important;
+    }
+    .sec-hd { border-bottom: 1px solid var(--navy-soft) !important; }
+    .sig-row { border-top: 1px dashed var(--rule-2) !important; }
+}
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+    <button class="btn-print" onclick="window.print()">🖨️ Print (2 sheets, A4)</button>
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- SHEET 1 — PAGE 1 -->
+<!-- ═══════════════════════════════════════════ -->
+<div class="sheet">
+
+    <div class="masthead">
+        <div class="masthead-badge">DAY<small>Closing</small></div>
+        <div class="masthead-center">
+            <div class="brand">TMC Garden Branch</div>
+            <div class="sub">Daily Closing Sheet · End-of-Day Report</div>
+            <div class="day-date-strip">
+                <div class="dd-block"><span class="k">Day</span><span class="v">Saturday</span></div>
+                <div class="dd-block date"><span class="k">Date</span><span class="v">20 April 2024</span></div>
+            </div>
+        </div>
+        <div class="masthead-right">
+            <span class="k">Supervisor</span> <span class="v">Qari Abdul Latif</span>
+            <span class="k">Doc Ref</span>    <span class="v">TMC-DAY-2024-04-20</span>
+        </div>
+    </div>
+
+    <div class="doc-meta">
+        <div class="item"><span class="k">Printed By</span>  <span class="v">Kashif · ID #A-1204</span></div>
+        <div class="item"><span class="k">Printed On</span>  <span class="v" id="printDate">Sat, 20 Apr 2024</span></div>
+        <div class="item"><span class="k">Print Time</span>  <span class="v" id="printTime">15:42:18</span></div>
+        <div class="item"><span class="k">Sheet Type</span>  <span class="v">Daily Closing</span></div>
+    </div>
+
+    <div class="page-strip">
+        <span class="label">Financial Summary</span>
+        <span class="page-num">PAGE 1 OF 2</span>
+    </div>
+
+    <div class="content">
+
+        <!-- ═══ BIGGER FINANCIALS ═══ -->
+        <div class="grand-totals">
+            <div class="gt-cell">
+                <span class="k">Day Total Income</span>
+                <span class="v">152,800</span>
+                <span class="hint">Cash 115,000 · Card 25,000 · Online 12,800</span>
+            </div>
+            <div class="gt-cell">
+                <span class="k">Day Total Expenses</span>
+                <span class="v danger">30,760</span>
+                <span class="hint">Paid out during the day</span>
+            </div>
+            <div class="gt-cell handover-amount">
+                <span class="k">Day Total Handover</span>
+                <span class="v">Rs. 124,040</span>
+                <span class="hint">Physical cash in drawer at end of day</span>
+            </div>
+        </div>
+
+        <div class="cols-2">
+            <div class="sec">
+                <div class="sec-hd">
+                    <span class="num">01</span>
+                    <h2>Appointments</h2>
+                    <span class="rule"></span>
+                </div>
+                <table class="kv">
+                    <tr><td class="k">Given</td><td class="v">3</td></tr>
+                    <tr><td class="k">Advance Collected</td><td class="v">10,000</td></tr>
+                </table>
+            </div>
+
+            <!-- ═══ UPDATED BOX 02: BRANCH TRANSFERS (IN & OUT) ═══ -->
+            <div class="sec">
+                <div class="sec-hd">
+                    <span class="num">02</span>
+                    <h2>Branch Transfers</h2>
+                    <span class="rule"></span>
+                </div>
+                <table class="kv">
+                    <tr>
+                        <td class="k" style="color:var(--red);">Transferred Out (Cases)</td>
+                        <td class="v">3</td>
+                    </tr>
+                    <tr>
+                        <td class="k" style="color:var(--red);">Transferred Out (Cash)</td>
+                        <td class="v">7,500</td>
+                    </tr>
+                    <tr>
+                        <td class="k" style="color:var(--green);">Transferred In (Cases)</td>
+                        <td class="v">2</td>
+                    </tr>
+                    <tr>
+                        <td class="k" style="color:var(--green);">Transferred In (Cash)</td>
+                        <td class="v">4,200</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+
+        <!-- ═══ BIGGER MRI BREAKDOWN ═══ -->
+        <div class="sec">
+            <div class="sec-hd">
+                <span class="num">03</span>
+                <h2>MRI Breakdown</h2>
+                <span class="rule"></span>
+                <span class="tag">Cases &amp; Amount</span>
+            </div>
+            <div class="modality-row">
+                <div class="mod-box">
+                    <span class="k">Screening</span>
+                    <div class="r"><span class="l">Cases</span><span class="v">47</span></div>
+                    <div class="r"><span class="l">Amount</span><span class="v">81,500</span></div>
+                </div>
+                <div class="mod-box">
+                    <span class="k">Full Study</span>
+                    <div class="r"><span class="l">Cases</span><span class="v">3</span></div>
+                    <div class="r"><span class="l">Amount</span><span class="v">33,000</span></div>
+                </div>
+                <div class="mod-box">
+                    <span class="k">Contrast</span>
+                    <div class="r"><span class="l">Cases</span><span class="v">3</span></div>
+                    <div class="r"><span class="l">Amount</span><span class="v">27,000</span></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══ 04 + 05 SIDE BY SIDE ═══ -->
+        <div class="cols-2">
+            <div class="sec">
+                <div class="sec-hd">
+                    <span class="num">04</span>
+                    <h2>Other Category Tests</h2>
+                    <span class="rule"></span>
+                    <span class="tag">↓ by Amt</span>
+                </div>
+                <table class="data box04">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Test Name</th>
+                            <th class="num">Cnt</th>
+                            <th class="num">Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td class="idx">1</td><td>Ultrasound — Abd.</td><td class="num">35</td><td class="num">52,500</td></tr>
+                        <tr><td class="idx">2</td><td>X-Ray — Digital</td><td class="num">42</td><td class="num">42,000</td></tr>
+                        <tr><td class="idx">3</td><td>Echo Cardiography</td><td class="num">4</td><td class="num">18,000</td></tr>
+                        <tr><td class="idx">4</td><td>EMG / NCS — Nerve</td><td class="num">1</td><td class="num">8,000</td></tr>
+                        <tr><td class="idx">5</td><td>ECG — Electrocardio.</td><td class="num">6</td><td class="num">7,200</td></tr>
+                        <tr><td class="idx">6</td><td>EEG — Electroenceph.</td><td class="num">2</td><td class="num">6,500</td></tr>
+                        <tr class="total"><td></td><td>Total</td><td class="num">90</td><td class="num">134,200</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- ═══ BOX 05: BIGGER EXPENSES ═══ -->
+            <div class="sec">
+                <div class="sec-hd">
+                    <span class="num">05</span>
+                    <h2>Day Expense Breakdown</h2>
+                    <span class="rule"></span>
+                </div>
+                <table class="exp">
+                    <tbody>
+                        <tr><td class="idx">1</td><td>Diesel</td><td class="amt">15,300</td></tr>
+                        <tr><td class="idx">2</td><td>Generator Oil Change</td><td class="amt">9,090</td></tr>
+                        <tr><td class="idx">3</td><td>Milk + Sugar + Tea</td><td class="amt">370</td></tr>
+                        <tr><td class="idx">4</td><td>Cut — Mr. Umer</td><td class="amt">2,000</td></tr>
+                        <tr><td class="idx">5</td><td>Cut — Madam Shumaila</td><td class="amt">1,000</td></tr>
+                        <tr><td class="idx">6</td><td>Cut — Pervaiz c/o Umer</td><td class="amt">1,000</td></tr>
+                        <tr><td class="idx">7</td><td>Patient Discounts</td><td class="amt">4,500</td></tr>
+                        <tr><td class="idx">8</td><td>Refunds Processed</td><td class="amt">2,000</td></tr>
+                        <tr class="total"><td></td><td>Day Total Expenses</td><td class="amt">35,260</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ═══ 06 REFERRALS (FULL WIDTH) ═══ -->
+        <div class="sec">
+            <div class="sec-hd">
+                <span class="num">06</span>
+                <h2>Referring Doc / Non-Doctors</h2>
+                <span class="rule"></span>
+            </div>
+            <table class="data box06">
+                <thead>
+                    <tr><th>Doctor</th><th class="num">Pts</th><th class="num">Amount</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>Dr. A. Siddiqui <span class="badge ref">Ref</span></td><td class="num">5</td><td class="num">25,000</td></tr>
+                    <tr><td>Dr. M. Khan <span class="badge non">Non</span></td><td class="num">4</td><td class="num">18,000</td></tr>
+                    <tr><td>Self Walk-in <span class="badge non">Non</span></td><td class="num">12</td><td class="num">45,000</td></tr>
+                    <tr class="total"><td>Total Referrals</td><td class="num">21</td><td class="num">88,000</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="sec">
+            <div class="sec-hd">
+                <span class="num">05b</span>
+                <h2>Refunds Today</h2>
+                <span class="rule"></span>
+            </div>
+            <table class="kv">
+                <tr><td class="k">Number of Refunds</td><td class="v">2</td></tr>
+                <tr><td class="k">Total Refund Amount</td><td class="v" style="color: var(--red);">2,000</td></tr>
+            </table>
+        </div>
+
+        <div class="notes-area">
+            <span class="lbl">Additional Notes / Remarks</span>
+            <div class="line"></div>
+            <div class="line"></div>
+        </div>
+
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- SHEET 2 — PAGE 2 -->
+<!-- ═══════════════════════════════════════════ -->
+<div class="sheet">
+
+    <div class="masthead">
+        <div class="masthead-badge">DAY<small>Closing</small></div>
+        <div class="masthead-center">
+            <div class="brand">TMC Garden Branch</div>
+            <div class="sub">Daily Closing Sheet · Operations &amp; Top Performers</div>
+            <div class="day-date-strip">
+                <div class="dd-block"><span class="k">Day</span><span class="v">Saturday</span></div>
+                <div class="dd-block date"><span class="k">Date</span><span class="v">20 April 2024</span></div>
+            </div>
+        </div>
+        <div class="masthead-right">
+            <span class="k">Supervisor</span> <span class="v">Qari Abdul Latif</span>
+            <span class="k">Doc Ref</span>    <span class="v">TMC-DAY-2024-04-20</span>
+        </div>
+    </div>
+
+    <div class="page-strip">
+        <span class="label">Operations · Top Performers</span>
+        <span class="page-num">PAGE 2 OF 2</span>
+    </div>
+
+    <div class="content">
+
+        <!-- ═══ 07 RADIOLOGIST LOG (MOVED HERE) ═══ -->
+        <div class="sec">
+            <div class="sec-hd">
+                <span class="num">07</span>
+                <h2>Radiologist Reporting Log</h2>
+                <span class="rule"></span>
+                <span class="tag">Assigned Today</span>
+            </div>
+            <table class="grid">
+                <thead>
+                    <tr>
+                        <th>Radiologist</th>
+                        <th class="num">Scr</th>
+                        <th class="num">FS</th>
+                        <th class="num">Con</th>
+                        <th class="num">Tot</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td>Dr. Fahad <span class="badge tele">Tele</span></td><td class="num">7</td><td class="num">2</td><td class="num">3</td><td class="num"><strong>12</strong></td></tr>
+                    <tr><td>Dr. Zara <span class="badge house">In-hs</span></td><td class="num">5</td><td class="num">1</td><td class="num">2</td><td class="num"><strong>8</strong></td></tr>
+                    <tr><td>Dr. Usman <span class="badge house">In-hs</span></td><td class="num">2</td><td class="num">0</td><td class="num">1</td><td class="num"><strong>3</strong></td></tr>
+                    <tr><td>Dr. Rabia <span class="badge house">In-hs</span></td><td class="num">1</td><td class="num">0</td><td class="num">1</td><td class="num"><strong>2</strong></td></tr>
+                    <tr class="total"><td>Total Assigned</td><td class="num">15</td><td class="num">3</td><td class="num">7</td><td class="num">25</td></tr>
+                    <tr class="unassigned">
+                        <td>Unassigned</td>
+                        <td class="num">—</td>
+                        <td class="num">—</td>
+                        <td class="num">—</td>
+                        <td class="num">—</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- ═══ 08 + 09 SIDE BY SIDE — INVENTORY STACKED VERTICALLY ═══ -->
+        <div class="cols-2">
+            <div class="sec">
+                <div class="sec-hd">
+                    <span class="num">08</span>
+                    <h2>Complete Inventory</h2>
+                    <span class="rule"></span>
+                </div>
+                <div class="inv-stack">
+                    <div class="inv-card">
+                        <div class="inv-title">Films</div>
+                        <div class="inv-body">
+                            <table>
+                                <tr><td class="k">Opening Balance</td><td class="v">79</td></tr>
+                                <tr><td class="k">New Packet</td><td class="v" style="color:var(--green);">+ 100</td></tr>
+                                <tr><td class="k">Scanned By</td><td class="v" style="font-size:9px;">10:15 AM · Bilal</td></tr>
+                                <tr><td class="k">Used</td><td class="v" style="color:var(--red);">− 77</td></tr>
+                                <tr class="total"><td>Closing Balance</td><td class="v">100</td></tr>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="inv-card">
+                        <div class="inv-title">Contrast Vials</div>
+                        <div class="inv-body">
+                            <table>
+                                <tr><td class="k">Scanned Yesterday</td><td class="v">6</td></tr>
+                                <tr><td class="k">Scanned Today</td><td class="v" style="color:var(--green);">+ 6</td></tr>
+                                <tr><td class="k">Used</td><td class="v" style="color:var(--red);">− 3</td></tr>
+                                <tr class="total"><td>Net Movement</td><td class="v green">+ 3</td></tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sec">
+                <div class="sec-hd">
+                    <span class="num">09</span>
+                    <h2>Working Staff</h2>
+                    <span class="rule"></span>
+                </div>
+                <table class="data">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Role</th>
+                            <th class="num">In</th>
+                            <th class="num">Out</th>
+                            <th class="num">Dur</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>Rashid Nawaz</td><td>Counter</td><td class="num">08:00</td><td class="num"><span class="pill active">Act</span></td><td class="num"><span class="pill active">7h</span></td></tr>
+                        <tr><td>Mr. Yaseen <span class="pill tech">17</span></td><td>Tech</td><td class="num">08:00</td><td class="num"><span class="pill active">Act</span></td><td class="num"><span class="pill active">7h</span></td></tr>
+                        <tr><td>Mr. Wahaj <span class="pill tech">22</span></td><td>Tech</td><td class="num">08:00</td><td class="num"><span class="pill active">Act</span></td><td class="num"><span class="pill active">7h</span></td></tr>
+                        <tr><td>Mr. Bilal <span class="pill tech">8</span></td><td>Tech</td><td class="num">08:30</td><td class="num">15:00</td><td class="num"><span class="pill">6h30</span></td></tr>
+                        <tr><td>Mr. Kamran <span class="pill tech">5</span></td><td>Tech</td><td class="num">09:00</td><td class="num">15:00</td><td class="num"><span class="pill">6h</span></td></tr>
+                        <tr><td>Dr. Ahmed Raza</td><td>Sup</td><td class="num">08:00</td><td class="num"><span class="pill active">Act</span></td><td class="num"><span class="pill active">7h</span></td></tr>
+                        <tr><td>Qari Abdul Latif</td><td>Sup</td><td class="num">08:00</td><td class="num"><span class="pill active">Act</span></td><td class="num"><span class="pill active">7h</span></td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ═══ TOP 5 DOCTORS + TOP 5 NON-DOCTORS ═══ -->
+        <div class="cols-2">
+            <div class="sec">
+                <div class="sec-hd">
+                    <span class="num gold">🏆</span>
+                    <h2>Top 5 Doctors of the Day</h2>
+                    <span class="rule"></span>
+                </div>
+                <table class="data">
+                    <thead>
+                        <tr>
+                            <th style="width:22px;">#</th>
+                            <th>Doctor</th>
+                            <th class="num">Pts</th>
+                            <th class="num">Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td><span class="rank gold">1</span></td><td>Dr. A. Siddiqui</td><td class="num">5</td><td class="num">25,000</td></tr>
+                        <tr><td><span class="rank silver">2</span></td><td>Dr. T. Hussain</td><td class="num">4</td><td class="num">22,000</td></tr>
+                        <tr><td><span class="rank bronze">3</span></td><td>Dr. R. Ahmed</td><td class="num">3</td><td class="num">16,500</td></tr>
+                        <tr><td><span class="rank">4</span></td><td>Dr. S. Nawaz</td><td class="num">2</td><td class="num">11,000</td></tr>
+                        <tr><td><span class="rank">5</span></td><td>Dr. F. Iqbal</td><td class="num">3</td><td class="num">9,500</td></tr>
+                        <tr class="total"><td colspan="2">Total</td><td class="num">17</td><td class="num">84,000</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="sec">
+                <div class="sec-hd">
+                    <span class="num gold">🏆</span>
+                    <h2>Top 5 Non-Doctors of the Day</h2>
+                    <span class="rule"></span>
+                </div>
+                <table class="data">
+                    <thead>
+                        <tr>
+                            <th style="width:22px;">#</th>
+                            <th>Non-Doctor</th>
+                            <th class="num">Pts</th>
+                            <th class="num">Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td><span class="rank gold">1</span></td><td>Self Walk-in</td><td class="num">12</td><td class="num">45,000</td></tr>
+                        <tr><td><span class="rank silver">2</span></td><td>Mr. Umer</td><td class="num">3</td><td class="num">5,000</td></tr>
+                        <tr><td><span class="rank bronze">3</span></td><td>Ms. Shumaila</td><td class="num">2</td><td class="num">3,500</td></tr>
+                        <tr><td><span class="rank">4</span></td><td>Pervaiz</td><td class="num">2</td><td class="num">2,800</td></tr>
+                        <tr><td><span class="rank">5</span></td><td>Mr. Kamran</td><td class="num">2</td><td class="num">2,500</td></tr>
+                        <tr class="total"><td colspan="2">Total</td><td class="num">21</td><td class="num">58,800</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="handover">
+            <div class="l">
+                Day Cash Handover
+                <small>Rashid Nawaz → Qari Abdul Latif (Supervisor)</small>
+            </div>
+            <div class="amt">Rs. 124,040</div>
+        </div>
+
+        <div class="sig-row">
+            <div class="sig-line">
+                <div class="role">Prepared By</div>
+                <div class="name">Day Closing Staff · Rashid Nawaz</div>
+            </div>
+            <div class="sig-line">
+                <div class="role">Cash Handover</div>
+                <div class="name">Qari Abdul Latif</div>
+            </div>
+            <div class="sig-line">
+                <div class="role">Approved By</div>
+                <div class="name">Branch Manager</div>
+            </div>
+        </div>
+
+        <div class="notes-area">
+            <span class="lbl">Additional Notes / Remarks</span>
+            <div class="line"></div>
+            <div class="line"></div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+(function setPrintStamp() {
+    const now = new Date();
+    const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const dateStr = days[now.getDay()] + ', ' + String(now.getDate()).padStart(2,'0') + ' ' + months[now.getMonth()] + ' ' + now.getFullYear();
+    const timeStr = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0') + ':' + String(now.getSeconds()).padStart(2,'0');
+    document.getElementById('printDate').textContent = dateStr;
+    document.getElementById('printTime').textContent = timeStr;
+})();
+</script>
+
+</body>
+</html>
