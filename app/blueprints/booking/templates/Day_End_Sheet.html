@@ -1,0 +1,1161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Daily Closing Sheet — {{ d.meta.branch_name }}</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+@page { size: A4 portrait; margin: 6mm; }
+
+:root {
+    --navy:#0b1e3f;
+    --navy-2:#1a3160;
+    --navy-soft:#eef3fb;
+    --navy-line:#c3d2ec;
+    --ink:#0a0f1a;
+    --ink2:#1c2537;
+    --paper:#ffffff;
+    --fill-2:#f1f5f9;
+    --rule:#e2e8f0;
+    --rule-2:#cbd5e1;
+    --green:#047857;
+    --green-bg:#ecfdf5;
+    --red:#be123c;
+    --red-bg:#fff1f3;
+    --amber:#b45309;
+    --amber-bg:#fffbeb;
+    --muted:#64748b;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+    font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+    font-size: 11px;
+    line-height: 1.4;
+    color: var(--ink);
+    background: #d9dee5;
+    padding: 14px;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+}
+
+.toolbar { position: fixed; top: 14px; right: 14px; z-index: 999; }
+.btn-print {
+    padding: 11px 22px;
+    background: var(--navy);
+    color: #fff;
+    border: 0;
+    border-radius: 7px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 800;
+    box-shadow: 0 6px 20px rgba(11,30,63,.35);
+}
+.btn-print:hover { transform: translateY(-1px); }
+
+/* FIXED A4 SHEET */
+.sheet {
+    width: 210mm;
+    height: 297mm;
+    margin: 0 auto 10mm auto;
+    background: var(--paper);
+    box-shadow: 0 24px 60px -20px rgba(11,30,63,.35);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* MASTHEAD */
+.masthead {
+    background: linear-gradient(135deg, var(--navy) 0%, var(--navy-2) 100%);
+    color: #fff;
+    padding: 10px 14px;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 12px;
+    align-items: center;
+    flex-shrink: 0;
+}
+.masthead-badge {
+    background: linear-gradient(135deg, #b8860b 0%, #78350f 100%);
+    border: 1px solid rgba(255,255,255,.5);
+    color: #fff;
+    padding: 7px 12px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    line-height: 1;
+    text-align: center;
+}
+.masthead-badge small {
+    display: block; font-size: 7px; letter-spacing: 2px;
+    color: rgba(255,255,255,.85); margin-top: 3px; font-weight: 800;
+}
+.masthead-center { display: flex; flex-direction: column; gap: 3px; }
+.masthead-center .brand { font-size: 15px; font-weight: 900; letter-spacing: -.3px; line-height: 1; }
+.masthead-center .sub {
+    font-size: 7.5px; letter-spacing: 2px; text-transform: uppercase;
+    color: rgba(255,255,255,.8); font-weight: 700;
+}
+.day-date-strip { display: flex; gap: 8px; margin-top: 3px; }
+.dd-block {
+    background: rgba(255,255,255,.14);
+    border: 1px solid rgba(255,255,255,.3);
+    padding: 2px 7px;
+    border-radius: 4px;
+    display: inline-flex;
+    align-items: baseline;
+    gap: 5px;
+}
+.dd-block .k {
+    font-size: 7.5px; text-transform: uppercase; letter-spacing: 1px;
+    color: rgba(255,255,255,.75); font-weight: 800;
+}
+.dd-block .v {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; font-weight: 800; color: #fff;
+}
+.dd-block.date .v { font-weight: 900; letter-spacing: .3px; }
+
+.masthead-right {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9.5px;
+    text-align: right;
+    line-height: 1.5;
+    background: rgba(255,255,255,.1);
+    border: 1px solid rgba(255,255,255,.2);
+    padding: 5px 9px;
+    border-radius: 5px;
+}
+.masthead-right .k { color: rgba(255,255,255,.75); font-size: 8px; text-transform: uppercase; letter-spacing: 1px; }
+.masthead-right .v { color: #fff; font-weight: 800; }
+
+/* DOC META */
+.doc-meta {
+    background: var(--navy-soft);
+    border-bottom: 1px solid var(--navy-line);
+    padding: 3px 14px;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    font-size: 8.5px;
+    flex-shrink: 0;
+}
+.doc-meta .item { display: flex; gap: 4px; }
+.doc-meta .k { color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: .5px; }
+.doc-meta .v { font-family: 'JetBrains Mono', monospace; font-weight: 700; color: var(--navy); }
+
+/* PAGE STRIP */
+.page-strip {
+    background: var(--ink2);
+    color: #fff;
+    padding: 3px 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 8.5px;
+    font-weight: 800;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    flex-shrink: 0;
+}
+.page-strip .page-num {
+    background: var(--navy);
+    border: 1px solid rgba(255,255,255,.3);
+    padding: 1px 7px;
+    border-radius: 3px;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 800;
+}
+
+/* CONTENT CONTAINER */
+.content {
+    flex: 1;
+    padding: 8px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    overflow: hidden;
+}
+
+/* ═══ BIGGER GRAND TOTALS ═══ */
+.grand-totals {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    flex-shrink: 0;
+}
+.gt-cell {
+    background: var(--fill-2);
+    border: 1.5px solid var(--navy-line);
+    border-radius: 6px;
+    padding: 10px 14px;
+    display: flex;
+    flex-direction: column;
+}
+.gt-cell .k {
+    font-size: 10px; font-weight: 800; text-transform: uppercase;
+    letter-spacing: .8px; color: var(--navy);
+}
+.gt-cell .v {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 26px; font-weight: 900; color: var(--navy);
+    line-height: 1.1; margin: 3px 0 1px 0;
+}
+.gt-cell .v.danger { color: var(--red); }
+.gt-cell .hint { font-size: 8.5px; color: var(--muted); font-weight: 600; }
+.gt-cell.handover-amount {
+    background: linear-gradient(135deg, var(--navy-soft) 0%, #fff 100%);
+    border: 1.5px solid var(--navy);
+}
+.gt-cell.handover-amount .v { color: var(--green); }
+
+/* 2-COLUMN ROW */
+.cols-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    align-items: stretch;
+}
+
+/* SECTION */
+.sec {
+    background: #fff;
+    border: 1px solid var(--rule-2);
+    border-radius: 5px;
+    padding: 5px 8px;
+    display: flex;
+    flex-direction: column;
+}
+.sec-hd {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding-bottom: 3px;
+    margin-bottom: 4px;
+    border-bottom: 1px solid var(--rule);
+    flex-shrink: 0;
+}
+.sec-hd .num {
+    background: var(--navy);
+    color: #fff;
+    font-size: 8px;
+    font-weight: 900;
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-family: 'JetBrains Mono', monospace;
+    line-height: 1.1;
+}
+.sec-hd .num.gold { background: #b8860b; }
+.sec-hd h2 {
+    font-size: 10.5px;
+    font-weight: 900;
+    color: var(--navy);
+    letter-spacing: .2px;
+    text-transform: uppercase;
+}
+.sec-hd .rule { flex: 1; height: 1px; background: var(--rule); }
+.sec-hd .tag {
+    font-size: 7.5px; font-weight: 700; text-transform: uppercase;
+    color: var(--muted); letter-spacing: .5px;
+}
+
+/* KV TABLE */
+table.kv { width: 100%; border-collapse: collapse; }
+table.kv td {
+    padding: 2.5px 0;
+    font-size: 10px;
+    border-bottom: 1px dashed var(--rule);
+}
+table.kv tr:last-child td { border-bottom: 0; }
+table.kv td.k { color: var(--ink); font-weight: 600; }
+table.kv td.v {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 800;
+    text-align: right;
+    color: var(--navy);
+}
+
+/* DATA TABLE */
+table.data { width: 100%; border-collapse: collapse; font-size: 9.5px; }
+table.data th {
+    background: var(--navy-soft);
+    color: var(--navy);
+    font-weight: 800;
+    text-transform: uppercase;
+    font-size: 7.5px;
+    letter-spacing: .5px;
+    padding: 3px 4px;
+    text-align: left;
+    border-bottom: 1px solid var(--navy-line);
+}
+table.data th.num, table.data td.num { text-align: right; }
+table.data td {
+    padding: 2.5px 4px;
+    border-bottom: 1px solid var(--rule);
+    font-size: 9.5px;
+}
+table.data td.idx {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 800;
+    color: var(--muted);
+    font-size: 8.5px;
+}
+table.data td.num {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+}
+table.data tr.total td {
+    border-top: 1.2px solid var(--navy); border-bottom: 0;
+    background: var(--navy-soft);
+    font-weight: 900; color: var(--navy);
+    padding: 4px 3px;
+    font-size: 10px;
+}
+
+/* BOX 04 — Other Tests */
+table.data.box04 th:nth-child(1), table.data.box04 td:nth-child(1) { width: 18px; }
+table.data.box04 th:nth-child(2), table.data.box04 td:nth-child(2) { width: 44px; }
+table.data.box04 th:nth-child(4), table.data.box04 td:nth-child(4) { width: 30px; }
+table.data.box04 th:nth-child(5), table.data.box04 td:nth-child(5) { width: 50px; }
+
+/* BOX 06 — Referrals */
+table.data.box06 th:nth-child(1), table.data.box06 td:nth-child(1) { width: auto; }
+table.data.box06 th:nth-child(2), table.data.box06 td:nth-child(2) { width: 35px; }
+table.data.box06 th:nth-child(3), table.data.box06 td:nth-child(3) { width: 55px; }
+
+/* ═══ BOX 05 — BIGGER EXPENSES ═══ */
+table.exp { width: 100%; border-collapse: collapse; table-layout: fixed; }
+table.exp td {
+    padding: 4px 0;
+    border-bottom: 1px solid var(--rule);
+    font-size: 10.5px;
+    font-weight: 600;
+}
+table.exp tr:last-child td { border-bottom: 0; }
+table.exp td.idx {
+    width: 24px; font-weight: 800;
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+}
+table.exp td.amt {
+    text-align: right;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 800;
+    color: var(--red);
+    width: 75px;
+    font-size: 11px;
+}
+table.exp tr.total td {
+    border-top: 1.2px solid var(--navy);
+    background: var(--navy-soft);
+    color: var(--navy);
+    font-weight: 900;
+    padding: 4px 2px;
+}
+table.exp tr.total td.amt { color: var(--red); font-size: 12px; }
+
+/* ═══ BIGGER MODALITY ROW (BOX 03) ═══ */
+.modality-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+}
+.mod-box {
+    background: var(--fill-2);
+    border: 1.5px solid var(--navy-line);
+    border-radius: 5px;
+    padding: 6px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+.mod-box .k {
+    font-size: 10.5px; font-weight: 900; text-transform: uppercase;
+    letter-spacing: .5px; color: var(--navy);
+    border-bottom: 1px solid var(--navy-line);
+    padding-bottom: 2px;
+}
+.mod-box .r {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-size: 10.5px;
+}
+.mod-box .r .l { color: var(--muted); font-weight: 700; }
+.mod-box .r .v {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 900;
+    color: var(--navy);
+    font-size: 12px;
+}
+
+/* GRID TABLE */
+table.grid { width: 100%; border-collapse: collapse; font-size: 9px; }
+table.grid th {
+    background: var(--navy-soft);
+    color: var(--navy);
+    font-weight: 800;
+    font-size: 7.5px;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    padding: 3px 4px;
+    border-bottom: 1px solid var(--navy-line);
+}
+table.grid th.num, table.grid td.num { text-align: right; }
+table.grid td {
+    padding: 2.5px 4px;
+    border-bottom: 1px solid var(--rule);
+    font-family: 'JetBrains Mono', monospace;
+}
+table.grid td:first-child { font-family: 'Inter', sans-serif; font-weight: 600; }
+table.grid tr.total td {
+    border-top: 1.2px solid var(--navy);
+    background: var(--navy-soft);
+    font-weight: 900;
+    color: var(--navy);
+}
+table.grid tr.unassigned td {
+    color: var(--muted);
+    font-style: italic;
+}
+
+/* BADGES */
+.badge {
+    display: inline-block;
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-size: 7px;
+    font-weight: 800;
+    letter-spacing: .3px;
+    text-transform: uppercase;
+    line-height: 1.1;
+    vertical-align: middle;
+}
+.badge.tele { background: #e0e7ff; color: #3730a3; }
+.badge.house { background: var(--green-bg); color: var(--green); }
+.badge.ref { background: var(--green-bg); color: var(--green); }
+.badge.non { background: #f1f5f9; color: var(--muted); }
+
+/* PILLS */
+.pill {
+    display: inline-block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 7.5px;
+    font-weight: 800;
+    padding: 1px 4px;
+    border-radius: 3px;
+    line-height: 1.1;
+    background: #e2e8f0;
+    color: var(--ink);
+}
+.pill.active { background: var(--green-bg); color: var(--green); font-weight: 900; }
+.pill.tech {
+    background: var(--navy-soft);
+    color: var(--navy);
+    border: 1px solid var(--navy-line);
+    margin-left: 2px;
+}
+
+/* RANKS */
+.rank {
+    display: inline-block;
+    width: 13px; height: 13px;
+    line-height: 13px;
+    text-align: center;
+    border-radius: 50%;
+    font-size: 7.5px;
+    font-weight: 900;
+    background: #e2e8f0;
+    color: var(--ink);
+    font-family: 'JetBrains Mono', monospace;
+}
+.rank.gold { background: #fef3c7; color: #92400e; }
+.rank.silver { background: #f1f5f9; color: #475569; }
+.rank.bronze { background: #ffedd5; color: #9a3412; }
+
+/* ═══ INVENTORY STACK (08) ═══ */
+.inv-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.inv-card {
+    background: var(--fill-2);
+    border: 1px solid var(--rule-2);
+    border-radius: 4px;
+    padding: 4px 6px;
+}
+.inv-title {
+    font-size: 9px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    color: var(--navy);
+    border-bottom: 1px solid var(--rule-2);
+    padding-bottom: 2px;
+    margin-bottom: 3px;
+}
+.inv-body table { width: 100%; border-collapse: collapse; font-size: 9px; }
+.inv-body td { padding: 1.5px 0; border-bottom: 1px dashed var(--rule); }
+.inv-body tr:last-child td { border-bottom: 0; }
+.inv-body td.k { color: var(--ink); font-weight: 600; font-size: 8.5px; }
+.inv-body td.v {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 800;
+    text-align: right;
+    color: var(--navy);
+    font-size: 9.5px;
+}
+.inv-body tr.total td {
+    font-weight: 900;
+    color: var(--navy);
+    border-top: 1px solid var(--navy-line);
+    padding-top: 2px;
+}
+
+/* HANDOVER BANNER */
+.handover {
+    background: linear-gradient(135deg, var(--navy-soft) 0%, #fff 100%);
+    border: 1.5px solid var(--navy);
+    border-radius: 5px;
+    padding: 6px 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0;
+}
+.handover .l {
+    font-size: 11px; font-weight: 900; color: var(--navy);
+    text-transform: uppercase; letter-spacing: .5px;
+}
+.handover .l small {
+    display: block; font-size: 8px; text-transform: none;
+    letter-spacing: 0; color: var(--muted); font-weight: 600; margin-top: 1px;
+}
+.handover .amt {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 16px; font-weight: 900; color: var(--green);
+}
+
+/* SIGNATURES */
+.sig-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    flex-shrink: 0;
+}
+.sig-line {
+    border-top: 1px solid var(--ink);
+    padding-top: 3px;
+    display: flex;
+    flex-direction: column;
+}
+.sig-line .role {
+    font-size: 7.5px; text-transform: uppercase; letter-spacing: .8px;
+    color: var(--muted); font-weight: 800;
+}
+.sig-line .name {
+    font-size: 9px; font-weight: 800; color: var(--navy);
+    margin-top: 1px;
+}
+
+/* NOTES AREA */
+.notes-area {
+    border: 1px dashed var(--rule-2);
+    border-radius: 4px;
+    padding: 4px 8px;
+    flex-shrink: 0;
+}
+.notes-area .lbl {
+    font-size: 7.5px; font-weight: 800; text-transform: uppercase;
+    letter-spacing: .8px; color: var(--muted);
+}
+.notes-area .line {
+    border-bottom: 1px dotted var(--rule-2);
+    height: 12px;
+    min-height: 12px;
+    outline: none;
+}
+
+[contenteditable="true"] {
+    outline: none;
+    cursor: text;
+}
+[contenteditable="true"]:hover {
+    background: rgba(255,255,255,0.2);
+}
+
+/* PRINT SETUP */
+@media print {
+    @page { size: A4 portrait; margin: 6mm; }
+    html, body {
+        background: #fff !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+    .toolbar { display: none !important; }
+    .sheet {
+        width: 100% !important;
+        height: 285mm !important;
+        margin: 0 !important;
+        box-shadow: none !important;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+        overflow: hidden !important;
+    }
+    .sheet:first-of-type {
+        page-break-after: always !important;
+        break-after: page !important;
+    }
+    .sheet:last-of-type {
+        page-break-after: avoid !important;
+        break-after: avoid !important;
+    }
+    [contenteditable="true"]:hover {
+        background: transparent !important;
+    }
+}
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+    <button class="btn-print" onclick="window.print()">🖨️ Print (2 sheets, A4)</button>
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- SHEET 1 — PAGE 1 -->
+<!-- ═══════════════════════════════════════════ -->
+<div class="sheet">
+
+    <div class="masthead">
+        <div class="masthead-badge">DAY<small>Closing</small></div>
+        <div class="masthead-center">
+            <div class="brand">{{ d.meta.branch_name }}</div>
+            <div class="sub">Daily Closing Sheet · End-of-Day Report</div>
+            <div class="day-date-strip">
+                <div class="dd-block"><span class="k">Day</span><span class="v">{{ d.meta.day_name }}</span></div>
+                <div class="dd-block date"><span class="k">Date</span><span class="v">{{ d.meta.date_formatted }}</span></div>
+            </div>
+        </div>
+        <div class="masthead-right">
+            <span class="k">Supervisor</span> <span class="v" id="mastheadSupervisor1" contenteditable="true">{{ d.meta.supervisor_name }}</span>
+            <span class="k">Doc Ref</span>    <span class="v">{{ d.meta.doc_ref }}</span>
+        </div>
+    </div>
+
+    <div class="doc-meta">
+        <div class="item"><span class="k">Printed By</span>  <span class="v">{{ d.meta.printed_by }} · ID #{{ d.meta.printed_by_id }}</span></div>
+        <div class="item"><span class="k">Printed On</span>  <span class="v" id="printDate1">{{ d.meta.date_short }}</span></div>
+        <div class="item"><span class="k">Print Time</span>  <span class="v" id="printTime1"></span></div>
+        <div class="item"><span class="k">Sheet Type</span>  <span class="v">{{ d.meta.sheet_type }}</span></div>
+    </div>
+
+    <div class="page-strip">
+        <span class="label">Financial Summary</span>
+        <span class="page-num">PAGE 1 OF 2</span>
+    </div>
+
+    <div class="content">
+
+        <!-- ═══ BIGGER FINANCIALS ═══ -->
+        <div class="grand-totals">
+            <div class="gt-cell">
+                <span class="k">Day Total Income</span>
+                <span class="v">{{ num(d.summary.total_income) }}</span>
+                <span class="hint">Cash {{ num(d.summary.cash_income) }} · Card {{ num(d.summary.card_income) }} · Online {{ num(d.summary.online_income) }}</span>
+            </div>
+            <div class="gt-cell">
+                <span class="k">Day Total Expenses</span>
+                <span class="v danger">{{ num(d.summary.total_expense) }}</span>
+                <span class="hint">Paid out during the day</span>
+            </div>
+            <div class="gt-cell handover-amount">
+                <span class="k">Day Total Handover</span>
+                <span class="v">Rs. {{ num(d.summary.total_handover) }}</span>
+                <span class="hint">Physical cash in drawer at end of day</span>
+            </div>
+        </div>
+
+        <div class="cols-2">
+            <div class="sec">
+                <div class="sec-hd">
+                    <span class="num">01</span>
+                    <h2>Appointments</h2>
+                    <span class="rule"></span>
+                </div>
+                <table class="kv">
+                    <tr><td class="k">Given</td><td class="v">{{ num(d.appointments.given) }}</td></tr>
+                    <tr><td class="k">Advance Collected</td><td class="v">{{ num(d.appointments.advance_collected) }}</td></tr>
+                </table>
+            </div>
+
+            <!-- ═══ BOX 02: BRANCH TRANSFERS (IN & OUT) ═══ -->
+            <div class="sec">
+                <div class="sec-hd">
+                    <span class="num">02</span>
+                    <h2>Branch Transfers</h2>
+                    <span class="rule"></span>
+                </div>
+                <table class="kv">
+                    <tr>
+                        <td class="k" style="color:var(--red);">Transferred Out (Cases)</td>
+                        <td class="v">{{ num(d.transfers.transferred_out_cases) }}</td>
+                    </tr>
+                    <tr>
+                        <td class="k" style="color:var(--red);">Transferred Out (Cash)</td>
+                        <td class="v">{{ num(d.transfers.transferred_out_cash) }}</td>
+                    </tr>
+                    <tr>
+                        <td class="k" style="color:var(--green);">Transferred In (Cases)</td>
+                        <td class="v">{{ num(d.transfers.transferred_in_cases) }}</td>
+                    </tr>
+                    <tr>
+                        <td class="k" style="color:var(--green);">Transferred In (Cash)</td>
+                        <td class="v">{{ num(d.transfers.transferred_in_cash) }}</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+
+        <!-- ═══ BIGGER MRI BREAKDOWN ═══ -->
+        <div class="sec">
+            <div class="sec-hd">
+                <span class="num">03</span>
+                <h2>MRI Breakdown</h2>
+                <span class="rule"></span>
+                <span class="tag">Cases &amp; Amount</span>
+            </div>
+            <div class="modality-row">
+                <div class="mod-box">
+                    <span class="k">Screening</span>
+                    <div class="r"><span class="l">Cases</span><span class="v">{{ num(d.mri.screening.cases) }}</span></div>
+                    <div class="r"><span class="l">Amount</span><span class="v">{{ num(d.mri.screening.amount) }}</span></div>
+                </div>
+                <div class="mod-box">
+                    <span class="k">Full Study</span>
+                    <div class="r"><span class="l">Cases</span><span class="v">{{ num(d.mri.full_study.cases) }}</span></div>
+                    <div class="r"><span class="l">Amount</span><span class="v">{{ num(d.mri.full_study.amount) }}</span></div>
+                </div>
+                <div class="mod-box">
+                    <span class="k">Contrast</span>
+                    <div class="r"><span class="l">Cases</span><span class="v">{{ num(d.mri.contrast.cases) }}</span></div>
+                    <div class="r"><span class="l">Amount</span><span class="v">{{ num(d.mri.contrast.amount) }}</span></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══ 04 + 05 SIDE BY SIDE ═══ -->
+        <div class="cols-2">
+            <div class="sec">
+                <div class="sec-hd">
+                    <span class="num">04</span>
+                    <h2>Other Category Tests</h2>
+                    <span class="rule"></span>
+                    <span class="tag">↓ by Amt</span>
+                </div>
+                <table class="data box04">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Cat</th>
+                            <th>Test Name</th>
+                            <th class="num">Cnt</th>
+                            <th class="num">Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in d.other_tests.rows %}
+                        <tr>
+                            <td class="idx">{{ loop.index }}</td>
+                            <td style="color:var(--navy);font-weight:700;">{{ item.category }}</td>
+                            <td>{{ item.test_name }}</td>
+                            <td class="num">{{ num(item.count) }}</td>
+                            <td class="num">{{ num(item.amount) }}</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="5" style="text-align:center;color:var(--muted);padding:8px 0;">No other category tests</td></tr>
+                        {% endfor %}
+                        <tr class="total">
+                            <td colspan="3">Total</td>
+                            <td class="num">{{ num(d.other_tests.total_count) }}</td>
+                            <td class="num">{{ num(d.other_tests.total_amount) }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- ═══ BOX 05: BIGGER EXPENSES ═══ -->
+            <div class="sec">
+                <div class="sec-hd">
+                    <span class="num">05</span>
+                    <h2>Day Expense Breakdown</h2>
+                    <span class="rule"></span>
+                </div>
+                <table class="exp">
+                    <tbody>
+                        {% for item in d.expenses.rows %}
+                        <tr>
+                            <td class="idx">{{ loop.index }}</td>
+                            <td>{{ item.name }}</td>
+                            <td class="amt">{{ num(item.amount) }}</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="3" style="text-align:center;color:var(--muted);padding:8px 0;">No expenses recorded</td></tr>
+                        {% endfor %}
+                        <tr class="total">
+                            <td></td>
+                            <td>Day Total Expenses</td>
+                            <td class="amt">{{ num(d.expenses.total_amount) }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ═══ 06 REFERRALS (FULL WIDTH) ═══ -->
+        <div class="sec">
+            <div class="sec-hd">
+                <span class="num">06</span>
+                <h2>Referring Doc / Non-Doctors</h2>
+                <span class="rule"></span>
+            </div>
+            <table class="data box06">
+                <thead>
+                    <tr><th>Doctor / Non-Doctor</th><th class="num">Pts</th><th class="num">Amount</th></tr>
+                </thead>
+                <tbody>
+                    {% for ref in d.referrals.all %}
+                    <tr>
+                        <td>{{ ref.name }} <span class="badge {{ 'ref' if ref.badge == 'Ref' else 'non' }}">{{ ref.badge }}</span></td>
+                        <td class="num">{{ num(ref.pts) }}</td>
+                        <td class="num">{{ num(ref.amount) }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="3" style="text-align:center;color:var(--muted);padding:8px 0;">No referrals recorded</td></tr>
+                    {% endfor %}
+                    <tr class="total">
+                        <td>Total Referrals</td>
+                        <td class="num">{{ num(d.referrals.total_pts) }}</td>
+                        <td class="num">{{ num(d.referrals.total_amount) }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="sec">
+            <div class="sec-hd">
+                <span class="num">05b</span>
+                <h2>Refunds Today</h2>
+                <span class="rule"></span>
+            </div>
+            <table class="kv">
+                <tr><td class="k">Number of Refunds</td><td class="v">{{ num(d.expenses.refund_count) }}</td></tr>
+                <tr><td class="k">Total Refund Amount</td><td class="v" style="color: var(--red);">{{ num(d.expenses.refund_amount) }}</td></tr>
+            </table>
+        </div>
+
+        <div class="notes-area">
+            <span class="lbl">Additional Notes / Remarks</span>
+            <div class="line" contenteditable="true"></div>
+            <div class="line" contenteditable="true"></div>
+        </div>
+
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- SHEET 2 — PAGE 2 -->
+<!-- ═══════════════════════════════════════════ -->
+<div class="sheet">
+
+    <div class="masthead">
+        <div class="masthead-badge">DAY<small>Closing</small></div>
+        <div class="masthead-center">
+            <div class="brand">{{ d.meta.branch_name }}</div>
+            <div class="sub">Daily Closing Sheet · Operations &amp; Top Performers</div>
+            <div class="day-date-strip">
+                <div class="dd-block"><span class="k">Day</span><span class="v">{{ d.meta.day_name }}</span></div>
+                <div class="dd-block date"><span class="k">Date</span><span class="v">{{ d.meta.date_formatted }}</span></div>
+            </div>
+        </div>
+        <div class="masthead-right">
+            <span class="k">Supervisor</span> <span class="v" id="mastheadSupervisor2" contenteditable="true">{{ d.meta.supervisor_name }}</span>
+            <span class="k">Doc Ref</span>    <span class="v">{{ d.meta.doc_ref }}</span>
+        </div>
+    </div>
+
+    <div class="page-strip">
+        <span class="label">Operations · Top Performers</span>
+        <span class="page-num">PAGE 2 OF 2</span>
+    </div>
+
+    <div class="content">
+
+        <!-- ═══ 07 RADIOLOGIST LOG ═══ -->
+        <div class="sec">
+            <div class="sec-hd">
+                <span class="num">07</span>
+                <h2>Radiologist Reporting Log</h2>
+                <span class="rule"></span>
+                <span class="tag">Assigned Today</span>
+            </div>
+            <table class="grid">
+                <thead>
+                    <tr>
+                        <th>Radiologist</th>
+                        <th class="num">Scr</th>
+                        <th class="num">FS</th>
+                        <th class="num">Con</th>
+                        <th class="num">Tot</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for rad in d.radiologists.rows %}
+                    <tr>
+                        <td>{{ rad.name }} <span class="badge {{ 'house' if rad.badge == 'In-hs' else 'tele' }}">{{ rad.badge }}</span></td>
+                        <td class="num">{{ num(rad.screening) }}</td>
+                        <td class="num">{{ num(rad.full_study) }}</td>
+                        <td class="num">{{ num(rad.contrast) }}</td>
+                        <td class="num"><strong>{{ num(rad.total) }}</strong></td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="5" style="text-align:center;color:var(--muted);padding:6px 0;">No radiologists assigned today</td></tr>
+                    {% endfor %}
+                    <tr class="total">
+                        <td>Total Assigned</td>
+                        <td class="num">{{ num(d.radiologists.total_assigned.screening) }}</td>
+                        <td class="num">{{ num(d.radiologists.total_assigned.full_study) }}</td>
+                        <td class="num">{{ num(d.radiologists.total_assigned.contrast) }}</td>
+                        <td class="num">{{ num(d.radiologists.total_assigned.total) }}</td>
+                    </tr>
+                    <tr class="unassigned">
+                        <td>Unassigned</td>
+                        <td class="num">{{ num(d.radiologists.unassigned.screening) }}</td>
+                        <td class="num">{{ num(d.radiologists.unassigned.full_study) }}</td>
+                        <td class="num">{{ num(d.radiologists.unassigned.contrast) }}</td>
+                        <td class="num">{{ num(d.radiologists.unassigned.total) }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- ═══ 08 + 09 SIDE BY SIDE — INVENTORY STACKED VERTICALLY ═══ -->
+        <div class="cols-2">
+            <div class="sec">
+                <div class="sec-hd">
+                    <span class="num">08</span>
+                    <h2>Complete Inventory</h2>
+                    <span class="rule"></span>
+                </div>
+                <div class="inv-stack">
+                    <div class="inv-card">
+                        <div class="inv-title">Films</div>
+                        <div class="inv-body">
+                            <table>
+                                <tr><td class="k">Opening Balance</td><td class="v">{{ num(d.inventory.films.opening) }}</td></tr>
+                                <tr><td class="k">New Packet</td><td class="v" style="color:var(--green);">+ {{ num(d.inventory.films.new_packet) }}</td></tr>
+                                <tr><td class="k">Scanned By</td><td class="v" style="font-size:9px;">{{ d.inventory.films.scanned_by }}</td></tr>
+                                <tr><td class="k">Used</td><td class="v" style="color:var(--red);">− {{ num(d.inventory.films.used) }}</td></tr>
+                                <tr class="total"><td>Closing Balance</td><td class="v">{{ num(d.inventory.films.closing) }}</td></tr>
+                            </table>
+                        </div>
+                    </div>
+                    {% if d.inventory.contrast %}
+                    <div class="inv-card">
+                        <div class="inv-title">Contrast Vials</div>
+                        <div class="inv-body">
+                            <table>
+                                <tr><td class="k">Scanned Yesterday</td><td class="v">{{ num(d.inventory.contrast.yesterday) }}</td></tr>
+                                <tr><td class="k">Scanned Today</td><td class="v" style="color:var(--green);">+ {{ num(d.inventory.contrast.today) }}</td></tr>
+                                <tr><td class="k">Used</td><td class="v" style="color:var(--red);">− {{ num(d.inventory.contrast.used) }}</td></tr>
+                                <tr class="total"><td>Net Movement</td><td class="v {{ 'green' if d.inventory.contrast.net >= 0 else '' }}">{{ d.inventory.contrast.net_display }}</td></tr>
+                            </table>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="inv-card">
+                        <div class="inv-title">Contrast Vials</div>
+                        <div class="inv-body" style="padding: 6px 0; text-align: center; color: var(--muted); font-size: 8.5px; font-weight: 600;">
+                            Not tracked
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="sec">
+                <div class="sec-hd">
+                    <span class="num">09</span>
+                    <h2>Working Staff</h2>
+                    <span class="rule"></span>
+                </div>
+                <table class="data">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Role</th>
+                            <th class="num">In</th>
+                            <th class="num">Out</th>
+                            <th class="num">Dur</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for s in d.working_staff %}
+                        <tr>
+                            <td>
+                                {{ s.name }}
+                                {% if s.tech_count is not none %}<span class="pill tech">{{ s.tech_count }}</span>{% endif %}
+                            </td>
+                            <td>{{ s.role }}</td>
+                            <td class="num">{{ s.in_time }}</td>
+                            <td class="num">
+                                {% if s.is_active %}<span class="pill active">Act</span>{% else %}{{ s.out_time }}{% endif %}
+                            </td>
+                            <td class="num">
+                                <span class="pill {{ 'active' if s.is_active else '' }}">{{ s.duration }}</span>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="5" style="text-align:center;color:var(--muted);padding:8px 0;">No active staff shifts</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ═══ TOP 5 DOCTORS + TOP 5 NON-DOCTORS ═══ -->
+        <div class="cols-2">
+            <div class="sec">
+                <div class="sec-hd">
+                    <span class="num gold">🏆</span>
+                    <h2>Top 5 Doctors of the Day</h2>
+                    <span class="rule"></span>
+                </div>
+                <table class="data">
+                    <thead>
+                        <tr>
+                            <th style="width:22px;">#</th>
+                            <th>Doctor</th>
+                            <th class="num">Pts</th>
+                            <th class="num">Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for doc in d.referrals.top_doctors %}
+                        <tr>
+                            <td><span class="rank {{ 'gold' if doc.rank == 1 else ('silver' if doc.rank == 2 else ('bronze' if doc.rank == 3 else '')) }}">{{ doc.rank }}</span></td>
+                            <td>{{ doc.name }}</td>
+                            <td class="num">{{ num(doc.pts) }}</td>
+                            <td class="num">{{ num(doc.amount) }}</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="4" style="text-align:center;color:var(--muted);padding:6px 0;">No doctor referrals today</td></tr>
+                        {% endfor %}
+                        <tr class="total"><td colspan="2">Total</td><td class="num">{{ num(d.referrals.top_doctors_total.pts) }}</td><td class="num">{{ num(d.referrals.top_doctors_total.amount) }}</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="sec">
+                <div class="sec-hd">
+                    <span class="num gold">🏆</span>
+                    <h2>Top 5 Non-Doctors of the Day</h2>
+                    <span class="rule"></span>
+                </div>
+                <table class="data">
+                    <thead>
+                        <tr>
+                            <th style="width:22px;">#</th>
+                            <th>Non-Doctor</th>
+                            <th class="num">Pts</th>
+                            <th class="num">Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ndoc in d.referrals.top_non_doctors %}
+                        <tr>
+                            <td><span class="rank {{ 'gold' if ndoc.rank == 1 else ('silver' if ndoc.rank == 2 else ('bronze' if ndoc.rank == 3 else '')) }}">{{ ndoc.rank }}</span></td>
+                            <td>{{ ndoc.name }}</td>
+                            <td class="num">{{ num(ndoc.pts) }}</td>
+                            <td class="num">{{ num(ndoc.amount) }}</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="4" style="text-align:center;color:var(--muted);padding:6px 0;">No non-doctor referrals today</td></tr>
+                        {% endfor %}
+                        <tr class="total"><td colspan="2">Total</td><td class="num">{{ num(d.referrals.top_non_doctors_total.pts) }}</td><td class="num">{{ num(d.referrals.top_non_doctors_total.amount) }}</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="handover">
+            <div class="l">
+                Day Cash Handover
+                <small id="dayHandoverLabel">{{ d.meta.printed_by }} → {{ d.meta.supervisor_name }} (Supervisor)</small>
+            </div>
+            <div class="amt">Rs. {{ num(d.summary.total_handover) }}</div>
+        </div>
+
+        <div class="sig-row">
+            <div class="sig-line">
+                <div class="role">Prepared By</div>
+                <div class="name">Day Closing Staff · {{ d.meta.printed_by }}</div>
+            </div>
+            <div class="sig-line">
+                <div class="role">Cash Handover / Received By</div>
+                <div class="name" id="sigSupervisorName" contenteditable="true">{{ d.meta.supervisor_name }}</div>
+            </div>
+            <div class="sig-line">
+                <div class="role">Approved By</div>
+                <div class="name" contenteditable="true">Branch Manager</div>
+            </div>
+        </div>
+
+        <div class="notes-area">
+            <span class="lbl">Additional Notes / Remarks</span>
+            <div class="line" contenteditable="true"></div>
+            <div class="line" contenteditable="true"></div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+(function setPrintStamp() {
+    const now = new Date();
+    const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const dateStr = days[now.getDay()] + ', ' + String(now.getDate()).padStart(2,'0') + ' ' + months[now.getMonth()] + ' ' + now.getFullYear();
+    const timeStr = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0') + ':' + String(now.getSeconds()).padStart(2,'0');
+    
+    const pDate = document.getElementById('printDate1');
+    if (pDate && !pDate.textContent.trim()) pDate.textContent = dateStr;
+    const pTime = document.getElementById('printTime1');
+    if (pTime) pTime.textContent = timeStr;
+
+    // Sync supervisor names across sheets
+    const s1 = document.getElementById('mastheadSupervisor1');
+    const s2 = document.getElementById('mastheadSupervisor2');
+    const sSig = document.getElementById('sigSupervisorName');
+    const sHandover = document.getElementById('dayHandoverLabel');
+    const prepBy = "{{ d.meta.printed_by }}";
+
+    function updateSupervisor(val) {
+        val = val.trim() || "Supervisor";
+        if (s1 && s1.textContent !== val) s1.textContent = val;
+        if (s2 && s2.textContent !== val) s2.textContent = val;
+        if (sSig && sSig.textContent !== val) sSig.textContent = val;
+        if (sHandover) sHandover.textContent = `${prepBy} → ${val} (Supervisor)`;
+    }
+
+    if (s1) s1.addEventListener('input', () => updateSupervisor(s1.textContent));
+    if (s2) s2.addEventListener('input', () => updateSupervisor(s2.textContent));
+    if (sSig) sSig.addEventListener('input', () => updateSupervisor(sSig.textContent));
+})();
+</script>
+
+</body>
+</html>

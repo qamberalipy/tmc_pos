@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Cash Envelope Sticker — {{ d.meta.branch_name }}</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+@page {
+    size: 5in 4in landscape;
+    margin: 0;
+}
+
+:root {
+    --navy: #0b1e3f;
+    --navy-2: #1a3160;
+    --navy-soft: #eef3fb;
+    --ink: #0a0f1a;
+    --ink2: #1c2537;
+    --muted: #64748b;
+    --rule: #e2e8f0;
+    --rule-2: #cbd5e1;
+    --red: #be123c;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body { 
+    width: 5in; 
+    height: 4in; 
+    background: #d9dee5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+body {
+    font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+    font-size: 11px;
+    line-height: 1.2;
+    color: var(--ink);
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+}
+
+/* STICKER CONTAINER */
+.sticker {
+    width: 5in;
+    height: 4in;
+    background: #fff;
+    border: 2.5px solid var(--navy);
+    border-radius: 8px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+}
+
+/* TOP HEADER */
+.sticker-top {
+    background: linear-gradient(135deg, var(--navy) 0%, var(--navy-2) 100%);
+    color: #fff;
+    padding: 8px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+    position: relative;
+}
+.sticker-top .brand {
+    font-size: 18px;
+    font-weight: 900;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    line-height: 1;
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    text-align: center;
+}
+.sticker-top .brand small {
+    display: block;
+    font-size: 8px;
+    letter-spacing: 3px;
+    color: rgba(255,255,255,.8);
+    font-weight: 800;
+    margin-top: 3px;
+}
+.sticker-top .badge {
+    background: linear-gradient(135deg, #b8860b 0%, #78350f 100%);
+    border: 1px solid rgba(255,255,255,.6);
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    text-align: center;
+    line-height: 1;
+    margin-left: auto;
+    z-index: 1;
+}
+.sticker-top .badge small {
+    display: block;
+    font-size: 7px;
+    letter-spacing: 1px;
+    color: rgba(255,255,255,.9);
+    margin-top: 2px;
+}
+
+/* PROMINENT DATE STRIP */
+.sticker-strip {
+    background: var(--navy-soft);
+    border-bottom: 2px solid var(--navy);
+    padding: 6px 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    flex-shrink: 0;
+}
+.sticker-strip .day {
+    font-size: 20px;
+    font-weight: 900;
+    color: var(--navy);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    line-height: 1;
+}
+.sticker-strip .date { 
+    font-family: 'JetBrains Mono', monospace; 
+    font-size: 18px; 
+    font-weight: 800;
+    color: var(--ink); 
+}
+
+/* MAIN BODY */
+.sticker-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 8px 14px;
+    overflow: hidden;
+    gap: 8px;
+}
+
+/* DAY ACTIVITY */
+.summary-section {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.summary-title {
+    font-size: 11px;
+    font-weight: 900;
+    text-transform: uppercase;
+    color: var(--navy);
+    letter-spacing: 0.5px;
+    border-bottom: 1.5px solid var(--navy);
+    padding-bottom: 3px;
+    margin-bottom: 2px;
+}
+.summary-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 24px;
+}
+.summary-item {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px; 
+    font-weight: 700;
+}
+.summary-item .lbl { color: var(--ink); }
+.summary-item .val { 
+    font-family: 'JetBrains Mono', monospace; 
+    font-weight: 900; 
+    font-size: 15px; 
+    color: var(--navy); 
+}
+
+/* FINANCIAL BLOCK */
+.fin-block {
+    background: #fbfcfe;
+    border: 1.5px solid var(--rule-2);
+    border-radius: 4px;
+    padding: 10px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex: 1;
+    justify-content: center;
+}
+
+.fin-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+}
+.fin-row .k { font-size: 12px; font-weight: 700; color: var(--ink2); }
+.fin-row .v { 
+    font-family: 'JetBrains Mono', monospace; 
+    font-size: 15px; 
+    font-weight: 900; 
+    color: var(--ink); 
+}
+.fin-row.expense .v { color: var(--red); }
+
+.fin-row.total {
+    border-top: 2px dashed var(--navy);
+    padding-top: 8px;
+    margin-top: 4px;
+}
+.fin-row.total .k { color: var(--navy); font-size: 15px; font-weight: 900; }
+.fin-row.total .v { color: var(--navy); font-size: 24px; font-weight: 900; }
+
+/* BOTTOM PANE */
+.bottom-pane {
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    border-top: 2.5px solid var(--navy);
+}
+
+.names-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 14px;
+    background: var(--navy-soft);
+    border-bottom: 1px dashed var(--rule-2);
+}
+.name-box {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+}
+.name-box .role {
+    font-size: 10px;
+    font-weight: 900;
+    text-transform: uppercase;
+    color: var(--ink2);
+}
+.name-box .name {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px; 
+    font-weight: 900;
+    color: var(--navy);
+}
+
+.sig-row {
+    display: flex;
+    height: 0.8in;
+}
+.sig-area {
+    flex: 1;
+    display: flex;
+    padding: 6px 14px;
+    gap: 16px;
+}
+.sig-box {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+}
+.sig-box .lbl {
+    font-size: 10px;
+    font-weight: 900;
+    text-transform: uppercase;
+    color: var(--ink2);
+    margin-bottom: 14px;
+}
+.sig-box .line {
+    border-bottom: 2px solid var(--ink);
+    height: 1px;
+}
+.bag-area {
+    width: 30%;
+    background: #fff;
+    border-left: 1.5px solid var(--navy);
+    padding: 6px 14px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+}
+.bag-area .k {
+    font-size: 10px;
+    font-weight: 900;
+    text-transform: uppercase;
+    color: var(--navy);
+    margin-bottom: 2px;
+}
+.bag-area .line {
+    border-bottom: 2px solid var(--navy);
+    height: 14px;
+    outline: none;
+}
+
+[contenteditable="true"] {
+    outline: none;
+    cursor: text;
+}
+
+/* PRINT SETTINGS */
+@media print {
+    html, body {
+        width: 5in;
+        height: 4in;
+        background: #fff !important;
+        margin: 0;
+        padding: 0;
+        display: block;
+    }
+    .sticker {
+        width: 5in;
+        height: 4in;
+        border-radius: 8px;
+        border: 2.5px solid var(--navy);
+        page-break-inside: avoid;
+        page-break-after: avoid;
+    }
+}
+</style>
+</head>
+<body>
+
+<div class="sticker">
+
+    <!-- HEADER -->
+    <div class="sticker-top">
+        <div style="width: 60px;"></div>
+        <div class="brand">
+            {{ d.meta.branch_name }}
+            <small>Cash Envelope</small>
+        </div>
+        <div class="badge">
+            DAY<br>Closing
+        </div>
+    </div>
+
+    <!-- DATE STRIP -->
+    <div class="sticker-strip">
+        <span class="day">{{ d.meta.day_name }}</span>
+        <span class="date">{{ d.meta.date_short }}</span>
+    </div>
+
+    <!-- MAIN BODY -->
+    <div class="sticker-body">
+        
+        <!-- Activity Summary -->
+        <div class="summary-section">
+            <div class="summary-title">Day Activity Summary</div>
+            <div class="summary-grid">
+                <div class="summary-item"><span class="lbl">Contrast</span><span class="val">{{ num(d.mri.contrast.cases) }}</span></div>
+                <div class="summary-item"><span class="lbl">Screening</span><span class="val">{{ num(d.mri.screening.cases) }}</span></div>
+                <div class="summary-item"><span class="lbl">Full Study</span><span class="val">{{ num(d.mri.full_study.cases) }}</span></div>
+                <div class="summary-item"><span class="lbl">Other Tests</span><span class="val">{{ num(d.other_tests.total_count) }}</span></div>
+            </div>
+        </div>
+
+        <!-- Financial Block -->
+        <div class="fin-block">
+            <div class="fin-row">
+                <span class="k">Total Income</span>
+                <span class="v">Rs. {{ num(d.summary.total_income) }}</span>
+            </div>
+            <div class="fin-row expense">
+                <span class="k">(−) Expenses</span>
+                <span class="v">Rs. {{ num(d.summary.total_expense) }}</span>
+            </div>
+            <div class="fin-row total">
+                <span class="k">(=) Cash Handover</span>
+                <span class="v">Rs. {{ num(d.summary.total_handover) }}</span>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- BOTTOM PANE -->
+    <div class="bottom-pane">
+        <div class="names-row">
+            <div class="name-box">
+                <span class="role">Closed By:</span>
+                <span class="name">{{ d.meta.printed_by }}</span>
+            </div>
+            <div class="name-box">
+                <span class="role">Received By:</span>
+                <span class="name" contenteditable="true">{{ d.meta.supervisor_name }}</span>
+            </div>
+        </div>
+
+        <div class="sig-row">
+            <div class="sig-area">
+                <div class="sig-box">
+                    <div class="lbl">Signature — Closed By</div>
+                    <div class="line"></div>
+                </div>
+                <div class="sig-box">
+                    <div class="lbl">Signature — Received By</div>
+                    <div class="line"></div>
+                </div>
+            </div>
+            <div class="bag-area">
+                <div class="k">Sealed Bag No.</div>
+                <div class="line" contenteditable="true"></div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+</body>
+</html>
