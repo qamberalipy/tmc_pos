@@ -1,3 +1,5 @@
+import os
+import logging
 from flask import redirect, render_template, request, jsonify, session, url_for
 from . import reports_bp
 from app.blueprints.reports import services as report_services
@@ -7,6 +9,13 @@ from zoneinfo import ZoneInfo
 from app.models.user import User
 from app.models.branch import Branch
 from app.models.shift import ShiftSession
+from app.models.test_booking import TestBooking
+from app.models.test_registration import Test_registration
+from app.utils.timezone import to_local
+from app.utils.email import send_email_async, build_assignment_email
+from app.extensions import db
+
+logger = logging.getLogger(__name__)
 
 @reports_bp.route('/view/test-report')
 @login_required
@@ -202,21 +211,138 @@ def assign_bookings():
         return jsonify({"error": "bookings data and doctor_id are required"}), 400
 
     try:
+        # Server-side guard: filter out or reject appointments
+        booking_ids = []
+        for item in bookings_payload:
+            try:
+                booking_ids.append(int(item.get("booking_id")))
+            except (ValueError, TypeError):
+                pass
+
+        skipped_appointments = []
+        valid_payload = bookings_payload
+        if booking_ids:
+            appt_rows = db.session.query(TestBooking.id).filter(
+                TestBooking.id.in_(booking_ids),
+                TestBooking.is_appointment == True
+            ).all()
+            appt_id_set = {str(row[0]) for row in appt_rows}
+            if appt_id_set:
+                skipped_appointments = list(appt_id_set)
+                valid_payload = [item for item in bookings_payload if str(item.get("booking_id")) not in appt_id_set]
+
+        if not valid_payload:
+            return jsonify({
+                "error": "Appointments cannot be assigned to a doctor. Please convert to a normal booking first."
+            }), 400
+
         # Pass the list of objects to the service
-        result_count = report_services.assign_bookings_to_doctor(
-            bookings_payload=bookings_payload,
+        result_count, newly_assigned_pairs = report_services.assign_bookings_to_doctor(
+            bookings_payload=valid_payload,
             doctor_id=doctor_id,
             assigned_by=user_id,
             branch_id=branch_id
         )
+
+        # Trigger asynchronous Gmail notification if any new tests were assigned
+        if result_count > 0 and newly_assigned_pairs:
+            try:
+                doctor = db.session.query(User).filter(User.id == int(doctor_id)).first()
+                doctor_email = (doctor.email or "").strip() if doctor else ""
+
+                if not doctor_email:
+                    logger.warning(
+                        "Skipping assignment email: Doctor %s has no email address configured.",
+                        doctor_id
+                    )
+                else:
+                    doctor_name = doctor.name if doctor else f"Doctor #{doctor_id}"
+
+                    # Active admin emails for CC, excluding the assigned doctor if they are an admin
+                    active_admins = db.session.query(User).filter(
+                        User.role_id == 1,
+                        User.is_active == True
+                    ).all()
+                    cc_emails = [
+                        u.email.strip() for u in active_admins
+                        if u.email and u.email.strip() and u.email.strip().lower() != doctor_email.lower()
+                    ]
+
+                    # Branch name
+                    current_branch = db.session.query(Branch).filter(Branch.id == branch_id).first()
+                    branch_name = current_branch.branch_name if current_branch else f"Branch #{branch_id}"
+
+                    # Assigned by user name
+                    assigned_by_name = session.get("user_name")
+                    if not assigned_by_name:
+                        staff_user = db.session.query(User).filter(User.id == user_id).first()
+                        assigned_by_name = staff_user.name if staff_user else f"User #{user_id}"
+
+                    # Formatted local assignment time (Asia/Karachi, PKT)
+                    assigned_at_str = to_local(datetime.now(timezone.utc), "%d %b %Y, %I:%M %p")
+
+                    # Fetch booking and test names for the newly assigned pairs
+                    assigned_booking_ids = {int(b_id) for b_id, _ in newly_assigned_pairs}
+                    assigned_test_ids = {int(t_id) for _, t_id in newly_assigned_pairs}
+
+                    bookings_map = {
+                        b.id: b for b in db.session.query(TestBooking).filter(
+                            TestBooking.id.in_(assigned_booking_ids)
+                        ).all()
+                    }
+                    tests_map = {
+                        t.id: t.test_name for t in db.session.query(Test_registration).filter(
+                            Test_registration.id.in_(assigned_test_ids)
+                        ).all()
+                    }
+
+                    case_items = []
+                    for b_id_str, t_id in newly_assigned_pairs:
+                        b_id_int = int(b_id_str)
+                        b_row = bookings_map.get(b_id_int)
+                        case_items.append({
+                            "booking_id": b_id_str,
+                            "mr_no": b_row.mr_no if b_row and b_row.mr_no else "-",
+                            "patient_name": b_row.patient_name if b_row and b_row.patient_name else "-",
+                            "test_name": tests_map.get(t_id, f"Test #{t_id}"),
+                        })
+
+                    base_url = (os.getenv("APP_BASE_URL") or "").strip().rstrip("/")
+                    if not base_url:
+                        base_url = request.host_url.rstrip("/")
+                    pending_cases_url = f"{base_url}/reports/pending_cases"
+
+                    email_subject = f"New Cases Assigned – Dr. {doctor_name} ({len(case_items)} Tests)"
+                    html_body, text_body = build_assignment_email(
+                        doctor_name=doctor_name,
+                        assigned_by_name=assigned_by_name,
+                        branch_name=branch_name,
+                        assigned_at_str=assigned_at_str,
+                        items=case_items,
+                        pending_cases_url=pending_cases_url,
+                    )
+
+                    send_email_async(
+                        to=doctor_email,
+                        subject=email_subject,
+                        html_body=html_body,
+                        text_body=text_body,
+                        cc=cc_emails,
+                    )
+            except Exception as email_err:
+                # Never fail the assignment response if email notification encounters an issue
+                logger.error("Error triggering assignment email notification: %s", email_err, exc_info=True)
         
         msg = f"{result_count} tests assigned successfully"
         if result_count == 0:
             msg = "No new tests were assigned (all selected tests were already assigned)."
+        if skipped_appointments:
+            msg += f" ({len(skipped_appointments)} appointment booking(s) skipped)"
 
         return jsonify({
             "message": msg, 
-            "assigned_count": result_count
+            "assigned_count": result_count,
+            "skipped_appointments": skipped_appointments
         }), 200
 
     except Exception as e:
