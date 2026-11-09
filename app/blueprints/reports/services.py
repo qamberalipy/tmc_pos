@@ -3,13 +3,16 @@ from sqlalchemy import func, cast, Date, desc, Integer, and_, String, or_
 from app.extensions import db
 from app.models import TestBookingDetails
 from decimal import Decimal
-from datetime import datetime, date, time, timezone
+from datetime import datetime, date, time, timezone, timedelta
+from zoneinfo import ZoneInfo
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import aliased
-from app.models.test_booking import TestFilmUsage, TestBooking, FilmInventoryTransaction
+from app.models.test_booking import TestFilmUsage, TestBooking, FilmInventoryTransaction, BookingTransferLog
 from app.models.test_registration import Test_registration, CATEGORY_CHOICES
 from app.models.doctor_reporting_details import DoctorReportingdetails, DoctorReportData
 from app.models.user import User
+from app.models.role import Role
+from app.models.shift import ShiftSession
 from app.models.expenses import Expenses
 from app.models.branch import Branch
 from collections import defaultdict
@@ -1157,3 +1160,631 @@ def get_monthly_case_logs(branch_id, from_date_str, to_date_str, referred_dr_id=
         "paid": float(r.paid_amount or 0),
         "due": float(r.due_amount or 0)
     } for i, r in enumerate(rows, 1)]
+
+
+def format_closing_number(value, decimals=0):
+    """Formats numeric values with thousands separators, safely handling None."""
+    if value is None:
+        return "-"
+    try:
+        val = float(value)
+        if decimals > 0:
+            return f"{val:,.{decimals}f}"
+        return f"{int(round(val)):,}"
+    except Exception:
+        return str(value)
+
+
+def build_closing_sheet_data(branch_id: int, date_str: str, shift_ids_str=None, user_id=None, sheet_type='day'):
+    """
+    Builds a complete, self-contained data dictionary for:
+      - Day End Sheet (2-page A4)
+      - Shift End Sheet (1-page A4)
+      - Cash Envelope Sticker (5x4 in)
+    Guarantees no N+1 per-row queries, strict branch-scoping, and mathematical
+    consistency between summary totals and breakdown rows.
+    """
+    if not branch_id:
+        branch_id = session.get("branch_id")
+    if branch_id:
+        try:
+            branch_id = int(branch_id)
+        except (ValueError, TypeError):
+            branch_id = None
+    if not branch_id:
+        first_b = Branch.query.first()
+        branch_id = first_b.id if first_b else 1
+
+    if user_id:
+        try:
+            user_id = int(user_id)
+        except (ValueError, TypeError):
+            user_id = None
+
+    branch = db.session.get(Branch, branch_id) if branch_id else None
+    branch_name = branch.branch_name if branch and branch.branch_name else "TMC Diagnostic Center"
+    tz_string = branch.timezone if branch and branch.timezone else 'Asia/Karachi'
+
+    try:
+        local_tz = ZoneInfo(tz_string)
+    except Exception:
+        local_tz = ZoneInfo('Asia/Karachi')
+
+    date_obj = datetime.strptime(date_str, "%Y-%m-%d")
+    day_name = date_obj.strftime("%A")
+    date_formatted = date_obj.strftime("%d %B %Y")
+    date_short = date_obj.strftime("%d %b %Y")
+
+    start_utc, end_utc = get_lab_date_bounds(date_str, date_str, branch_id)
+
+    # 1. Shifts parsing
+    shift_ranges = []
+    shifts = []
+    shift_label = "All Day (08:00 – 04:00+1)"
+    am_pm = "AM"
+    if shift_ids_str:
+        s_ids = [int(s) for s in str(shift_ids_str).split(',') if s.strip()]
+        if s_ids:
+            shifts = ShiftSession.query.filter(ShiftSession.id.in_(s_ids)).all()
+            for s in shifts:
+                e_time = s.end_time if s.end_time else datetime.now(timezone.utc)
+                shift_ranges.append((s.start_time, e_time))
+            if shifts:
+                first_shift = shifts[0]
+                s_start_local = to_local(first_shift.start_time)
+                am_pm = "AM" if (s_start_local and s_start_local.hour < 12) else "PM"
+                s_end_local = to_local(first_shift.end_time) if first_shift.end_time else None
+                start_str = s_start_local.strftime("%H:%M") if s_start_local else "08:00"
+                end_str = s_end_local.strftime("%H:%M") if s_end_local else "Active"
+                shift_label = f"{'Morning' if am_pm == 'AM' else 'Evening'} ({start_str} – {end_str})"
+
+    # Doc Ref format
+    if sheet_type == 'shift':
+        doc_ref = f"TMC-SFT-{date_str}-{am_pm}"
+    else:
+        doc_ref = f"TMC-DAY-{date_str}"
+
+    # Current user / printed by
+    cur_user_id = session.get("user_id") or user_id
+    if cur_user_id:
+        try:
+            cur_user_id = int(cur_user_id)
+        except (ValueError, TypeError):
+            cur_user_id = None
+    cur_user_name = session.get("user_name") or "Staff"
+    cur_user = db.session.get(User, cur_user_id) if cur_user_id else None
+    if cur_user:
+        cur_user_name = cur_user.name
+
+    # Helper: Apply time bounds
+    def _apply_time(q, col):
+        if shift_ranges:
+            conds = [and_(col >= s, col <= e) for s, e in shift_ranges]
+            return q.filter(or_(*conds))
+        return q.filter(col >= start_utc, col <= end_utc)
+
+    # 2. Financial Collections (PaymentTransaction)
+    pt_query = db.session.query(
+        PaymentTransaction.direction,
+        PaymentTransaction.transaction_type,
+        PaymentTransaction.payment_type,
+        func.sum(PaymentTransaction.amount).label("total")
+    ).filter(PaymentTransaction.branch_id == branch_id)
+
+    pt_query = _apply_time(pt_query, PaymentTransaction.payment_date)
+    if user_id:
+        pt_query = pt_query.filter(PaymentTransaction.created_by == user_id)
+
+    pt_results = pt_query.group_by(
+        PaymentTransaction.direction,
+        PaymentTransaction.transaction_type,
+        PaymentTransaction.payment_type
+    ).all()
+
+    cash_income = 0.0
+    card_income = 0.0
+    online_income = 0.0
+    other_income = 0.0
+    regular_income = 0.0
+    transferred_held_cash = 0.0
+    total_income = 0.0
+    db_out_expenses = 0.0
+
+    for direction, trans_type, p_type, total in pt_results:
+        val = _to_float(total)
+        if direction == 'IN':
+            if trans_type == 'TransferOut_Held':
+                transferred_held_cash += val
+            else:
+                regular_income += val
+            total_income += val
+
+            p_norm = (p_type or 'Cash').strip().capitalize()
+            if p_norm == 'Cash':
+                cash_income += val
+            elif p_norm == 'Card':
+                card_income += val
+            elif p_norm == 'Online':
+                online_income += val
+            else:
+                other_income += val
+        elif direction == 'OUT':
+            db_out_expenses += val
+
+    # 3. Expenses Breakdown & Patient Discounts / Refunds
+    exp_query = db.session.query(
+        Expense_head.name.label("head_name"),
+        func.sum(Expenses.amount).label("total_amount")
+    ).join(Expense_head, Expenses.expense_head_id == Expense_head.id)\
+     .filter(Expenses.branch_id == branch_id, Expenses.is_deleted == False)
+
+    exp_query = _apply_time(exp_query, Expenses.created_at)
+    if user_id:
+        exp_query = exp_query.filter(Expenses.created_by == user_id)
+
+    exp_rows = exp_query.group_by(Expense_head.name).order_by(func.sum(Expenses.amount).desc()).all()
+
+    # Patient Discounts from TestBooking
+    disc_query = db.session.query(func.sum(TestBooking.discount_value)).filter(
+        TestBooking.branch_id == branch_id
+    )
+    disc_query = _apply_time(disc_query, TestBooking.create_at)
+    if user_id:
+        disc_query = disc_query.filter(TestBooking.create_by == user_id)
+    patient_discounts = _to_float(disc_query.scalar())
+
+    refunds_amt = 0.0
+    refunds_count = 0
+    expense_items = []
+
+    for r in exp_rows:
+        h_name = r.head_name
+        amt = _to_float(r.total_amount)
+        if "refund" in h_name.lower():
+            refunds_amt += amt
+            refunds_count += 1
+            expense_items.append({"name": "Patient Refunds", "amount": amt})
+        else:
+            expense_items.append({"name": h_name, "amount": amt})
+
+    # If patient discounts were granted, append line
+    if patient_discounts > 0:
+        expense_items.append({"name": "Patient Discounts", "amount": patient_discounts})
+
+    # Ensure total_expenses matches the breakdown total exactly
+    if expense_items:
+        total_expense = sum(it["amount"] for it in expense_items)
+    else:
+        total_expense = db_out_expenses
+
+    # Net drawer cash = cash income minus actual cash paid out for expenses/refunds
+    cash_expenses_paid = sum(it["amount"] for it in expense_items if it["name"] != "Patient Discounts")
+    net_cash = max(0.0, cash_income - cash_expenses_paid)
+
+    # 4. Appointments (Box 01)
+    appt_query = db.session.query(
+        func.count(TestBooking.id),
+        func.sum(TestBooking.paid_amount)
+    ).filter(
+        TestBooking.branch_id == branch_id,
+        TestBooking.is_appointment == True,
+        TestBooking.is_transferred_in == False
+    )
+    appt_query = _apply_time(appt_query, TestBooking.create_at)
+    if user_id:
+        appt_query = appt_query.filter(TestBooking.create_by == user_id)
+    appt_cnt, appt_adv = appt_query.first() or (0, 0)
+    appointments_data = {
+        "given": appt_cnt or 0,
+        "advance_collected": _to_float(appt_adv)
+    }
+
+    # 5. Branch Transfers (Box 02)
+    xfer_out_query = db.session.query(
+        func.count(BookingTransferLog.id),
+        func.sum(BookingTransferLog.transferred_cash_held)
+    ).filter(BookingTransferLog.from_branch_id == branch_id)
+    xfer_out_query = _apply_time(xfer_out_query, BookingTransferLog.transferred_at)
+    if user_id:
+        xfer_out_query = xfer_out_query.filter(BookingTransferLog.transferred_by_user_id == user_id)
+    xfer_out_cases, xfer_out_cash = xfer_out_query.first() or (0, 0)
+
+    xfer_in_query = db.session.query(
+        func.count(TestBooking.id),
+        func.sum(TestBooking.paid_amount)
+    ).filter(
+        TestBooking.branch_id == branch_id,
+        TestBooking.is_transferred_in == True
+    )
+    xfer_in_query = _apply_time(xfer_in_query, TestBooking.create_at)
+    if user_id:
+        xfer_in_query = xfer_in_query.filter(TestBooking.create_by == user_id)
+    xfer_in_cases, xfer_in_cash = xfer_in_query.first() or (0, 0)
+
+    transfers_data = {
+        "transferred_out_cases": xfer_out_cases or 0,
+        "transferred_out_cash": _to_float(xfer_out_cash),
+        "transferred_in_cases": xfer_in_cases or 0,
+        "transferred_in_cash": _to_float(xfer_in_cash)
+    }
+
+    # 6. MRI Breakdown & Other Category Tests (Box 03 & Box 04)
+    test_query = db.session.query(
+        Test_registration.category,
+        Test_registration.test_name,
+        func.count(TestBookingDetails.id).label("cnt"),
+        func.sum(TestBookingDetails.amount).label("charges")
+    ).join(Test_registration, TestBookingDetails.test_id == Test_registration.id)\
+     .join(TestBooking, TestBookingDetails.booking_id == TestBooking.id)\
+     .filter(TestBooking.branch_id == branch_id)
+
+    test_query = _apply_time(test_query, TestBooking.create_at)
+    if user_id:
+        test_query = test_query.filter(TestBooking.create_by == user_id)
+
+    test_rows = test_query.group_by(Test_registration.category, Test_registration.test_name).all()
+
+    mri_screening = {"cases": 0, "amount": 0.0}
+    mri_full_study = {"cases": 0, "amount": 0.0}
+    mri_contrast = {"cases": 0, "amount": 0.0}
+    other_tests_list = []
+    other_tests_total_cnt = 0
+    other_tests_total_amt = 0.0
+
+    for cat, t_name, cnt, charges in test_rows:
+        cnt_val = int(cnt or 0)
+        amt_val = _to_float(charges)
+        cat_norm = (cat or "Other").strip()
+
+        if cat_norm == "Screening":
+            mri_screening["cases"] += cnt_val
+            mri_screening["amount"] += amt_val
+        elif cat_norm == "Full Study":
+            mri_full_study["cases"] += cnt_val
+            mri_full_study["amount"] += amt_val
+        elif cat_norm == "Contrast":
+            mri_contrast["cases"] += cnt_val
+            mri_contrast["amount"] += amt_val
+        else:
+            other_tests_list.append({
+                "category": cat_norm,
+                "test_name": t_name or "Test",
+                "count": cnt_val,
+                "amount": amt_val
+            })
+            other_tests_total_cnt += cnt_val
+            other_tests_total_amt += amt_val
+
+    other_tests_list.sort(key=lambda x: x["amount"], reverse=True)
+
+    mri_total = {
+        "cases": mri_screening["cases"] + mri_full_study["cases"] + mri_contrast["cases"],
+        "amount": mri_screening["amount"] + mri_full_study["amount"] + mri_contrast["amount"]
+    }
+
+    # 7. Referring Doctors & Non-Doctors (Box 06 on Page 1 & Top 5 on Page 2)
+    ReferredDr = aliased(Referred)
+    ReferredNonDr = aliased(Referred)
+
+    ref_query = db.session.query(
+        TestBooking.id,
+        TestBooking.net_receivable,
+        TestBooking.paid_amount,
+        ReferredDr.name.label("dr_name"),
+        ReferredNonDr.name.label("non_dr_name")
+    ).outerjoin(ReferredDr, and_(ReferredDr.id == TestBooking.referred_dr, ReferredDr.is_doctor == True))\
+     .outerjoin(ReferredNonDr, ReferredNonDr.id == TestBooking.referred_non_dr)\
+     .filter(TestBooking.branch_id == branch_id)
+
+    ref_query = _apply_time(ref_query, TestBooking.create_at)
+    if user_id:
+        ref_query = ref_query.filter(TestBooking.create_by == user_id)
+
+    ref_bookings = ref_query.all()
+
+    doctors_map = defaultdict(lambda: {"pts": 0, "amount": 0.0})
+    non_doctors_map = defaultdict(lambda: {"pts": 0, "amount": 0.0})
+
+    for b in ref_bookings:
+        amt = _to_float(b.net_receivable or b.paid_amount)
+        if b.dr_name:
+            doctors_map[b.dr_name]["pts"] += 1
+            doctors_map[b.dr_name]["amount"] += amt
+        elif b.non_dr_name:
+            non_doctors_map[b.non_dr_name]["pts"] += 1
+            non_doctors_map[b.non_dr_name]["amount"] += amt
+        else:
+            non_doctors_map["Self Walk-in"]["pts"] += 1
+            non_doctors_map["Self Walk-in"]["amount"] += amt
+
+    all_referrals = []
+    for d_name, d_data in doctors_map.items():
+        all_referrals.append({
+            "name": d_name,
+            "badge": "Ref",
+            "pts": d_data["pts"],
+            "amount": d_data["amount"]
+        })
+    for nd_name, nd_data in non_doctors_map.items():
+        all_referrals.append({
+            "name": nd_name,
+            "badge": "Non",
+            "pts": nd_data["pts"],
+            "amount": nd_data["amount"]
+        })
+
+    all_referrals.sort(key=lambda x: x["amount"], reverse=True)
+    total_ref_pts = sum(x["pts"] for x in all_referrals)
+    total_ref_amt = sum(x["amount"] for x in all_referrals)
+
+    top_doctors_sorted = sorted(doctors_map.items(), key=lambda x: x[1]["amount"], reverse=True)[:5]
+    top_doctors = [
+        {"rank": i, "name": name, "pts": data["pts"], "amount": data["amount"]}
+        for i, (name, data) in enumerate(top_doctors_sorted, 1)
+    ]
+    top_doctors_total = {
+        "pts": sum(d["pts"] for d in top_doctors),
+        "amount": sum(d["amount"] for d in top_doctors)
+    }
+
+    top_non_doctors_sorted = sorted(non_doctors_map.items(), key=lambda x: x[1]["amount"], reverse=True)[:5]
+    top_non_doctors = [
+        {"rank": i, "name": name, "pts": data["pts"], "amount": data["amount"]}
+        for i, (name, data) in enumerate(top_non_doctors_sorted, 1)
+    ]
+    top_non_doctors_total = {
+        "pts": sum(nd["pts"] for nd in top_non_doctors),
+        "amount": sum(nd["amount"] for nd in top_non_doctors)
+    }
+
+    # 8. Radiologist Reporting Log (Box 07 on Page 2 & Box 06 in Shift Sheet)
+    rad_query = db.session.query(
+        User.id.label("doctor_id"),
+        User.name.label("doctor_name"),
+        User.branch_id.label("doctor_branch_id"),
+        Test_registration.category,
+        func.count(DoctorReportingdetails.id).label("assigned_count")
+    ).select_from(DoctorReportingdetails)\
+     .join(User, cast(User.id, String) == DoctorReportingdetails.doctor_id)\
+     .join(Test_registration, Test_registration.id == DoctorReportingdetails.test_id)\
+     .join(TestBooking, cast(TestBooking.id, String) == DoctorReportingdetails.booking_id)\
+     .filter(TestBooking.branch_id == branch_id)
+
+    rad_query = _apply_time(rad_query, DoctorReportingdetails.report_at)
+
+    rad_rows = rad_query.group_by(
+        User.id, User.name, User.branch_id, Test_registration.category
+    ).all()
+
+    rad_map = {}
+    for doc_id, doc_name, doc_branch, cat, count in rad_rows:
+        if doc_id not in rad_map:
+            rad_map[doc_id] = {
+                "name": doc_name,
+                "badge": "In-hs" if doc_branch == branch_id else "Tele",
+                "screening": 0,
+                "full_study": 0,
+                "contrast": 0,
+                "other": 0,
+                "total": 0
+            }
+        c = int(count or 0)
+        cat_norm = (cat or "Other").strip()
+        if cat_norm == "Screening":
+            rad_map[doc_id]["screening"] += c
+        elif cat_norm == "Full Study":
+            rad_map[doc_id]["full_study"] += c
+        elif cat_norm == "Contrast":
+            rad_map[doc_id]["contrast"] += c
+        else:
+            rad_map[doc_id]["other"] += c
+        rad_map[doc_id]["total"] += c
+
+    radiologists_list = list(rad_map.values())
+    radiologists_list.sort(key=lambda x: x["total"], reverse=True)
+
+    total_assigned = {
+        "screening": sum(r["screening"] for r in radiologists_list),
+        "full_study": sum(r["full_study"] for r in radiologists_list),
+        "contrast": sum(r["contrast"] for r in radiologists_list),
+        "other": sum(r["other"] for r in radiologists_list),
+        "total": sum(r["total"] for r in radiologists_list)
+    }
+
+    unassigned = {
+        "screening": max(0, mri_screening["cases"] - total_assigned["screening"]),
+        "full_study": max(0, mri_full_study["cases"] - total_assigned["full_study"]),
+        "contrast": max(0, mri_contrast["cases"] - total_assigned["contrast"]),
+        "other": max(0, other_tests_total_cnt - total_assigned["other"]),
+    }
+    unassigned["total"] = unassigned["screening"] + unassigned["full_study"] + unassigned["contrast"] + unassigned["other"]
+
+    # 9. Complete Inventory (Box 08 on Page 2)
+    films_data = get_daily_films_report(branch_id, start_utc, end_utc, shift_ranges, user_id)
+
+    film_in_query = db.session.query(
+        FilmInventoryTransaction.transaction_date,
+        User.name.label("scanner_name")
+    ).join(User, FilmInventoryTransaction.handled_by == User.id)\
+     .filter(
+         FilmInventoryTransaction.branch_id == branch_id,
+         FilmInventoryTransaction.transaction_type == 'IN'
+     )
+    film_in_query = _apply_time(film_in_query, FilmInventoryTransaction.transaction_date)
+    film_in_latest = film_in_query.order_by(FilmInventoryTransaction.transaction_date.desc()).first()
+
+    if film_in_latest and film_in_latest.transaction_date:
+        scanned_time_str = to_local(film_in_latest.transaction_date, "%I:%M %p")
+        scanned_by_text = f"{scanned_time_str} · {film_in_latest.scanner_name}"
+    else:
+        scanned_by_text = "—"
+
+    # 10. Working Staff (Box 09 on Page 2)
+    staff_query = db.session.query(
+        ShiftSession,
+        User.name.label("staff_name"),
+        Role.role.label("role_name")
+    ).join(User, ShiftSession.user_id == User.id)\
+     .outerjoin(Role, User.role_id == Role.id)\
+     .filter(
+         ShiftSession.branch_id == branch_id,
+         ShiftSession.start_time <= end_utc,
+         or_(ShiftSession.end_time >= start_utc, ShiftSession.end_time.is_(None))
+     )
+    staff_rows = staff_query.order_by(ShiftSession.start_time.asc()).all()
+
+    tech_cases_map = defaultdict(int)
+    tech_cases_query = db.session.query(
+        TestBooking.create_by,
+        func.count(TestBooking.id)
+    ).filter(TestBooking.branch_id == branch_id)
+    tech_cases_query = _apply_time(tech_cases_query, TestBooking.create_at)
+    for u_id, c in tech_cases_query.group_by(TestBooking.create_by).all():
+        tech_cases_map[u_id] = c
+
+    working_staff_list = []
+    for s_sess, s_name, r_name in staff_rows:
+        r_name_clean = (r_name or "Staff").strip().lower()
+        if r_name_clean == 'techician':
+            display_role = "Tech"
+        elif r_name_clean == 'staff':
+            display_role = "Counter"
+        elif r_name_clean == 'doctor':
+            display_role = "Doctor"
+        elif r_name_clean == 'admin':
+            display_role = "Admin"
+        else:
+            display_role = r_name or "Staff"
+
+        in_local = to_local(s_sess.start_time)
+        in_time_str = in_local.strftime("%H:%M") if in_local else "08:00"
+
+        is_active = (s_sess.status == 'Open' or s_sess.end_time is None)
+        if is_active:
+            out_time_str = "Act"
+            now_utc = datetime.now(timezone.utc)
+            duration_delta = now_utc - s_sess.start_time
+        else:
+            out_local = to_local(s_sess.end_time)
+            out_time_str = out_local.strftime("%H:%M") if out_local else "15:00"
+            duration_delta = s_sess.end_time - s_sess.start_time
+
+        hours = int(duration_delta.total_seconds() // 3600)
+        minutes = int((duration_delta.total_seconds() % 3600) // 60)
+        dur_str = f"{hours}h" + (f"{minutes}" if minutes > 0 else "")
+
+        tech_count = tech_cases_map.get(s_sess.user_id) if display_role == "Tech" else None
+
+        working_staff_list.append({
+            "name": s_name,
+            "role": display_role,
+            "tech_count": tech_count,
+            "in_time": in_time_str,
+            "out_time": out_time_str,
+            "is_active": is_active,
+            "duration": dur_str
+        })
+
+    # 11. Activity Summary (for Shift Sheet Box 05 & Sticker)
+    activity_summary = [
+        {"category": "Contrast", "cases": mri_contrast["cases"], "amount": mri_contrast["amount"]},
+        {"category": "Screening", "cases": mri_screening["cases"], "amount": mri_screening["amount"]},
+        {"category": "Full Study", "cases": mri_full_study["cases"], "amount": mri_full_study["amount"]},
+        {"category": "Other Tests", "cases": other_tests_total_cnt, "amount": other_tests_total_amt}
+    ]
+
+    # 12. Cash Reconciliation (for Shift Sheet Box 03)
+    cash_expenses_ex_refunds = max(0.0, cash_expenses_paid - refunds_amt)
+    expected_drawer = max(0.0, cash_income - cash_expenses_paid)
+
+    reconciliation = {
+        "cash_collections": cash_income,
+        "cash_expenses": cash_expenses_ex_refunds,
+        "cash_refunds": refunds_amt,
+        "expected_drawer": expected_drawer,
+        "counted_cash": expected_drawer,
+        "variance": 0.0
+    }
+
+    # Assembling final dictionary
+    return {
+        "meta": {
+            "branch_id": branch_id,
+            "branch_name": branch_name,
+            "day_name": day_name,
+            "date_formatted": date_formatted,
+            "date_short": date_short,
+            "date_str": date_str,
+            "doc_ref": doc_ref,
+            "printed_by": cur_user_name,
+            "printed_by_id": cur_user_id or "—",
+            "sheet_type": "Shift Closing" if sheet_type == 'shift' else "Daily Closing",
+            "shift_label": shift_label,
+            "supervisor_name": "Supervisor"
+        },
+        "summary": {
+            "regular_income": regular_income,
+            "transferred_held_cash": transferred_held_cash,
+            "total_income": total_income,
+            "cash_income": cash_income,
+            "card_income": card_income,
+            "online_income": online_income,
+            "other_income": other_income,
+            "total_expense": total_expense,
+            "net_cash": net_cash,
+            "total_handover": net_cash
+        },
+        "appointments": appointments_data,
+        "transfers": transfers_data,
+        "mri": {
+            "screening": mri_screening,
+            "full_study": mri_full_study,
+            "contrast": mri_contrast,
+            "total": mri_total
+        },
+        "other_tests": {
+            "rows": other_tests_list,
+            "items": other_tests_list,
+            "total_count": other_tests_total_cnt,
+            "total_amount": other_tests_total_amt
+        },
+        "expenses": {
+            "rows": expense_items,
+            "items": expense_items,
+            "total_amount": total_expense,
+            "refund_count": refunds_count,
+            "refund_amount": refunds_amt
+        },
+        "referrals": {
+            "all": all_referrals,
+            "total_pts": total_ref_pts,
+            "total_amount": total_ref_amt,
+            "top_doctors": top_doctors,
+            "top_doctors_total": top_doctors_total,
+            "top_non_doctors": top_non_doctors,
+            "top_non_doctors_total": top_non_doctors_total
+        },
+        "radiologists": {
+            "rows": radiologists_list,
+            "items": radiologists_list,
+            "total_assigned": total_assigned,
+            "unassigned": unassigned
+        },
+        "inventory": {
+            "films": {
+                "opening": films_data.get("film_start", 0),
+                "new_packet": films_data.get("film_added", 0),
+                "scanned_by": scanned_by_text,
+                "used": films_data.get("film_use", 0),
+                "closing": films_data.get("film_closing", 0)
+            },
+            "contrast": None
+        },
+        "working_staff": working_staff_list,
+        "activity_summary": activity_summary,
+        "reconciliation": reconciliation,
+        "fn": {
+            "num": format_closing_number,
+            "curr": lambda v: format_closing_number(v, decimals=2)
+        }
+    }

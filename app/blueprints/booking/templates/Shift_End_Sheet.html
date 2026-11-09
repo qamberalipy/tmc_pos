@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Shift Closing Sheet — TMC Garden Branch</title>
+<title>Shift Closing Sheet — {{ d.meta.branch_name }}</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;600;700;800&display=swap" rel="stylesheet">
 <style>
 @page { size: A4 portrait; margin: 6mm; }
@@ -98,386 +98,411 @@ body {
 .masthead-center .brand { font-size: 17px; font-weight: 900; letter-spacing: -.3px; line-height: 1; }
 .masthead-center .sub {
     font-size: 8.5px; letter-spacing: 2px; text-transform: uppercase;
-    color: rgba(255,255,255,.7); font-weight: 800;
+    color: rgba(255,255,255,.8); font-weight: 700;
 }
-.day-date-strip { display: flex; gap: 8px; margin-top: 4px; }
+.day-date-strip { display: flex; gap: 10px; margin-top: 4px; }
 .dd-block {
-    background: rgba(255,255,255,.10);
-    border: 1px solid rgba(255,255,255,.25);
-    border-radius: 4px; padding: 4px 10px;
-    display: flex; align-items: baseline; gap: 6px;
-}
-.dd-block .k { font-size: 8px; letter-spacing: 1px; text-transform: uppercase; color: rgba(255,255,255,.75); font-weight: 800; }
-.dd-block .v { font-size: 12px; font-weight: 900; color: #fff; line-height: 1; }
-.dd-block.date .v { font-family: 'JetBrains Mono', monospace; font-size: 11.5px; }
-.masthead-right {
-    display: grid; grid-template-columns: auto auto;
-    column-gap: 12px; row-gap: 3px;
-}
-.masthead-right .k { font-size: 8px; letter-spacing: 1px; text-transform: uppercase; color: rgba(255,255,255,.75); font-weight: 800; }
-.masthead-right .v { font-size: 10px; color: #fff; font-weight: 800; text-align: right; }
-
-/* DOC META (Larger font & padding) */
-.doc-meta {
-    background: var(--fill-2);
-    border-bottom: 1px solid var(--rule);
-    padding: 10px 16px;
-    display: flex; justify-content: space-between; align-items: center;
-    font-size: 10px;
-    flex-wrap: wrap; gap: 6px;
-    flex-shrink: 0;
-}
-.doc-meta .item { display: inline-flex; gap: 5px; align-items: baseline; }
-.doc-meta .k { font-weight: 800; text-transform: uppercase; font-size: 8.5px; color: var(--ink2); letter-spacing: .5px; }
-.doc-meta .v { font-family: 'JetBrains Mono', monospace; font-weight: 700; }
-
-/* Removed Page Strip entirely */
-
-.content {
-    padding: 10px 14px;
-    display: flex; flex-direction: column;
-    gap: 8px;
-    flex: 1;
-    overflow: hidden;
-}
-
-/* GRAND TOTALS */
-.grand-totals {
-    display: grid; grid-template-columns: 1fr 1fr 1.15fr;
-    border: 2px solid var(--navy); /* Heavy */
+    background: rgba(255,255,255,.14);
+    border: 1px solid rgba(255,255,255,.3);
+    padding: 3px 8px;
     border-radius: 4px;
-    overflow: hidden;
-    flex-shrink: 0;
+    display: inline-flex;
+    align-items: baseline;
+    gap: 6px;
 }
-.gt-cell {
-    padding: 12px 16px;
-    display: flex; flex-direction: column; gap: 4px;
-    border-right: 2px solid var(--navy);
-    background: #fff;
+.dd-block .k {
+    font-size: 8.5px; text-transform: uppercase; letter-spacing: 1px;
+    color: rgba(255,255,255,.75); font-weight: 800;
 }
-.gt-cell:last-child { border-right: 0; }
-.gt-cell.handover-amount {
-    background: linear-gradient(135deg, var(--navy) 0%, var(--navy-2) 100%);
-    color: #fff;
-}
-.gt-cell.handover-amount .k { color: rgba(255,255,255,.8); }
-.gt-cell.handover-amount .v { color: #fff; }
-.gt-cell.handover-amount .hint { color: rgba(255,255,255,.75); }
-.gt-cell .k { font-size: 10.5px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--ink2); font-weight: 900; }
-.gt-cell .v {
+.dd-block .v {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 34px; font-weight: 900; color: var(--navy);
-    letter-spacing: -1px; line-height: 1; white-space: nowrap;
+    font-size: 11px; font-weight: 800; color: #fff;
 }
-.gt-cell .v.danger { color: var(--red); }
-.gt-cell .hint { font-size: 10px; color: var(--muted); font-weight: 700; margin-top: 2px; }
+.dd-block.date .v { font-weight: 900; letter-spacing: .3px; }
 
-/* SECTION */
-.sec {
-    border: 1px solid var(--navy-line);
-    border-radius: 4px;
-    padding: 8px 12px;
-    background: #fff;
+.masthead-right {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10.5px;
+    text-align: right;
+    line-height: 1.6;
+    background: rgba(255,255,255,.1);
+    border: 1px solid rgba(255,255,255,.2);
+    padding: 6px 12px;
+    border-radius: 5px;
+}
+.masthead-right .k { color: rgba(255,255,255,.75); font-size: 9px; text-transform: uppercase; letter-spacing: 1px; }
+.masthead-right .v { color: #fff; font-weight: 800; }
+
+/* DOC META */
+.doc-meta {
+    background: var(--navy-soft);
+    border-bottom: 1px solid var(--navy-line);
+    padding: 4px 16px;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    font-size: 9.5px;
+    flex-shrink: 0;
+}
+.doc-meta .item { display: flex; gap: 5px; }
+.doc-meta .k { color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: .5px; }
+.doc-meta .v { font-family: 'JetBrains Mono', monospace; font-weight: 700; color: var(--navy); }
+
+/* CONTENT CONTAINER */
+.content {
+    flex: 1;
+    padding: 10px 14px;
     display: flex;
     flex-direction: column;
+    gap: 8px;
+    overflow: hidden;
 }
 
-/* Heavy Border Class for Box 1-6 */
-.heavy-border {
-    border: 2px solid var(--navy) !important;
-}
-
-.sec-hd {
-    display: flex; align-items: baseline; gap: 8px;
-    margin-bottom: 6px; padding-bottom: 4px;
-    border-bottom: 1px solid var(--navy-soft);
-    flex-wrap: wrap;
+/* ═══ GRAND TOTALS ═══ */
+.grand-totals {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
     flex-shrink: 0;
+    border-radius: 6px;
+    border: 1.5px solid var(--navy);
+    overflow: hidden;
+    background: #fff;
 }
-.sec-hd .num {
+.gt-cell {
+    background: var(--fill-2);
+    padding: 10px 14px;
+    display: flex;
+    flex-direction: column;
+    border-right: 1.5px solid var(--navy);
+}
+.gt-cell:last-child { border-right: none; }
+.gt-cell .k {
+    font-size: 11px; font-weight: 800; text-transform: uppercase;
+    letter-spacing: .8px; color: var(--navy);
+}
+.gt-cell .v {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 9px; font-weight: 700;
-    color: #fff; background: var(--navy);
-    padding: 1px 6px; border-radius: 2px;
+    font-size: 28px; font-weight: 900; color: var(--navy);
+    line-height: 1.1; margin: 4px 0 2px 0;
 }
-.sec-hd h2 {
-    font-size: 11px; font-weight: 900;
-    letter-spacing: .3px; text-transform: uppercase;
-    color: var(--navy);
+.gt-cell .v.danger { color: var(--red); }
+.gt-cell .hint { font-size: 9.5px; color: var(--muted); font-weight: 600; }
+.gt-cell.handover-amount {
+    background: linear-gradient(135deg, var(--navy-soft) 0%, #fff 100%);
 }
-.sec-hd .rule { flex: 1; height: 0; border-bottom: 1px solid var(--rule); margin-bottom: 2px; min-width: 15px; }
-.sec-hd .tag { font-size: 8px; letter-spacing: .7px; text-transform: uppercase; color: var(--muted); font-weight: 800; }
+.gt-cell.handover-amount .v { color: var(--green); }
 
-/* UPDATED GRID */
+/* SHIFT GRID (2 COLUMNS) */
 .shift-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 8px;
-    flex-shrink: 0;
+    align-items: stretch;
 }
+
 .shift-left-col {
     display: flex;
     flex-direction: column;
     gap: 8px;
 }
 
-/* TABLES */
+/* SECTION */
+.sec {
+    background: #fff;
+    border: 1px solid var(--rule-2);
+    border-radius: 5px;
+    padding: 6px 10px;
+    display: flex;
+    flex-direction: column;
+}
+.sec.heavy-border {
+    border: 1.5px solid var(--navy);
+}
+.sec-hd {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding-bottom: 3px;
+    margin-bottom: 4px;
+    border-bottom: 1px solid var(--rule);
+    flex-shrink: 0;
+}
+.sec-hd .num {
+    background: var(--navy);
+    color: #fff;
+    font-size: 9px;
+    font-weight: 900;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-family: 'JetBrains Mono', monospace;
+    line-height: 1.1;
+}
+.sec-hd h2 {
+    font-size: 11.5px;
+    font-weight: 900;
+    color: var(--navy);
+    letter-spacing: .2px;
+    text-transform: uppercase;
+}
+.sec-hd .rule { flex: 1; height: 1px; background: var(--rule); }
+
+/* KV TABLE */
 table.kv { width: 100%; border-collapse: collapse; }
 table.kv td {
-    padding: 6px 0; border-bottom: 1px dashed var(--rule);
+    padding: 3.5px 0;
     font-size: 11px;
+    border-bottom: 1px dashed var(--rule);
 }
 table.kv tr:last-child td { border-bottom: 0; }
-table.kv td.k { font-weight: 700; }
+table.kv td.k { color: var(--ink); font-weight: 600; }
 table.kv td.v {
-    text-align: right;
     font-family: 'JetBrains Mono', monospace;
     font-weight: 800;
+    text-align: right;
+    color: var(--navy);
 }
 table.kv tr.total td {
     border-top: 1.2px solid var(--navy); border-bottom: 0;
-    background: var(--navy-soft); color: var(--navy);
-    font-weight: 900; padding: 6px 4px;
+    background: var(--navy-soft);
+    font-weight: 900; color: var(--navy);
+    padding: 5px 0;
     font-size: 11.5px;
 }
 
-/* EXPENSES */
-table.exp { width: 100%; border-collapse: collapse; table-layout: fixed; height: 100%; }
-table.exp td {
-    padding: 6px 0;
-    border-bottom: 1px solid var(--rule);
+/* CASH RECONCILIATION TABLE */
+.recon-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #fff;
+}
+.recon-table td {
+    padding: 4px 6px;
+    font-size: 11px;
+    border-bottom: 1px dashed var(--rule);
+}
+.recon-table td.num {
+    text-align: right;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 800;
+    color: var(--navy);
+}
+.recon-table tr.total td {
+    background: var(--navy-soft);
+    border-top: 1.5px solid var(--navy);
+    border-bottom: 1.5px solid var(--navy);
+    font-weight: 900;
     font-size: 11.5px;
+    color: var(--navy);
+}
+.recon-table tr.counted td {
+    background: #fff;
+    padding: 4px 6px;
+    font-weight: 800;
+}
+.recon-table tr.variance td {
+    font-weight: 900;
+    padding: 4px 6px;
+}
+.recon-table tr.variance.ok td {
+    background: var(--green-bg);
+    color: var(--green);
+}
+.recon-table tr.variance.bad td {
+    background: var(--red-bg);
+    color: var(--red);
+}
+
+/* INPUT LINE */
+.input-line {
+    width: 100%;
+    border: none;
+    border-bottom: 1.5px solid var(--navy);
+    padding: 2px 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11.5px;
+    font-weight: 800;
+    color: var(--ink);
+    background: transparent;
+    outline: none;
+}
+.counted-input-wrap {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    justify-content: flex-end;
+}
+.counted-input {
+    width: 110px;
+    text-align: right;
+}
+.checkbox-large {
+    width: 14px;
+    height: 14px;
+    accent-color: var(--navy);
+    cursor: pointer;
+}
+
+/* EXPENSES TABLE */
+table.exp { width: 100%; border-collapse: collapse; table-layout: fixed; }
+table.exp td {
+    padding: 3.5px 0;
+    border-bottom: 1px solid var(--rule);
+    font-size: 11px;
     font-weight: 600;
 }
 table.exp tr:last-child td { border-bottom: 0; }
 table.exp td.idx {
-    width: 22px; font-weight: 800;
-    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    width: 20px; font-weight: 800;
+    font-family: 'JetBrains Mono', monospace; font-size: 9.5px;
 }
 table.exp td.amt {
     text-align: right;
     font-family: 'JetBrains Mono', monospace;
     font-weight: 800;
     color: var(--red);
-    width: 70px;
+    width: 75px;
     font-size: 11.5px;
 }
 table.exp tr.total td {
-    border-top: 1.5px solid var(--red);
-    background: var(--red-bg); color: var(--red);
-    font-weight: 900; padding: 8px 0;
-    font-size: 12.5px;
-}
-
-/* CASH RECONCILIATION */
-.recon-table { width: 100%; border-collapse: collapse; border: 2px solid var(--navy); }
-.recon-table td {
-    padding: 6px 10px;
-    border-bottom: 1px solid var(--rule);
-    font-size: 11px; font-weight: 600;
-}
-.recon-table td.num {
-    text-align: right;
-    font-family: 'JetBrains Mono', monospace;
-    font-weight: 700;
-    width: 110px;
-}
-.recon-table tr.total td {
     border-top: 1.2px solid var(--navy);
     background: var(--navy-soft);
     color: var(--navy);
     font-weight: 900;
-    padding: 6px 10px;
+    padding: 5px 0;
 }
-.recon-table tr.counted td {
-    border-top: 1px dashed var(--rule-2);
-    padding: 8px 10px;
-    font-weight: 800;
+
+/* RADIOLOGIST ASSIGNMENT GRID (BOX 06) */
+.rad-grid-table {
+    width: 100%;
+    border-collapse: collapse;
 }
-.recon-table tr.variance td {
-    border-top: 1.2px solid var(--ink);
-    padding: 7px 10px;
-    font-weight: 900;
-    font-size: 12.5px;
+.rad-grid-table th {
     background: var(--navy-soft);
     color: var(--navy);
-    transition: background 0.3s, color 0.3s;
+    font-size: 8.5px;
+    font-weight: 800;
+    text-transform: uppercase;
+    padding: 3px 2px;
+    text-align: center;
+    border-bottom: 1px solid var(--navy-line);
 }
-.recon-table tr.variance.ok td { background: var(--green-bg); color: var(--green); }
-.recon-table tr.variance.bad td { background: var(--red-bg); color: var(--red); }
+.rad-grid-table td {
+    padding: 2px 2px;
+    border-bottom: 1px solid var(--rule);
+    text-align: center;
+}
+.rad-grid-table td.k {
+    text-align: left;
+    font-weight: 700;
+    font-size: 10px;
+    color: var(--ink);
+    padding-left: 2px;
+}
+.rad-input {
+    width: 100%;
+    border: 1px solid var(--rule-2);
+    border-radius: 3px;
+    padding: 1px 2px;
+    text-align: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    outline: none;
+    background: #fff;
+}
+.rad-input:focus { border-color: var(--navy); }
 
-/* BOX 05: ACTIVITY SUMMARY GRID */
+/* ACTIVITY SUMMARY (BOX 05) */
 .act-summary-table {
     width: 100%;
     border-collapse: collapse;
-    table-layout: fixed;
 }
 .act-summary-table th {
-    font-size: 9px;
-    text-transform: uppercase;
-    color: var(--muted);
+    background: var(--navy-soft);
+    color: var(--navy);
+    font-size: 8.5px;
     font-weight: 800;
+    text-transform: uppercase;
+    padding: 3px 4px;
     text-align: left;
-    padding-bottom: 2px;
-    border-bottom: 1px solid var(--rule);
+    border-bottom: 1px solid var(--navy-line);
 }
 .act-summary-table td {
-    font-size: 10.5px;
-    font-weight: 700;
-    padding: 6px 0;
-    border-bottom: 1px dashed var(--rule);
+    padding: 3.5px 4px;
+    font-size: 11px;
+    border-bottom: 1px solid var(--rule);
+    font-weight: 600;
 }
-.act-summary-table tr:last-child td { border-bottom: 0; }
 .act-summary-table td.num {
     font-family: 'JetBrains Mono', monospace;
     font-weight: 800;
     color: var(--navy);
 }
 
-/* BOX 06: RADIOLOGIST GRID */
-.rad-grid-table {
-    width: 100%;
-    border-collapse: collapse;
-    table-layout: fixed;
-}
-.rad-grid-table th {
-    font-size: 8px;
-    text-transform: uppercase;
-    color: var(--ink2);
-    font-weight: 800;
-    text-align: center;
-    padding: 3px 2px;
-    border-bottom: 1px solid var(--rule);
-}
-.rad-grid-table th:first-child { text-align: left; }
-.rad-grid-table td {
-    padding: 5px 2px;
-    border-bottom: 1px dashed var(--rule);
-    text-align: center;
-}
-.rad-grid-table tr:last-child td { border-bottom: 0; }
-.rad-grid-table td.k {
-    text-align: left;
-    font-weight: 700;
-    font-size: 10px;
-    color: var(--ink);
-}
-.rad-input {
-    width: 100%;
-    border: 1px solid var(--rule);
-    border-radius: 2px;
-    padding: 2px;
-    text-align: center;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 10px;
-    outline: none;
-}
-.rad-input:focus { border-color: var(--navy); }
-
-/* ENLARGED COUNTED CASH INPUT */
-.counted-input-wrap {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 8px;
-}
-.counted-input {
-    width: 120px;
-    font-size: 14px !important;
-    font-weight: 900 !important;
-    color: var(--navy) !important;
-    text-align: right;
-    border-bottom: 2px solid var(--navy) !important;
-    padding: 0 0 2px 0 !important;
-}
-.checkbox-large {
-    width: 18px !important;
-    height: 18px !important;
-    accent-color: var(--navy);
-    cursor: pointer;
-}
-
-/* INPUT FIELDS (TYPABLE) */
-.input-line {
-    width: 100%;
-    border: 0;
-    border-bottom: 1.2px solid var(--ink);
-    background: transparent;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 11px;
-    font-weight: 800;
-    color: var(--navy);
-    text-align: right;
-    outline: none;
-    padding: 2px 0;
-}
-.input-line::placeholder {
-    color: #cbd5e1;
-    font-weight: 600;
-    font-family: 'Inter', sans-serif;
-    font-size: 10px;
-}
-.input-line:focus { border-bottom-color: var(--green); }
-
-/* BADGES */
-.badge {
-    display: inline-block; padding: 1.5px 5px; border-radius: 2px;
-    font-size: 7px; font-weight: 800; letter-spacing: .3px;
-    text-transform: uppercase; margin-left: 4px; vertical-align: 1px;
-}
-.badge.cash { background: var(--green-bg); color: var(--green); }
-.badge.card { background: var(--navy-soft); color: var(--navy); }
-.badge.online { background: var(--amber-bg); color: var(--amber); }
-
-/* HANDOVER BAR */
+/* CASH HANDOVER BAR */
 .handover {
-    background: linear-gradient(135deg, var(--navy) 0%, var(--navy-2) 100%);
-    color: #fff; padding: 10px 16px; border-radius: 4px;
-    display: flex; justify-content: space-between; align-items: center;
+    background: linear-gradient(135deg, var(--navy-soft) 0%, #fff 100%);
+    border: 1.5px solid var(--navy);
+    border-radius: 5px;
+    padding: 6px 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     flex-shrink: 0;
 }
-.handover .l { font-size: 11px; font-weight: 800; }
+.handover .l {
+    font-size: 11.5px; font-weight: 900; color: var(--navy);
+    text-transform: uppercase; letter-spacing: .5px;
+}
 .handover .l small {
-    display: block; font-size: 8px;
-    color: rgba(255,255,255,.75);
-    letter-spacing: 1px; text-transform: uppercase;
-    margin-top: 3px; font-weight: 700;
+    display: block; font-size: 8.5px; text-transform: none;
+    letter-spacing: 0; color: var(--muted); font-weight: 600; margin-top: 1px;
 }
 .handover .amt {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 20px; font-weight: 800;
+    font-size: 17px; font-weight: 900; color: var(--green);
 }
 
 /* SIGNATURES */
 .sig-row {
-    display: grid; grid-template-columns: repeat(3, 1fr);
-    gap: 24px;
-    margin-top: 2px;
-    padding-top: 12px;
-    border-top: 1px dashed var(--rule-2);
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
     flex-shrink: 0;
 }
 .sig-line {
-    text-align: center; padding-top: 4px;
-    border-top: 1.2px solid var(--ink); position: relative;
+    border-top: 1px solid var(--ink);
+    padding-top: 3px;
+    display: flex;
+    flex-direction: column;
 }
-.sig-line::before {
-    content: ''; position: absolute;
-    left: 0; top: -2.5px; width: 22px; height: 2.5px;
-    background: var(--navy);
+.sig-line .role {
+    font-size: 8px; text-transform: uppercase; letter-spacing: .8px;
+    color: var(--muted); font-weight: 800;
+    display: flex;
+    align-items: center;
+    gap: 4px;
 }
-.sig-line .role { font-size: 9.5px; letter-spacing: 1px; text-transform: uppercase; font-weight: 900; }
-.sig-line .name { font-size: 9px; font-weight: 800; text-transform: uppercase; margin-top: 2px; min-height: 10px; }
+.sig-line .name {
+    font-size: 10px; font-weight: 800; color: var(--navy);
+    margin-top: 2px;
+}
 
-/* CHECKBOXES */
-input[type="checkbox"] {
-    width: 14px;
-    height: 14px;
-    accent-color: var(--navy);
-    cursor: pointer;
-    margin-right: 4px;
+/* BADGES */
+.badge {
+    display: inline-block;
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-size: 8px;
+    font-weight: 800;
+    letter-spacing: .3px;
+    text-transform: uppercase;
+    line-height: 1.1;
     vertical-align: middle;
 }
+.badge.cash { background: var(--green-bg); color: var(--green); }
+.badge.card { background: #e0e7ff; color: #3730a3; }
+.badge.online { background: #fef3c7; color: #92400e; }
 
 /* PRINT */
 @media print {
@@ -505,8 +530,6 @@ input[type="checkbox"] {
     .sec { padding: 4px 8px !important; }
     .sec-hd h2 { font-size: 10px !important; }
     table.kv td { padding: 3px 0 !important; font-size: 10px !important; }
-    table.grid td { padding: 2px 4px !important; font-size: 9px !important; }
-    table.grid th { padding: 2px 4px !important; font-size: 7px !important; }
     .recon-table td { padding: 3px 8px !important; font-size: 10px !important; }
     
     .gt-cell { padding: 8px 12px !important; }
@@ -529,15 +552,12 @@ input[type="checkbox"] {
         -webkit-print-color-adjust: exact;
     }
 
-    /* Retain heavier borders for Box 1-6 in print */
     .sec.heavy-border, .grand-totals, .recon-table {
         border-width: 2px !important;
         border-color: var(--navy) !important;
     }
     
-    /* Keep inner borders standard */
-    .sec, .gt-cell, table.grid, table.grid th, table.grid td,
-    table.kv td, .recon-table td, .sig-line, .masthead-badge, .dd-block {
+    .sec, .gt-cell, table.kv td, .recon-table td, .sig-line, .masthead-badge, .dd-block {
         border-width: 1px !important;
     }
 }
@@ -557,26 +577,26 @@ input[type="checkbox"] {
     <div class="masthead">
         <div class="masthead-badge">SHIFT<small>Closing</small></div>
         <div class="masthead-center">
-            <div class="brand">TMC Garden Branch</div>
+            <div class="brand">{{ d.meta.branch_name }}</div>
             <div class="sub">Shift Closing Sheet · Cash Handover Report</div>
             <div class="day-date-strip">
-                <div class="dd-block"><span class="k">Day</span><span class="v">Saturday</span></div>
-                <div class="dd-block date"><span class="k">Date</span><span class="v">20 April 2024</span></div>
-                <div class="dd-block"><span class="k">Shift</span><span class="v">Morning (08:00 – 15:00)</span></div>
+                <div class="dd-block"><span class="k">Day</span><span class="v">{{ d.meta.day_name }}</span></div>
+                <div class="dd-block date"><span class="k">Date</span><span class="v">{{ d.meta.date_formatted }}</span></div>
+                <div class="dd-block"><span class="k">Shift</span><span class="v">{{ d.meta.shift_label }}</span></div>
             </div>
         </div>
         <div class="masthead-right">
-            <span class="k">Supervisor</span> <span class="v" id="mastheadSupervisor">Qari Abdul Latif</span>
-            <span class="k">Doc Ref</span>    <span class="v">TMC-SFT-2024-04-20-AM</span>
+            <span class="k">Supervisor</span> <span class="v" id="mastheadSupervisor">{{ d.meta.supervisor_name }}</span>
+            <span class="k">Doc Ref</span>    <span class="v">{{ d.meta.doc_ref }}</span>
         </div>
     </div>
 
-    <!-- Expanded Doc Meta -->
+    <!-- Doc Meta -->
     <div class="doc-meta">
-        <div class="item"><span class="k">Printed By</span>  <span class="v">Kashif · ID #A-1204</span></div>
-        <div class="item"><span class="k">Printed On</span>  <span class="v" id="printDate">Sat, 20 Apr 2024</span></div>
-        <div class="item"><span class="k">Print Time</span>  <span class="v" id="printTime">15:42:18</span></div>
-        <div class="item"><span class="k">Sheet Type</span>  <span class="v">Shift Closing</span></div>
+        <div class="item"><span class="k">Printed By</span>  <span class="v">{{ d.meta.printed_by }} · ID #{{ d.meta.printed_by_id }}</span></div>
+        <div class="item"><span class="k">Printed On</span>  <span class="v" id="printDate">{{ d.meta.date_short }}</span></div>
+        <div class="item"><span class="k">Print Time</span>  <span class="v" id="printTime"></span></div>
+        <div class="item"><span class="k">Sheet Type</span>  <span class="v">{{ d.meta.sheet_type }}</span></div>
     </div>
 
     <div class="content">
@@ -585,17 +605,17 @@ input[type="checkbox"] {
         <div class="grand-totals">
             <div class="gt-cell">
                 <span class="k">Shift Total Income</span>
-                <span class="v">152,800</span>
-                <span class="hint">Cash 115,000 · Card 25,000 · Online 12,800</span>
+                <span class="v">{{ num(d.summary.total_income) }}</span>
+                <span class="hint">Cash {{ num(d.summary.cash_income) }} · Card {{ num(d.summary.card_income) }} · Online {{ num(d.summary.online_income) }}</span>
             </div>
             <div class="gt-cell">
                 <span class="k">Shift Total Expenses</span>
-                <span class="v danger">30,760</span>
+                <span class="v danger">{{ num(d.summary.total_expense) }}</span>
                 <span class="hint">Paid out during shift</span>
             </div>
             <div class="gt-cell handover-amount">
                 <span class="k">Expected Handover</span>
-                <span class="v">Rs. 124,040</span>
+                <span class="v">Rs. {{ num(d.summary.total_handover) }}</span>
                 <span class="hint">Physical cash in drawer</span>
             </div>
         </div>
@@ -614,16 +634,16 @@ input[type="checkbox"] {
                         <span class="rule"></span>
                     </div>
                     <table class="kv">
-                        <tr><td class="k">Cash Collections <span class="badge cash">Cash</span></td><td class="v">115,000</td></tr>
-                        <tr><td class="k">Card Collections <span class="badge card">Card</span></td><td class="v">25,000</td></tr>
-                        <tr><td class="k">Online / Bank <span class="badge online">Online</span></td><td class="v">12,800</td></tr>
+                        <tr><td class="k">Cash Collections <span class="badge cash">Cash</span></td><td class="v">{{ num(d.summary.cash_income) }}</td></tr>
+                        <tr><td class="k">Card Collections <span class="badge card">Card</span></td><td class="v">{{ num(d.summary.card_income) }}</td></tr>
+                        <tr><td class="k">Online / Bank <span class="badge online">Online</span></td><td class="v">{{ num(d.summary.online_income) }}</td></tr>
                         
-                        <tr><td class="k" style="color: var(--red);">Transferred Out (Cases)</td><td class="v">3</td></tr>
-                        <tr><td class="k" style="color: var(--red);">Transferred Out (Amt)</td><td class="v">7,500</td></tr>
-                        <tr><td class="k" style="color: var(--green);">Transferred In (Cases)</td><td class="v">2</td></tr>
-                        <tr><td class="k" style="color: var(--green);">Transferred In (Amt)</td><td class="v">4,200</td></tr>
+                        <tr><td class="k" style="color: var(--red);">Transferred Out (Cases)</td><td class="v">{{ num(d.transfers.transferred_out_cases) }}</td></tr>
+                        <tr><td class="k" style="color: var(--red);">Transferred Out (Amt)</td><td class="v">{{ num(d.transfers.transferred_out_cash) }}</td></tr>
+                        <tr><td class="k" style="color: var(--green);">Transferred In (Cases)</td><td class="v">{{ num(d.transfers.transferred_in_cases) }}</td></tr>
+                        <tr><td class="k" style="color: var(--green);">Transferred In (Amt)</td><td class="v">{{ num(d.transfers.transferred_in_cash) }}</td></tr>
 
-                        <tr class="total"><td>Shift Total Income</td><td class="v">152,800</td></tr>
+                        <tr class="total"><td>Shift Total Income</td><td class="v">{{ num(d.summary.total_income) }}</td></tr>
                     </table>
                 </div>
 
@@ -638,26 +658,26 @@ input[type="checkbox"] {
                         <tbody>
                             <tr>
                                 <td>+ Total Cash Collections</td>
-                                <td class="num">115,000</td>
+                                <td class="num">{{ num(d.reconciliation.cash_collections) }}</td>
                             </tr>
                             <tr>
                                 <td>− Cash Expenses Paid Out</td>
-                                <td class="num">28,760</td>
+                                <td class="num">{{ num(d.reconciliation.cash_expenses) }}</td>
                             </tr>
                             <tr>
                                 <td>− Cash Refunds Issued</td>
-                                <td class="num">2,000</td>
+                                <td class="num">{{ num(d.reconciliation.cash_refunds) }}</td>
                             </tr>
                             <tr class="total">
                                 <td>Expected Cash in Drawer</td>
-                                <td class="num">84,240</td>
+                                <td class="num" id="expectedDrawerText">{{ num(d.reconciliation.expected_drawer) }}</td>
                             </tr>
                             <tr class="counted">
                                 <td>Physical Cash Counted</td>
                                 <td class="num">
                                     <div class="counted-input-wrap">
                                         <input type="checkbox" class="checkbox-large" checked>
-                                        <input type="text" id="countedCash" class="input-line counted-input" placeholder="e.g. 84,240" value="84,240" oninput="calcVariance()">
+                                        <input type="text" id="countedCash" class="input-line counted-input" placeholder="{{ num(d.reconciliation.expected_drawer) }}" value="{{ num(d.reconciliation.expected_drawer) }}" oninput="calcVariance()">
                                     </div>
                                 </td>
                             </tr>
@@ -683,15 +703,16 @@ input[type="checkbox"] {
                     </div>
                     <table class="exp">
                         <tbody>
-                            <tr><td class="idx">1</td><td>Diesel / Fuel</td><td class="amt">15,300</td></tr>
-                            <tr><td class="idx">2</td><td>Generator Oil</td><td class="amt">9,090</td></tr>
-                            <tr><td class="idx">3</td><td>Tea / Refreshments</td><td class="amt">370</td></tr>
-                            <tr><td class="idx">4</td><td>Agent Cuts Paid</td><td class="amt">4,000</td></tr>
-                            <tr><td class="idx">5</td><td>Patient Refunds</td><td class="amt">2,000</td></tr>
-                            <tr><td class="idx">6</td><td>Rent / Utilities</td><td class="amt">—</td></tr>
-                            <tr><td class="idx">7</td><td>Electricity Bill</td><td class="amt">—</td></tr>
-                            <tr><td class="idx">8</td><td>Miscellaneous</td><td class="amt">—</td></tr>
-                            <tr class="total"><td></td><td>Total Expenses</td><td class="amt">30,760</td></tr>
+                            {% for item in d.expenses.rows %}
+                            <tr>
+                                <td class="idx">{{ loop.index }}</td>
+                                <td>{{ item.name }}</td>
+                                <td class="amt">{{ num(item.amount) }}</td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="3" style="text-align:center;color:var(--muted);padding:8px 0;">No shift expenses</td></tr>
+                            {% endfor %}
+                            <tr class="total"><td></td><td>Total Expenses</td><td class="amt">{{ num(d.expenses.total_amount) }}</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -706,28 +727,31 @@ input[type="checkbox"] {
                     <table class="rad-grid-table">
                         <thead>
                             <tr>
-                                <th style="width: 30%;">Radiologist</th>
-                                <th>Contrast</th>
-                                <th>Screening</th>
-                                <th>Full Study</th>
-                                <th>Other</th>
+                                <th style="width: 32%;">Radiologist</th>
+                                <th>Con</th>
+                                <th>Scr</th>
+                                <th>FS</th>
+                                <th>Oth</th>
                             </tr>
                         </thead>
                         <tbody>
+                            {% for rad in d.radiologists.rows %}
                             <tr>
-                                <td class="k">Dr. Fahad</td>
+                                <td class="k">{{ rad.name }}</td>
+                                <td><input type="number" class="rad-input" placeholder="0" value="{{ rad.contrast }}"></td>
+                                <td><input type="number" class="rad-input" placeholder="0" value="{{ rad.screening }}"></td>
+                                <td><input type="number" class="rad-input" placeholder="0" value="{{ rad.full_study }}"></td>
+                                <td><input type="number" class="rad-input" placeholder="0" value="{{ rad.other }}"></td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td class="k" style="color:var(--muted);">No Doctor</td>
                                 <td><input type="number" class="rad-input" placeholder="0"></td>
                                 <td><input type="number" class="rad-input" placeholder="0"></td>
                                 <td><input type="number" class="rad-input" placeholder="0"></td>
                                 <td><input type="number" class="rad-input" placeholder="0"></td>
                             </tr>
-                            <tr>
-                                <td class="k">Dr. Zara</td>
-                                <td><input type="number" class="rad-input" placeholder="0"></td>
-                                <td><input type="number" class="rad-input" placeholder="0"></td>
-                                <td><input type="number" class="rad-input" placeholder="0"></td>
-                                <td><input type="number" class="rad-input" placeholder="0"></td>
-                            </tr>
+                            {% endfor %}
                         </tbody>
                     </table>
                 </div>
@@ -750,7 +774,7 @@ input[type="checkbox"] {
                     <tr>
                         <td class="k">Handed Over To</td>
                         <td class="v">
-                            <input type="text" id="handedToInput" class="input-line" placeholder="Supervisor name…" oninput="syncReceiver(this.value)">
+                            <input type="text" id="handedToInput" class="input-line" placeholder="Supervisor name…" value="{{ d.meta.supervisor_name }}" oninput="syncReceiver(this.value)">
                         </td>
                     </tr>
                     <tr>
@@ -761,7 +785,7 @@ input[type="checkbox"] {
                     </tr>
                     <tr>
                         <td class="k">Cash Amount Handed</td>
-                        <td class="v" style="font-size:13px; color:var(--navy);">Rs. 84,240</td>
+                        <td class="v" style="font-size:13px; color:var(--navy);">Rs. {{ num(d.summary.total_handover) }}</td>
                     </tr>
                     <tr>
                         <td class="k">Witness Name</td>
@@ -788,26 +812,13 @@ input[type="checkbox"] {
                         </tr>
                     </thead>
                     <tbody>
+                        {% for act in d.activity_summary %}
                         <tr>
-                            <td style="color: var(--navy);">Contrast</td>
-                            <td class="num" style="text-align: right;">3</td>
-                            <td class="num" style="text-align: right;">27,000</td>
+                            <td style="color: var(--navy);">{{ act.category }}</td>
+                            <td class="num" style="text-align: right;">{{ num(act.cases) }}</td>
+                            <td class="num" style="text-align: right;">{{ num(act.amount) }}</td>
                         </tr>
-                        <tr>
-                            <td style="color: var(--navy);">Screening</td>
-                            <td class="num" style="text-align: right;">47</td>
-                            <td class="num" style="text-align: right;">81,500</td>
-                        </tr>
-                        <tr>
-                            <td style="color: var(--navy);">Full Study</td>
-                            <td class="num" style="text-align: right;">3</td>
-                            <td class="num" style="text-align: right;">33,000</td>
-                        </tr>
-                        <tr>
-                            <td style="color: var(--navy);">Other Tests</td>
-                            <td class="num" style="text-align: right;">42</td>
-                            <td class="num" style="text-align: right;">44,300</td>
-                        </tr>
+                        {% endfor %}
                     </tbody>
                 </table>
             </div>
@@ -818,29 +829,29 @@ input[type="checkbox"] {
         <div class="handover">
             <div class="l">
                 Shift Cash Handover
-                <small id="handoverLine">Rashid Nawaz → Qari Abdul Latif (Supervisor)</small>
+                <small id="handoverLine">{{ d.meta.printed_by }} → {{ d.meta.supervisor_name }} (Supervisor)</small>
             </div>
-            <div class="amt">Rs. 84,240</div>
+            <div class="amt">Rs. {{ num(d.summary.total_handover) }}</div>
         </div>
 
-        <!-- ═══ SIGNATURES (No Tag/Title) ═══ -->
+        <!-- ═══ SIGNATURES ═══ -->
         <div class="sec" style="margin-top: 0; padding-bottom: 4px; flex-shrink: 0; border: none;">
             <div class="sig-row" style="border-top:0; padding-top:2px; margin-top:0;">
                 <div class="sig-line">
                     <div class="role">
-                        <input type="checkbox" checked> Closing Staff — <span id="sigTime1">15:42</span>
+                        <input type="checkbox" checked> Closing Staff — <span id="sigTime1"></span>
                     </div>
-                    <div class="name">Rashid Nawaz</div>
+                    <div class="name">{{ d.meta.printed_by }}</div>
                 </div>
                 <div class="sig-line">
                     <div class="role">
-                        <input type="checkbox"> Received By — <span id="sigTime2">15:42</span>
+                        <input type="checkbox"> Received By — <span id="sigTime2"></span>
                     </div>
-                    <div class="name" id="sigReceiverName">__________________</div>
+                    <div class="name" id="sigReceiverName">{{ d.meta.supervisor_name | upper }}</div>
                 </div>
                 <div class="sig-line">
                     <div class="role">
-                        <input type="checkbox"> Manager / Supervisor — <span id="sigTime3">15:42</span>
+                        <input type="checkbox"> Manager / Supervisor — <span id="sigTime3"></span>
                     </div>
                     <div class="name">__________________</div>
                 </div>
@@ -851,16 +862,13 @@ input[type="checkbox"] {
 </div>
 
 <script>
-/* 
-  1. Calculates Variance dynamically
-*/
+const expectedDrawerCash = {{ d.reconciliation.expected_drawer | round | int }};
+
 function calcVariance() {
-    const expected = 84240; // Expected cash for this shift
     const input = document.getElementById('countedCash');
     const row = document.getElementById('varianceRow');
     const text = document.getElementById('varianceText');
 
-    // Strip commas and parse
     let raw = input.value.replace(/,/g, '');
     let counted = parseFloat(raw);
 
@@ -870,12 +878,9 @@ function calcVariance() {
         return;
     }
 
-    const diff = counted - expected;
-    
-    // Update text (format with commas)
-    text.textContent = (diff > 0 ? '+' : '') + diff.toLocaleString('en-US');
+    const diff = counted - expectedDrawerCash;
+    text.textContent = (diff > 0 ? '+' : '') + Math.round(diff).toLocaleString('en-US');
 
-    // Update row colors
     if (diff === 0) {
         row.className = 'variance ok';
     } else {
@@ -883,28 +888,15 @@ function calcVariance() {
     }
 }
 
-/* 
-  2. Updates the Supervisor name in the top right header, 
-     the Handover Bar at the bottom, and the Signature line
-     automatically as you type.
-*/
 function syncReceiver(value) {
     const name = value.trim() || "__________________";
+    const closingStaff = "{{ d.meta.printed_by }}";
     
-    // Update masthead supervisor
-    document.getElementById('mastheadSupervisor').textContent = value.trim() || "Qari Abdul Latif";
-    
-    // Update handover bar text
-    document.getElementById('handoverLine').textContent = 
-        'Rashid Nawaz → ' + (value.trim() || "Supervisor") + ' (Supervisor)';
-        
-    // Update signature line
+    document.getElementById('mastheadSupervisor').textContent = value.trim() || "Supervisor";
+    document.getElementById('handoverLine').textContent = `${closingStaff} → ${value.trim() || "Supervisor"} (Supervisor)`;
     document.getElementById('sigReceiverName').textContent = name.toUpperCase();
 }
 
-/* 
-  3. Set Print Time Stamps AND Auto-fill Signature Times
-*/
 (function setPrintStamp() {
     const now = new Date();
     const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
@@ -913,11 +905,11 @@ function syncReceiver(value) {
     const timeStr = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0') + ':' + String(now.getSeconds()).padStart(2,'0');
     const shortTimeStr = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
 
-    // Top doc meta
-    document.getElementById('printDate').textContent = dateStr;
-    document.getElementById('printTime').textContent = timeStr;
+    const pDate = document.getElementById('printDate');
+    if (pDate && !pDate.textContent.trim()) pDate.textContent = dateStr;
+    const pTime = document.getElementById('printTime');
+    if (pTime) pTime.textContent = timeStr;
 
-    // Signature lines (auto-fill with current time)
     document.getElementById('sigTime1').textContent = shortTimeStr;
     document.getElementById('sigTime2').textContent = shortTimeStr;
     document.getElementById('sigTime3').textContent = shortTimeStr;

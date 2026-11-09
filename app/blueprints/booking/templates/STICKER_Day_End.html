@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Cash Envelope Sticker — TMC Garden Branch</title>
+<title>Cash Envelope Sticker — {{ d.meta.branch_name }}</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;600;700;800&display=swap" rel="stylesheet">
 <style>
 @page {
@@ -161,7 +161,7 @@ body {
 .summary-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 4px 24px; /* Spread out across full width */
+    gap: 4px 24px;
 }
 .summary-item {
     display: flex;
@@ -291,6 +291,12 @@ body {
 .bag-area .line {
     border-bottom: 2px solid var(--navy);
     height: 14px;
+    outline: none;
+}
+
+[contenteditable="true"] {
+    outline: none;
+    cursor: text;
 }
 
 /* PRINT SETTINGS */
@@ -322,7 +328,7 @@ body {
     <div class="sticker-top">
         <div style="width: 60px;"></div>
         <div class="brand">
-            TMC Garden Branch
+            {{ d.meta.branch_name }}
             <small>Cash Envelope</small>
         </div>
         <div class="badge">
@@ -332,8 +338,8 @@ body {
 
     <!-- DATE STRIP -->
     <div class="sticker-strip">
-        <span class="day">Saturday</span>
-        <span class="date">20 Apr 2024</span>
+        <span class="day">{{ d.meta.day_name }}</span>
+        <span class="date">{{ d.meta.date_short }}</span>
     </div>
 
     <!-- MAIN BODY -->
@@ -343,10 +349,10 @@ body {
         <div class="summary-section">
             <div class="summary-title">Day Activity Summary</div>
             <div class="summary-grid">
-                <div class="summary-item"><span class="lbl">Contrast</span><span class="val">3</span></div>
-                <div class="summary-item"><span class="lbl">Screening</span><span class="val">47</span></div>
-                <div class="summary-item"><span class="lbl">Full Study</span><span class="val">3</span></div>
-                <div class="summary-item"><span class="lbl">Other Tests</span><span class="val">42</span></div>
+                <div class="summary-item"><span class="lbl">Contrast</span><span class="val">{{ num(d.mri.contrast.cases) }}</span></div>
+                <div class="summary-item"><span class="lbl">Screening</span><span class="val">{{ num(d.mri.screening.cases) }}</span></div>
+                <div class="summary-item"><span class="lbl">Full Study</span><span class="val">{{ num(d.mri.full_study.cases) }}</span></div>
+                <div class="summary-item"><span class="lbl">Other Tests</span><span class="val">{{ num(d.other_tests.total_count) }}</span></div>
             </div>
         </div>
 
@@ -354,15 +360,15 @@ body {
         <div class="fin-block">
             <div class="fin-row">
                 <span class="k">Total Income</span>
-                <span class="v">Rs. 154,800</span>
+                <span class="v">Rs. {{ num(d.summary.total_income) }}</span>
             </div>
             <div class="fin-row expense">
                 <span class="k">(−) Expenses</span>
-                <span class="v">Rs. 30,760</span>
+                <span class="v">Rs. {{ num(d.summary.total_expense) }}</span>
             </div>
             <div class="fin-row total">
                 <span class="k">(=) Cash Handover</span>
-                <span class="v">Rs. 124,040</span>
+                <span class="v">Rs. {{ num(d.summary.total_handover) }}</span>
             </div>
         </div>
 
@@ -373,11 +379,11 @@ body {
         <div class="names-row">
             <div class="name-box">
                 <span class="role">Closed By:</span>
-                <span class="name">Rashid Nawaz</span>
+                <span class="name">{{ d.meta.printed_by }}</span>
             </div>
             <div class="name-box">
                 <span class="role">Received By:</span>
-                <span class="name">Qari Abdul Latif</span>
+                <span class="name" contenteditable="true">{{ d.meta.supervisor_name }}</span>
             </div>
         </div>
 
@@ -394,7 +400,7 @@ body {
             </div>
             <div class="bag-area">
                 <div class="k">Sealed Bag No.</div>
-                <div class="line"></div>
+                <div class="line" contenteditable="true"></div>
             </div>
         </div>
     </div>

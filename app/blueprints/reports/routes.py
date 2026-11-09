@@ -622,3 +622,74 @@ def api_monthly_case_logs():
     except Exception as exc:
         print(f"Error in api_monthly_case_logs: {str(exc)}")
         return jsonify({"error": str(exc)}), 500
+
+
+# =====================================================================
+# DAILY CLOSING REPORT SHEETS (Day Sheet, Shift Sheet, Envelope Sticker)
+# =====================================================================
+
+@reports_bp.route("/day-sheet", methods=["GET"])
+@reports_bp.route("/closing-sheet/day", methods=["GET"])
+@login_required
+def view_day_closing_sheet():
+    branch_id = session.get("branch_id")
+    date_str = request.args.get("date")
+    user_id = request.args.get("user_id")
+
+    if not date_str:
+        today = datetime.now()
+        date_str = today.strftime("%Y-%m-%d")
+
+    data = report_services.build_closing_sheet_data(
+        branch_id=branch_id,
+        date_str=date_str,
+        user_id=user_id,
+        sheet_type="day"
+    )
+    return render_template("Day_End_Sheet.html", d=data, num=report_services.format_closing_number)
+
+
+@reports_bp.route("/shift-sheet", methods=["GET"])
+@reports_bp.route("/closing-sheet/shift", methods=["GET"])
+@login_required
+def view_shift_closing_sheet():
+    branch_id = session.get("branch_id")
+    date_str = request.args.get("date")
+    shift_ids_str = request.args.get("shift_ids")
+    user_id = request.args.get("user_id")
+
+    if not date_str:
+        today = datetime.now()
+        date_str = today.strftime("%Y-%m-%d")
+
+    data = report_services.build_closing_sheet_data(
+        branch_id=branch_id,
+        date_str=date_str,
+        shift_ids_str=shift_ids_str,
+        user_id=user_id,
+        sheet_type="shift"
+    )
+    return render_template("Shift_End_Sheet.html", d=data, num=report_services.format_closing_number)
+
+
+@reports_bp.route("/day-sticker", methods=["GET"])
+@reports_bp.route("/closing-sheet/sticker", methods=["GET"])
+@login_required
+def view_day_closing_sticker():
+    branch_id = session.get("branch_id")
+    date_str = request.args.get("date")
+    shift_ids_str = request.args.get("shift_ids")
+    user_id = request.args.get("user_id")
+
+    if not date_str:
+        today = datetime.now()
+        date_str = today.strftime("%Y-%m-%d")
+
+    data = report_services.build_closing_sheet_data(
+        branch_id=branch_id,
+        date_str=date_str,
+        shift_ids_str=shift_ids_str,
+        user_id=user_id,
+        sheet_type="sticker"
+    )
+    return render_template("STICKER_Day_End.html", d=data, num=report_services.format_closing_number)
