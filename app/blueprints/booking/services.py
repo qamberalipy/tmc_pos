@@ -23,8 +23,140 @@ from app.models.technician_chat_log import TechnicianChatLog
 from app.models.expenses import Expenses
 from app.models.referred import ReferralShare
 from app.models.expenses import PaymentTransaction
+from app.utils.whatsapp import (
+    build_referral_booking_message,
+    build_referral_change_message,
+    normalize_phone,
+    send_whatsapp_message,
+    send_whatsapp_async,
+)
 
 logger = logging.getLogger(__name__)
+
+
+def _dispatch_referral_doctor_booking_whatsapp(booking: TestBooking, test_details_list: list):
+    """
+    Safely build and dispatch WhatsApp referral notification in realtime for newly committed booking.
+    Never raises an exception; failures must never affect booking flow.
+    """
+    try:
+        if not booking.referred_dr:
+            return
+
+        doctor = db.session.get(Referred, booking.referred_dr)
+        if not doctor:
+            msg = f"[WhatsApp Realtime] Skipped: Referred doctor #{booking.referred_dr} not found"
+            logger.info(msg)
+            print(msg)
+            return
+
+        raw_phone = doctor.contact_no
+        if not raw_phone:
+            msg = f"[WhatsApp Realtime] Skipped: Referred doctor '{doctor.name}' has no contact number"
+            logger.info(msg)
+            print(msg)
+            return
+
+        normalized = normalize_phone(raw_phone)
+        if not normalized:
+            msg = f"[WhatsApp Realtime] Skipped: Contact number '{raw_phone}' for doctor '{doctor.name}' failed normalization"
+            logger.info(msg)
+            print(msg)
+            return
+
+        # Fetch test names
+        test_ids = [t.get("test_id") for t in (test_details_list or []) if t.get("test_id")]
+        test_names = []
+        if test_ids:
+            reg_tests = Test_registration.query.filter(Test_registration.id.in_(test_ids)).all()
+            name_map = {t.id: t.test_name for t in reg_tests}
+            test_names = [name_map[tid] for tid in test_ids if tid in name_map]
+
+        # Branch name
+        branch = db.session.get(Branch, booking.branch_id) if booking.branch_id else None
+        branch_name = branch.branch_name if branch and branch.branch_name else "TMC Diagnostic Center"
+
+        # Booking date
+        date_obj = to_local(booking.create_at) if booking.create_at else datetime.now()
+        booking_date_str = date_obj.strftime("%d %b %Y")
+
+        message = build_referral_booking_message(
+            doctor_name=doctor.name or "Doctor",
+            patient_name=booking.patient_name or "Patient",
+            mr_no=booking.mr_no or "—",
+            branch_name=branch_name,
+            test_names=test_names,
+            booking_date=booking_date_str,
+            is_appointment=bool(booking.is_appointment),
+        )
+
+        ok, detail = send_whatsapp_message(normalized, message)
+        if ok:
+            print(f"[WhatsApp Realtime] Successfully delivered referral notification to doctor '{doctor.name}' for booking {booking.id}")
+        else:
+            print(f"[WhatsApp Realtime WARNING] Delivery to doctor '{doctor.name}' failed: {detail}")
+    except Exception as exc:
+        logger.warning("Error dispatching referral booking WhatsApp notification: %s", exc)
+        print(f"[WhatsApp Realtime WARNING] Error dispatching referral booking WhatsApp notification: {exc}")
+
+
+def _dispatch_referral_change_whatsapp(booking: TestBooking, doctor: Referred):
+    """
+    Safely build and dispatch WhatsApp referral change notification in realtime after commit.
+    Never raises an exception; failures must never affect share update flow.
+    """
+    try:
+        raw_phone = doctor.contact_no
+        if not raw_phone:
+            msg = f"[WhatsApp Realtime] Skipped: Assigned doctor '{doctor.name}' has no contact number"
+            logger.info(msg)
+            print(msg)
+            return
+
+        normalized = normalize_phone(raw_phone)
+        if not normalized:
+            msg = f"[WhatsApp Realtime] Skipped: Contact number '{raw_phone}' for doctor '{doctor.name}' failed normalization"
+            logger.info(msg)
+            print(msg)
+            return
+
+        # Fetch test names for this booking
+        test_rows = (
+            db.session.query(Test_registration.test_name)
+            .join(TestBookingDetails, TestBookingDetails.test_id == Test_registration.id)
+            .filter(TestBookingDetails.booking_id == booking.id)
+            .all()
+        )
+        test_names = [t[0] for t in test_rows if t[0]]
+
+        # Branch name
+        branch = db.session.get(Branch, booking.branch_id) if booking.branch_id else None
+        branch_name = branch.branch_name if branch and branch.branch_name else "TMC Diagnostic Center"
+
+        # Booking date
+        date_obj = to_local(booking.create_at) if booking.create_at else datetime.now()
+        booking_date_str = date_obj.strftime("%d %b %Y")
+
+        message = build_referral_change_message(
+            doctor_name=doctor.name or "Doctor",
+            patient_name=booking.patient_name or "Patient",
+            mr_no=booking.mr_no or "—",
+            branch_name=branch_name,
+            test_names=test_names,
+            booking_date=booking_date_str,
+            is_appointment=bool(booking.is_appointment),
+        )
+
+        ok, detail = send_whatsapp_message(normalized, message)
+        if ok:
+            print(f"[WhatsApp Realtime] Successfully delivered referral change notification to doctor '{doctor.name}' for booking {booking.id}")
+        else:
+            print(f"[WhatsApp Realtime WARNING] Delivery to doctor '{doctor.name}' failed: {detail}")
+    except Exception as exc:
+        logger.warning("Error dispatching referral change WhatsApp notification: %s", exc)
+        print(f"[WhatsApp Realtime WARNING] Error dispatching referral change WhatsApp notification: {exc}")
+
+
 
 def to_decimal(value, field_name="Value"):
     if value is None:
@@ -160,6 +292,12 @@ def create_test_booking(data):
             
             # --- 8. Final Commit ---
             db.session.commit()
+
+            # --- 9. Async WhatsApp Notification for Referred Doctor ---
+            try:
+                _dispatch_referral_doctor_booking_whatsapp(booking, test_details_list)
+            except Exception as notify_err:
+                logger.warning("WhatsApp booking notification trigger failed: %s", notify_err)
             
             return {
                 "message": "Booking created successfully",
@@ -405,6 +543,8 @@ def update_booking_share_provider(booking_id, new_referred_id, user_id):
         if not booking:
             return {"error": "Booking not found"}, 404
 
+        previous_give_share_to = booking.give_share_to
+
         # 2. Check if Share is already paid (Safety Check)
         # If we allow changing this, your Accounts/Expenses will be wrong 
         # (Expense paid to Person A, but Record shows Person B).
@@ -452,6 +592,18 @@ def update_booking_share_provider(booking_id, new_referred_id, user_id):
             db.session.add(new_share)
 
         db.session.commit()
+
+        # WhatsApp notification for Referring Doctor on share change
+        try:
+            if (
+                new_id is not None
+                and new_id != previous_give_share_to
+                and provider is not None
+                and bool(getattr(provider, "is_doctor", False))
+            ):
+                _dispatch_referral_change_whatsapp(booking, provider)
+        except Exception as notify_err:
+            logger.warning("WhatsApp share update notification failed: %s", notify_err)
         
         return {
             "message": "Referral share and booking details updated successfully",
