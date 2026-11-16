@@ -583,11 +583,21 @@ $(document).on("input change", ".input-error, #referred_dr, #referred_non_dr", f
 
 // 2. Submit Handler with Error Highlighting
 $(document).on("click", "#submit_booking", async function () {
+    const $btn = $(this);
+    if ($btn.prop("disabled")) return;
+
     try {
         // Clear previous errors
         $(".input-error").removeClass("input-error");
         $(".select2-selection").removeClass("border-danger");
 
+        // --- 0. Must have at least one test selected ---
+        if (!bookingState.tests || bookingState.tests.length === 0) {
+            showToastMessage("error", "Please add at least one test before submitting.");
+            return;
+        }
+
+        $btn.prop("disabled", true);
         myshowLoader();
 
         let isValid = true; 
@@ -602,6 +612,7 @@ $(document).on("click", "#submit_booking", async function () {
                 $("#referred_dr").addClass("input-error").focus();
                 $("#referred_dr").next(".select2-container").find(".select2-selection").addClass("border-danger");
                 showToastMessage("error", "Please select a doctor to give share!");
+                $btn.prop("disabled", false);
                 myhideLoader();
                 return;
             }
@@ -611,6 +622,7 @@ $(document).on("click", "#submit_booking", async function () {
                 $("#referred_non_dr").addClass("input-error").focus();
                 $("#referred_non_dr").next(".select2-container").find(".select2-selection").addClass("border-danger");
                 showToastMessage("error", "Please select a Non-Doctor to give share!");
+                $btn.prop("disabled", false);
                 myhideLoader();
                 return;
             }
@@ -690,6 +702,7 @@ $(document).on("click", "#submit_booking", async function () {
                 scrollTop: $(".input-error").first().offset().top - 100
             }, 500);
 
+            $btn.prop("disabled", false);
             myhideLoader();
             return;
         }
@@ -701,30 +714,58 @@ $(document).on("click", "#submit_booking", async function () {
             headers: { "Content-Type": "application/json" }
         });
 
-        // [ ... Rest of the success handling logic ... ]
-        var responseData = res.data[0];
-        var responseStatus = res.data[1];
+        let responseData = res.data;
+        let responseStatus = res.status;
 
-        if (responseStatus === 201) {
-            showToastMessage("success", responseData.message || "Booking created!");
-            $("#receipt_box").fadeIn(100);
+        // Support backward compatibility if backend ever sends [body, status] tuple
+        if (Array.isArray(res.data)) {
+            responseData = res.data[0];
+            responseStatus = res.data[1] || res.status;
+        }
 
-            $("#booking_id").text(responseData.booking_id);
-            $("#print_receipt_btn").attr("href", baseUrl + "/booking/receipt/" + responseData.booking_id);
-            $("#print_sticker_btn").attr("href", baseUrl + "/booking/print-sticker/" + responseData.booking_id);
+        // On an error response (status >= 400 or error field present), show the exact error message
+        if (responseStatus >= 400 || (responseData && responseData.error)) {
+            let errorMsg = responseData?.error || responseData?.message || "Failed to create booking!";
+            showToastMessage("error", errorMsg);
+            $btn.prop("disabled", false);
+            return;
+        }
 
-            $("html, body").animate({ scrollTop: 0 }, 500);
-            $(".select2-selection").removeClass("border-danger");
+        if (responseStatus === 201 || responseStatus === 200) {
+            if (responseData && (responseData.booking_id || responseData.message)) {
+                showToastMessage("success", responseData.message || "Booking created!");
+                $("#receipt_box").fadeIn(100);
 
-            resetBookingForm();
+                $("#booking_id").text(responseData.booking_id);
+                $("#print_receipt_btn").attr("href", baseUrl + "/booking/receipt/" + responseData.booking_id);
+                $("#print_sticker_btn").attr("href", baseUrl + "/booking/print-sticker/" + responseData.booking_id);
+
+                $("html, body").animate({ scrollTop: 0 }, 500);
+                $(".select2-selection").removeClass("border-danger");
+
+                resetBookingForm();
+                $btn.prop("disabled", false);
+            } else {
+                showToastMessage("error", "Unexpected response from server!");
+                $btn.prop("disabled", false);
+            }
         } else {
-            showToastMessage("error", "Unexpected response from server!");
+            let errorMsg = responseData?.error || responseData?.message || "Unexpected response from server!";
+            showToastMessage("error", errorMsg);
+            $btn.prop("disabled", false);
         }
 
     } catch (err) {
         console.error("❌ Booking submission failed:", err);
-        let msg = err.response?.data?.error || "Failed to create booking!";
+        let msg = err.response?.data?.error || err.response?.data?.message;
+        if (!msg && Array.isArray(err.response?.data) && err.response.data[0]?.error) {
+            msg = err.response.data[0].error;
+        }
+        if (!msg) {
+            msg = err.message || "Failed to create booking!";
+        }
         showToastMessage("error", msg);
+        $btn.prop("disabled", false);
     } finally {
         myhideLoader();
     }

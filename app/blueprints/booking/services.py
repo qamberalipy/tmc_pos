@@ -166,15 +166,64 @@ def to_decimal(value, field_name="Value"):
     except (InvalidOperation, ValueError):
         raise ValueError(f"{field_name} must be a valid number")
 
+def _validate_booking_payload(data):
+    """
+    Validates booking creation payload before touching database or generating MR number.
+    Returns None if valid, or an (error_dict, status_code) tuple if invalid.
+    """
+    tests = data.get("tests")
+    if not tests or not isinstance(tests, list) or len(tests) == 0:
+        return {"error": "At least one test is required to create a booking."}, 400
+
+    for idx, test in enumerate(tests, start=1):
+        if not isinstance(test, dict):
+            return {"error": f"Test #{idx} is invalid."}, 400
+        raw_amt = test.get("amount")
+        try:
+            amt = Decimal(str(raw_amt if raw_amt is not None and raw_amt != "" else 0))
+        except (InvalidOperation, ValueError):
+            return {"error": f"Test #{idx} has an invalid amount."}, 400
+        if amt < Decimal("0"):
+            return {"error": f"Test #{idx} amount cannot be negative."}, 400
+
+    raw_net = data.get("net_receivable")
+    raw_disc = data.get("discount_value")
+    raw_total = data.get("total_amount")
+
+    try:
+        net_receivable = Decimal(str(raw_net if raw_net is not None and raw_net != "" else 0))
+        discount_value = Decimal(str(raw_disc if raw_disc is not None and raw_disc != "" else 0))
+        total_amount = Decimal(str(raw_total if raw_total is not None and raw_total != "" else net_receivable))
+    except (InvalidOperation, ValueError):
+        return {"error": "One or more financial fields contain an invalid number."}, 400
+
+    if net_receivable < Decimal("0"):
+        return {"error": "Net receivable cannot be negative."}, 400
+    if discount_value < Decimal("0"):
+        return {"error": "Discount value cannot be negative."}, 400
+    if discount_value > total_amount and total_amount > Decimal("0"):
+        return {"error": f"Discount ({discount_value}) exceeds total amount ({total_amount})."}, 400
+
+    return None
+
+
 def create_test_booking(data):
+    # --- 0. Pre-write validation (before any DB write/flush or MR generation) ---
+    val_error = _validate_booking_payload(data)
+    if val_error:
+        return val_error
+
+    caller_mr_no = data.get("mr_no")
     max_retries = 3
     attempt = 0
 
     while attempt < max_retries:
         try:
             # --- 1. Generate MR No ---
-            if not data.get("mr_no"):
-                data["mr_no"] = _generate_mr_no()
+            if caller_mr_no:
+                current_mr_no = caller_mr_no
+            else:
+                current_mr_no = _generate_mr_no()
 
             # --- 2. Required fields validation ---
             required = ["patient_name", "gender", "contact_no", "branch_id", "net_receivable", "create_by"]
@@ -191,7 +240,7 @@ def create_test_booking(data):
 
             # --- 3. Booking Object Creation ---
             booking = TestBooking(
-                mr_no=data.get("mr_no"),
+                mr_no=current_mr_no,
                 patient_name=data["patient_name"],
                 gender=data["gender"],
                 age=data.get("age"),
@@ -275,8 +324,10 @@ def create_test_booking(data):
                     sample_to_follow=test.get("sample_to_follow")
                 ))
 
-            if details:
-                db.session.add_all(details)
+            if not details:
+                db.session.rollback()
+                return {"error": "At least one test is required to create a booking."}, 400
+            db.session.add_all(details)
             
             # --- 7. Film Usage & Inventory Transaction (skip for appointments — deducted on conversion) ---
             if total_initial_films > 0 and not booking.is_appointment:
@@ -308,10 +359,11 @@ def create_test_booking(data):
 
         except IntegrityError:
             db.session.rollback()
+            if caller_mr_no:
+                return {"error": f"MR Number '{caller_mr_no}' already exists."}, 400
             attempt += 1
             if attempt < max_retries:
                 print(f"MR No collision detected. Retrying... (Attempt {attempt})")
-                data["mr_no"] = None 
                 continue 
             else:
                 return {"error": "System busy (MR Generation collision). Please try again."}, 500
@@ -488,23 +540,28 @@ def convert_normal_to_appointment(booking_id, converted_by):
 
 def _generate_mr_no():
     now = datetime.now(timezone.utc)
-    prefix = now.strftime("%y%m") 
-    last_booking = (
-        db.session.query(TestBooking.mr_no) # Fetch ONLY the column we need (Performance)
-        .filter(TestBooking.mr_no.like(f"{prefix}-%"))
-        .order_by(TestBooking.id.desc())
-        .first()
+    prefix = now.strftime("%y%m")
+    prefix_dash = f"{prefix}-"
+
+    records = (
+        db.session.query(TestBooking.mr_no)
+        .filter(TestBooking.mr_no.like(f"{prefix_dash}%"))
+        .all()
     )
 
-    if last_booking and last_booking.mr_no:
-        try:
-            last_seq = int(last_booking.mr_no.split("-")[1])
-            new_seq = last_seq + 1
-        except (IndexError, ValueError):
-            new_seq = 1
-    else:
-        new_seq = 1
+    max_seq = 0
+    prefix_len = len(prefix_dash)
+    for (mr,) in records:
+        if mr and mr.startswith(prefix_dash):
+            suffix = mr[prefix_len:]
+            try:
+                seq = int(suffix)
+                if seq > max_seq:
+                    max_seq = seq
+            except (ValueError, TypeError):
+                continue
 
+    new_seq = max_seq + 1
     return f"{prefix}-{new_seq:04d}"
 
 def get_single_booking_details(booking_id):
@@ -1281,6 +1338,12 @@ def _format_test_booking(row):
                 "transferred_at": to_local(log.transferred_at, "%Y-%m-%d %H:%M") if log.transferred_at else None,
                 "reason": log.reason
             }
+    raw_details = row.test_booking_details or []
+    if isinstance(raw_details, list):
+        details = [d for d in raw_details if d and d.get("id") is not None]
+    else:
+        details = []
+
     return {
         "booking_id": row.id,
         "patient_name": row.patient_name,
@@ -1291,8 +1354,9 @@ def _format_test_booking(row):
         "referred_dr": row.referred_dr,
         "give_share_to": row.give_share_to,
         "sent_to_doctor": row.sent_to_doctor,
-        # This contains: [{"id": 12, "test_name": "xyz", "film_issued": False}, ...]
-        "test_booking_details": row.test_booking_details,
+        # This contains: [{"id": 12, "test_name": "xyz", "film_issued": False}, ...] or []
+        "test_booking_details": details,
+        "has_no_tests": len(details) == 0,
         "technician_comments": row.technician_comments,
         "total_amount": float(row.total_amount) if getattr(row, 'total_amount', None) is not None else float((row.net_receivable or 0) + (row.discount_value or 0)),
         "total_films": row.total_no_of_films_used,
@@ -1351,16 +1415,19 @@ def get_all_test_bookings(branch_id=None, from_date=None, to_date=None, booking_
                     DoctorReportingdetails.booking_id == db.cast(TestBooking.id, db.String),
                     DoctorReportingdetails.is_active == True
                 ).label("sent_to_doctor"),
-                func.json_agg(
-                    func.json_build_object(
-                        'id', Test_registration.id,
-                        'test_name', Test_registration.test_name,
-                        'film_issued', TestBookingDetails.film_issued
-                    )
+                func.coalesce(
+                    func.json_agg(
+                        func.json_build_object(
+                            'id', Test_registration.id,
+                            'test_name', Test_registration.test_name,
+                            'film_issued', TestBookingDetails.film_issued
+                        )
+                    ).filter(TestBookingDetails.id.isnot(None)),
+                    func.cast('[]', db.JSON)
                 ).label("test_booking_details")
             )
-            .join(TestBookingDetails, TestBookingDetails.booking_id == TestBooking.id)
-            .join(Test_registration, Test_registration.id == TestBookingDetails.test_id)
+            .outerjoin(TestBookingDetails, TestBookingDetails.booking_id == TestBooking.id)
+            .outerjoin(Test_registration, Test_registration.id == TestBookingDetails.test_id)
             .outerjoin(Referred, and_(Referred.id == TestBooking.referred_dr, Referred.is_doctor == True))
             .outerjoin(Branch, Branch.id == TestBooking.branch_id)
             .outerjoin(User, User.id == TestBooking.create_by)

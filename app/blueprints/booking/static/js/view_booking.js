@@ -436,9 +436,13 @@ function renderTestBookingsTable() {
 
         // 1. TESTS & STATUS RENDERING
         let testHtml = `<div class="d-flex flex-column gap-2 py-1">`;
-        tests.forEach(obj => {
-            testHtml += renderTestStatusCard(t.booking_id, obj.id, obj.film_issued, obj.test_name);
-        });
+        if (tests.length === 0) {
+            testHtml += `<span class="badge bg-warning text-dark"><i class="bi bi-exclamation-triangle me-1"></i>No tests</span>`;
+        } else {
+            tests.forEach(obj => {
+                testHtml += renderTestStatusCard(t.booking_id, obj.id, obj.film_issued, obj.test_name);
+            });
+        }
         testHtml += `</div>`;
 
         let currentShareId = t.give_share_to || "";
