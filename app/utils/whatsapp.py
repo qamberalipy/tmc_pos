@@ -27,7 +27,7 @@ else:
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_TIMEOUT = 10.0
+DEFAULT_TIMEOUT = (3, 5)  # (connect timeout: 3s, read timeout: 5s)
 BRAND_NAME = "TMC Diagnostic Center"
 
 
@@ -158,9 +158,15 @@ def send_whatsapp_async(phone: str, text: str) -> threading.Thread:
     IMPORTANT: Must not touch db, session, or flask.g.
     Accepts only plain python values.
     """
+    def _worker():
+        try:
+            send_whatsapp_message(phone, text)
+        except Exception as exc:
+            logger.warning("Error in background WhatsApp delivery: %s", exc)
+            print(f"[WhatsApp Realtime WARNING] Error in background WhatsApp delivery: {exc}")
+
     thread = threading.Thread(
-        target=send_whatsapp_message,
-        args=(phone, text),
+        target=_worker,
         daemon=True,
     )
     thread.start()
