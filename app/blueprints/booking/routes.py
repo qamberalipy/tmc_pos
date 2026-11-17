@@ -78,10 +78,11 @@ def create_booking():
     data = request.get_json()
     data['create_by'] = session.get('user_id')
     data['branch_id'] = session.get('branch_id')
-    print("Booking Data:", data)
     try:
         result = booking_services.create_test_booking(data)
-        print("Create Booking Response:", result)
+        if isinstance(result, tuple):
+            body, status = result
+            return jsonify(body), status
         return jsonify(result), 201
     
     except Exception as e:
