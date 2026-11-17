@@ -80,21 +80,24 @@ def _dispatch_referral_doctor_booking_whatsapp(booking: TestBooking, test_detail
         date_obj = to_local(booking.create_at) if booking.create_at else datetime.now()
         booking_date_str = date_obj.strftime("%d %b %Y")
 
+        doctor_name = doctor.name or "Doctor"
+        patient_name = booking.patient_name or "Patient"
+        mr_no = booking.mr_no or "—"
+        is_appointment = bool(booking.is_appointment)
+        booking_id = booking.id
+
         message = build_referral_booking_message(
-            doctor_name=doctor.name or "Doctor",
-            patient_name=booking.patient_name or "Patient",
-            mr_no=booking.mr_no or "—",
+            doctor_name=doctor_name,
+            patient_name=patient_name,
+            mr_no=mr_no,
             branch_name=branch_name,
             test_names=test_names,
             booking_date=booking_date_str,
-            is_appointment=bool(booking.is_appointment),
+            is_appointment=is_appointment,
         )
 
-        ok, detail = send_whatsapp_message(normalized, message)
-        if ok:
-            print(f"[WhatsApp Realtime] Successfully delivered referral notification to doctor '{doctor.name}' for booking {booking.id}")
-        else:
-            print(f"[WhatsApp Realtime WARNING] Delivery to doctor '{doctor.name}' failed: {detail}")
+        send_whatsapp_async(normalized, message)
+        print(f"[WhatsApp Realtime] Dispatched async referral notification to doctor '{doctor_name}' for booking {booking_id}")
     except Exception as exc:
         logger.warning("Error dispatching referral booking WhatsApp notification: %s", exc)
         print(f"[WhatsApp Realtime WARNING] Error dispatching referral booking WhatsApp notification: {exc}")
@@ -137,21 +140,24 @@ def _dispatch_referral_change_whatsapp(booking: TestBooking, doctor: Referred):
         date_obj = to_local(booking.create_at) if booking.create_at else datetime.now()
         booking_date_str = date_obj.strftime("%d %b %Y")
 
+        doctor_name = doctor.name or "Doctor"
+        patient_name = booking.patient_name or "Patient"
+        mr_no = booking.mr_no or "—"
+        is_appointment = bool(booking.is_appointment)
+        booking_id = booking.id
+
         message = build_referral_change_message(
-            doctor_name=doctor.name or "Doctor",
-            patient_name=booking.patient_name or "Patient",
-            mr_no=booking.mr_no or "—",
+            doctor_name=doctor_name,
+            patient_name=patient_name,
+            mr_no=mr_no,
             branch_name=branch_name,
             test_names=test_names,
             booking_date=booking_date_str,
-            is_appointment=bool(booking.is_appointment),
+            is_appointment=is_appointment,
         )
 
-        ok, detail = send_whatsapp_message(normalized, message)
-        if ok:
-            print(f"[WhatsApp Realtime] Successfully delivered referral change notification to doctor '{doctor.name}' for booking {booking.id}")
-        else:
-            print(f"[WhatsApp Realtime WARNING] Delivery to doctor '{doctor.name}' failed: {detail}")
+        send_whatsapp_async(normalized, message)
+        print(f"[WhatsApp Realtime] Dispatched async referral change notification to doctor '{doctor_name}' for booking {booking_id}")
     except Exception as exc:
         logger.warning("Error dispatching referral change WhatsApp notification: %s", exc)
         print(f"[WhatsApp Realtime WARNING] Error dispatching referral change WhatsApp notification: {exc}")
